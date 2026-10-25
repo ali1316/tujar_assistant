@@ -109,6 +109,8 @@ function countUp(el, to, unit) {
       const opt = Object.assign({ backgroundColor: 'transparent', textStyle: { fontFamily: 'IBM Plex Sans Arabic' },
         color: ['#3ee6ff', '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'], animationDuration: 1400, animationEasing: 'cubicOut',
         tooltip: { trigger: 'item' } }, c.option);
+      // كل التسميات تظهر (بدون ما يخفي ECharts بعضها)، ونميّلها لو كثيرة
+      [].concat(opt.xAxis || []).forEach(ax => { if (ax && ax.type !== 'value' && ax.type !== 'time') { const n = (ax.data || []).length; ax.axisLabel = { interval: 0, rotate: n > 5 ? 25 : 0, ...(ax.axisLabel || {}) }; } });
       ch.setOption(opt); charts.push(ch);
     } catch (e) { col.querySelector('.chart').innerHTML = `<div class="text-danger">تعذّر الرسم: ${esc(e.message)}</div>`; }
   });
