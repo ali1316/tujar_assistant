@@ -1,175 +1,221 @@
 <!doctype html>
-<html lang="ar" dir="rtl" data-bs-theme="dark">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>داشبورد · نورة</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.6.1/dist/css/tabler.rtl.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.6.1/dist/css/tabulator_bootstrap5.min.css">
+<title>داشبورد · اتحاد الغرف</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.6.1/dist/css/tabulator_midnight.min.css">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.6.1/dist/js/tabulator.min.js"></script>
 <style>
-  :root{--tblr-font-sans-serif:'IBM Plex Sans Arabic',system-ui,sans-serif;--glow:#3ee6ff}
-  body{background:radial-gradient(1200px 600px at 80% -10%,rgba(62,230,255,.08),transparent),var(--tblr-body-bg)}
-  .page-header{animation:rise .6s ease-out both}
-  .card{animation:rise .7s cubic-bezier(.2,.9,.2,1) both;border-color:rgba(62,230,255,.15)}
-  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-  .kpi-val{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-  .kpi-val small{font-size:.9rem;font-weight:500;color:var(--tblr-secondary)}
-  .chart{height:340px}
-  .nora-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .7rem;border-radius:99px;background:rgba(62,230,255,.12);color:var(--glow);font-size:.8rem}
-  .insight{border-inline-start:3px solid var(--glow);padding:.4rem .8rem;margin-bottom:.5rem;background:rgba(62,230,255,.05);border-radius:4px}
-  .tabulator{font-family:inherit;font-size:.9rem;background:transparent}
-  .tabulator .tabulator-header{background:transparent;color:var(--tblr-body-color);border-bottom-color:rgba(62,230,255,.25)}
-  .tabulator .tabulator-header .tabulator-col{background:transparent}
-  .tabulator .tabulator-header .tabulator-col input{background:rgba(255,255,255,.04);color:var(--tblr-body-color);border:1px solid var(--tblr-border-color)}
-  .tabulator .tabulator-tableholder .tabulator-table{background:transparent;color:var(--tblr-body-color)}
-  .tabulator-row,.tabulator-row.tabulator-row-even{background:transparent;color:var(--tblr-body-color)}
-  .tabulator-row.tabulator-row-even{background:rgba(255,255,255,.025)}
-  .tabulator-row.tabulator-selectable:hover{background:rgba(62,230,255,.08)}
-  .tabulator,.tabulator-row,.tabulator-row .tabulator-cell,.tabulator .tabulator-header .tabulator-col{border-color:var(--tblr-border-color)!important}
-  .tabulator .tabulator-footer{background:transparent;color:var(--tblr-body-color)}
-  html{background:var(--tblr-body-bg)} body{background-attachment:fixed;min-height:100vh}
-  @media (prefers-reduced-motion:reduce){.card,.page-header{animation:none}}
+  /* هوية اتحاد الغرف التجارية السعودية: كحلي + ذهبي */
+  :root{
+    --bg:#081726;--panel:#0e2238;--panel2:#12294390;--line:#1d3a5a;--ink:#eef2f7;--mute:#8ea3bd;--dim:#5d7591;
+    --gold:#d1a65c;--sand:#e8d3a8;--steel:#5f86b3;--ok:#59c48f;--warn:#e6b450;--bad:#e0705f;
+    --font:'IBM Plex Sans Arabic';--num:var(--font);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font),'IBM Plex Sans Arabic',system-ui,sans-serif}
+  body{min-height:100vh}
+  .wrap{padding:0 28px 18px}
+  /* الشريط العلوي */
+  .top{display:flex;align-items:center;gap:18px;padding:14px 28px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,#0b1f35,#081726)}
+  .top .logo{height:46px;width:auto;display:block}
+  .top .sep{width:1px;height:32px;background:var(--line)}
+  .top .kicker{color:var(--mute);font-size:14px;letter-spacing:.01em}
+  .top .chip{background:#14304f;border:1px solid var(--line);color:var(--sand);border-radius:99px;padding:5px 14px;font-size:13px;font-weight:600}
+  .top .meta{margin-inline-start:auto;color:var(--mute);font-size:13px;display:flex;gap:14px;align-items:center}
+  .top .back{color:var(--gold);text-decoration:none;border:1px solid #2b4a6c;border-radius:8px;padding:5px 12px}
+  /* العنوان والأرقام الكبيرة */
+  .hero{padding:22px 0 8px}
+  .hero h1{margin:0;font-size:30px;font-weight:700;letter-spacing:-.01em}
+  .hero .sub{color:var(--mute);margin-top:4px;font-size:14px}
+  .kpis{display:flex;flex-wrap:wrap;gap:12px 40px;margin-top:18px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .kpi{min-width:150px}
+  .kpi .v{font-family:var(--num),var(--font),sans-serif;font-size:36px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
+  .kpi .v small{font-family:var(--font),sans-serif;font-size:15px;font-weight:500;color:var(--mute)}
+  .kpi .l{color:var(--mute);font-size:13px;margin-top:4px}
+  .kpi:first-child .v{color:var(--gold)}
+  .pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;background:#1b3553;color:var(--sand);direction:ltr;align-self:center}
+  .pill.up{background:#16392e;color:var(--ok)} .pill.down{background:#3d2226;color:var(--bad)}
+  /* الألواح */
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-flow:row dense;gap:16px;margin-top:18px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0;animation:rise .6s cubic-bezier(.2,.9,.2,1) both}
+  .panel.span2{grid-column:span 2} .panel.full{grid-column:1/-1}
+  .panel h3{margin:0 0 10px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center}
+  .panel h3 .tag{color:var(--gold);font-weight:700}
+  .panel h3 .count{margin-inline-start:auto;color:var(--dim);font-size:12px;font-weight:500}
+  .chart{height:300px}
+  @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}.panel.span2{grid-column:auto}.top{flex-wrap:wrap;padding:12px 16px}.wrap{padding:0 16px 16px}.kpi .v{font-size:28px}}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  /* ملخص نورة */
+  .summary{border-inline-start:3px solid var(--gold)}
+  .summary ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .summary li{background:#0b1d31;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:14px;line-height:1.7}
+  .summary li::before{content:"✓";color:var(--gold);margin-inline-end:8px;font-weight:700}
+  /* الجداول */
+  .tabulator{background:transparent;border:0;font-family:inherit;font-size:14px}
+  .tabulator .tabulator-header{background:transparent;border-bottom:1px solid var(--line);color:var(--mute)}
+  .tabulator .tabulator-header .tabulator-col{background:transparent;border-color:var(--line)!important}
+  .tabulator .tabulator-header .tabulator-col input{background:#0b1d31!important;border:1px solid var(--line)!important;color:var(--ink)!important;border-radius:6px;padding:4px 8px!important}
+  .tabulator .tabulator-header .tabulator-col .tabulator-col-content{padding:8px}
+  .tabulator .tabulator-tableholder .tabulator-table{background:transparent;color:var(--ink)}
+  .tabulator-row,.tabulator-row.tabulator-row-even{background:transparent;border-bottom:1px solid #16304d}
+  .tabulator-row .tabulator-cell{border-color:transparent!important;padding:9px 8px}
+  .tabulator-row.tabulator-selectable:hover{background:#13304f}
+  .tabulator .tabulator-footer{background:transparent;border-top:1px solid var(--line);color:var(--mute)}
+  .tabulator .tabulator-footer .tabulator-page{background:#0b1d31;color:var(--ink);border-color:var(--line)}
+  .num{font-family:var(--num),var(--font),sans-serif;font-variant-numeric:tabular-nums}
+  /* التذييل */
+  .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--dim);font-size:12px;padding:14px 0 0;margin-top:18px;border-top:1px solid var(--line)}
+  .embed .top .back{display:none}
+  .embed body{min-height:0}
+  @media (prefers-reduced-motion:reduce){.panel{animation:none}}
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="page-wrapper">
-    <div class="page-header d-print-none"><div class="container-xl"><div class="row g-2 align-items-center">
-      <div class="col"><div class="page-pretitle"><span class="nora-chip">✦ صمّمته نورة</span> <span id="when" class="ms-2"></span></div>
-        <h2 class="page-title mt-2" id="title">جاري التحميل…</h2><div class="text-secondary mt-1" id="subtitle"></div></div>
-      <div class="col-auto"><a href="/" class="btn btn-outline-info">← رجوع للوحة نورة</a></div>
-    </div></div></div>
-    <div class="page-body"><div class="container-xl">
-      <div class="row row-deck row-cards" id="kpis"></div>
-      <div class="row row-deck row-cards mt-1" id="charts"></div>
-      <div id="tables"></div>
-      <div class="row row-cards mt-1" id="insights"></div>
-    </div></div>
-  </div>
-</div>
+<header class="top">
+  <img class="logo" src="/brand/fsc-logo-dark.svg" alt="اتحاد الغرف التجارية السعودية">
+  <span class="sep"></span>
+  <span class="kicker" id="kicker">لوحة تحليلية</span>
+  <span class="chip" id="when">—</span>
+  <div class="meta"><span>✦ أعدّتها نورة</span><a class="back" href="/">← لوحة نورة</a></div>
+</header>
+<main class="wrap">
+  <section class="hero"><h1 id="title">جاري التحميل…</h1><div class="sub" id="subtitle"></div><div class="kpis" id="kpis"></div></section>
+  <section class="grid" id="grid"></section>
+  <footer class="foot"><span id="source"></span><span>اتحاد الغرف التجارية السعودية · وثيقة للاستخدام الداخلي</span></footer>
+</main>
 <script>
 const $ = s => document.querySelector(s);
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-let LOCALE = 'ar-SA';
-let FONT = 'IBM Plex Sans Arabic', ACC = '#3ee6ff';
+let LOCALE = 'ar-SA', FONT = 'IBM Plex Sans Arabic';
 const fmt = n => new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 }).format(n);
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
 const id = location.pathname.split('/').pop();
-// داخل الشاشة الرئيسية (iframe): نخفي زر الرجوع ونبلّغ الصفحة الأم بالطول
+const LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي'];
+// ألوان الرسوم من هوية الاتحاد
+const PALETTE = ['#d1a65c', '#5f86b3', '#e8d3a8', '#4fb3a9', '#c97a5b', '#8fa7c4', '#9b86c9', '#7fae6e'];
+
+// داخل الشاشة الرئيسية (iframe): نخفي زر الرجوع ونبلّغ الصفحة الأم بطول المحتوى
 const EMBED = new URLSearchParams(location.search).has('embed');
 if (EMBED) {
   document.documentElement.classList.add('embed');
-  document.head.insertAdjacentHTML('beforeend', '<style>.embed .page-header{display:none}.embed .page-body{margin:12px 0}.embed body,.embed .page,.embed .page-wrapper{min-height:0!important;height:auto!important}.embed body{background:transparent}</style>');
-  // نقيس طول المحتوى نفسه (مو طول النافذة) عشان ما يكبر الإطار بلا نهاية
-  const post = () => { const b = document.querySelector('.page-body'); if (b) parent.postMessage({ noraDashHeight: Math.ceil(b.getBoundingClientRect().height) + 24 }, location.origin); };
-  new ResizeObserver(post).observe(document.querySelector('.page-body')); addEventListener('load', post); setTimeout(post, 1500); setTimeout(post, 3500);
+  const post = () => parent.postMessage({ noraDashHeight: Math.ceil($('.top').getBoundingClientRect().height + $('.wrap').getBoundingClientRect().height) + 8 }, location.origin);
+  new ResizeObserver(post).observe($('.wrap')); addEventListener('load', post); setTimeout(post, 1500); setTimeout(post, 3500);
 }
 
 function countUp(el, to, unit) {
-  const t0 = performance.now(), d = 1400;
-  const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3);
-    el.innerHTML = fmt(to * e) + (unit ? ` <small>${esc(unit)}</small>` : ''); if (p < 1) requestAnimationFrame(step); };
+  const t0 = performance.now(), d = 1400, dec = Number.isInteger(to) ? 0 : 1;
+  const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3), v = to * e;
+    el.innerHTML = (dec ? new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 }).format(v) : fmt(Math.round(v))) + (unit ? ` <small>${esc(unit)}</small>` : '');
+    if (p < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
 
 (async () => {
-  // نفس شكل الأرقام والخط اللي اختاره فواز في اللوحة الرئيسية
+  // الخط وشكل الأرقام من إعدادات الواجهة الرئيسية
   try {
     const ui = await (await fetch('/api/ui', { headers: { 'x-access-code': CODE } })).json();
     if (ui.numerals === 'latin') LOCALE = 'ar-SA-u-nu-latn';
     const clean = f => String(f || '').replace(/[^\p{L}\p{N} ]/gu, '');
     const gf = f => `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;500;600;700&display=swap">`;
     if (ui.font) FONT = clean(ui.font);
-    if (/^#[0-9a-f]{6}$/i.test(ui.colors?.acc || '')) ACC = ui.colors.acc;
     const NUMF = ui.numFont ? clean(ui.numFont) : FONT;
-    // نفس هوية اللوحة الرئيسية: الخط، خط الأرقام، اللون الرئيسي
-    document.head.insertAdjacentHTML('beforeend', gf(FONT) + (NUMF !== FONT ? gf(NUMF) : '') +
-      `<style>:root{--tblr-font-sans-serif:'${FONT}','IBM Plex Sans Arabic',system-ui,sans-serif;--glow:${ACC}}body,.tabulator{font-family:'${FONT}','IBM Plex Sans Arabic',sans-serif}.kpi-val{font-family:'${NUMF}','${FONT}',sans-serif}.kpi-val small{font-family:'${FONT}',sans-serif}</style>`);
+    document.head.insertAdjacentHTML('beforeend', gf(FONT) + (NUMF !== FONT ? gf(NUMF) : '') + `<style>:root{--font:'${FONT}';--num:'${NUMF}'}</style>`);
     await document.fonts.load(`16px '${FONT}'`).catch(() => {});
   } catch {}
+
   const r = await fetch(`/api/dashboards/${id}`, { headers: { 'x-access-code': CODE } });
   if (!r.ok) { $('#title').textContent = r.status === 401 ? 'افتح لوحة نورة وادخل رمز الدخول أول' : 'الداشبورد غير موجود'; return; }
   const { spec, created_at } = await r.json();
-  document.title = `${spec.title} · نورة`;
+  const when = new Date(spec.generated_at || created_at);
+  document.title = `${spec.title} · اتحاد الغرف`;
   $('#title').textContent = spec.title;
   $('#subtitle').textContent = spec.subtitle || '';
-  $('#when').textContent = new Date(spec.generated_at || created_at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
+  $('#when').textContent = when.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
+  $('#kicker').textContent = '— ' + (spec.kicker || 'لوحة تحليلية');
+  $('#source').textContent = `المصدر: ${spec.subtitle || 'بيانات منصة نورة'} · حُدّثت ${when.toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })}`;
 
-  // بطاقات الأرقام
-  const kc = Math.max(1, spec.kpis.length);
-  spec.kpis.forEach((k, i) => {
-    const col = document.createElement('div');
-    col.className = `col-sm-6 col-lg-${kc >= 4 ? 3 : 12 / kc}`;
+  // الأرقام الكبيرة
+  spec.kpis.forEach(k => {
+    const d = document.createElement('div'); d.className = 'kpi';
     const up = /^\+/.test(k.delta || ''), down = /^-/.test(k.delta || '');
-    col.innerHTML = `<div class="card" style="animation-delay:${i * 90}ms"><div class="card-body">
-      <div class="subheader">${esc(k.label)}</div>
-      <div class="d-flex align-items-baseline"><div class="kpi-val" data-v="${+k.value || 0}" data-u="${esc(k.unit || '')}">0</div>
-      ${k.delta ? `<div class="ms-auto"><span dir="ltr" class="badge ${up ? 'bg-green-lt' : down ? 'bg-red-lt' : 'bg-azure-lt'}">${esc(k.delta)}</span></div>` : ''}</div></div></div>`;
-    $('#kpis').append(col);
+    d.innerHTML = `<div class="v"><span class="cnt"></span>${k.delta ? `<span class="pill ${up ? 'up' : down ? 'down' : ''}">${esc(k.delta)}</span>` : ''}</div><div class="l">${esc(k.label)}</div>`;
+    $('#kpis').append(d); countUp(d.querySelector('.cnt'), +k.value || 0, k.unit || '');
   });
-  document.querySelectorAll('.kpi-val').forEach(el => countUp(el, +el.dataset.v, el.dataset.u));
 
-  // الرسوم (ECharts)
+  let n = 0;
+  const panel = (cls, title, extra = '') => {
+    const p = document.createElement('div'); p.className = 'panel ' + cls; p.style.animationDelay = `${120 + n * 90}ms`;
+    p.innerHTML = `<h3><span class="tag">(${LETTERS[n % LETTERS.length]})</span>${esc(title)}${extra}</h3>`; n++;
+    $('#grid').append(p); return p;
+  };
+
+  // الرسوم (ECharts) بهوية الاتحاد
   const charts = [];
-  spec.charts.forEach((c, i) => {
-    const col = document.createElement('div');
-    col.className = c.span === 2 ? 'col-12' : 'col-lg-6';
-    col.innerHTML = `<div class="card" style="animation-delay:${300 + i * 120}ms"><div class="card-header"><h3 class="card-title">${esc(c.title)}</h3></div>
-      <div class="card-body"><div class="chart"></div></div></div>`;
-    $('#charts').append(col);
+  spec.charts.forEach(c => {
+    const p = panel(c.span === 2 ? 'span2' : '', c.title);
+    const box = document.createElement('div'); box.className = 'chart'; p.append(box);
     try {
-      const ch = echarts.init(col.querySelector('.chart'), 'dark', { renderer: 'canvas' });
-      const opt = Object.assign({ backgroundColor: 'transparent', textStyle: { fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` },
-        color: [ACC, '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'], animationDuration: 1400, animationEasing: 'cubicOut',
-        tooltip: { trigger: 'item' } }, c.option);
-      // كل التسميات تظهر (بدون ما يخفي ECharts بعضها)، ونميّلها لو كثيرة
-      [].concat(opt.legend || []).forEach(l => { if (l) { l.itemGap ??= 22; l.textStyle = { padding: [0, 6], ...(l.textStyle || {}) }; } });
-      // لو وسيلة الإيضاح تحت، نوسّع المساحة عشان ما تركب على تسميات المحور
+      const ch = echarts.init(box, null, { renderer: 'canvas' });
+      const opt = { ...c.option };
+      delete opt.title; delete opt.backgroundColor; delete opt.color; // العنوان والألوان من الهوية
+      opt.backgroundColor = 'transparent'; opt.color = PALETTE; opt.animationDuration = 1300; opt.animationEasing = 'cubicOut';
+      opt.textStyle = { color: '#c9d6e6', fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` };
+      opt.tooltip = { trigger: (opt.xAxis ? 'axis' : 'item'), backgroundColor: '#0e2238', borderColor: '#2b4a6c', textStyle: { color: '#eef2f7', fontFamily: `'${FONT}', sans-serif` }, ...(opt.tooltip || {}),
+        ...(LOCALE === 'ar-SA' ? { valueFormatter: v => typeof v === 'number' ? fmt(v) : v } : {}) };
+      const axisStyle = ax => ({ ...ax, axisLine: { lineStyle: { color: '#2b4a6c' } }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#16304d' } },
+        axisLabel: { color: '#8ea3bd', ...(ax.axisLabel || {}) }, nameTextStyle: { color: '#8ea3bd' } });
+      if (opt.xAxis) opt.xAxis = Array.isArray(opt.xAxis) ? opt.xAxis.map(axisStyle) : axisStyle(opt.xAxis);
+      if (opt.yAxis) opt.yAxis = Array.isArray(opt.yAxis) ? opt.yAxis.map(axisStyle) : axisStyle(opt.yAxis);
+      // تخطيط ثابت: وسيلة الإيضاح تحت، ومساحة كافية للتسميات
+      if (opt.legend) opt.legend = [].concat(opt.legend).map(l => ({ ...l, textStyle: { color: '#c9d6e6' }, itemGap: 22, icon: 'roundRect' }));
       if (opt.xAxis || opt.yAxis) {
-        // تخطيط ثابت للرسوم ذات المحاور: وسيلة الإيضاح تحت في المنتصف، ومساحة كافية لها ولتسميات المحور
-        const hasLegend = !!opt.legend;
-        if (hasLegend) opt.legend = [].concat(opt.legend).map(l => ({ ...l, top: undefined, left: 'center', right: undefined, bottom: 0, orient: 'horizontal' }));
+        if (opt.legend) opt.legend = opt.legend.map(l => ({ ...l, top: undefined, left: 'center', right: undefined, bottom: 0, orient: 'horizontal' }));
         const g = Array.isArray(opt.grid) ? opt.grid[0] : (opt.grid || {});
-        opt.grid = { ...g, containLabel: true, top: 28, left: 12, right: 16, bottom: hasLegend ? 44 : 12 };
+        opt.grid = { ...g, containLabel: true, top: 24, left: 8, right: 12, bottom: opt.legend ? 40 : 8 };
+        [].concat(opt.xAxis || []).forEach(ax => { if (ax && ax.type !== 'value' && ax.type !== 'time') { const k = (ax.data || []).length; ax.axisLabel = { ...ax.axisLabel, interval: 0, rotate: k > 5 ? 25 : 0 }; } });
+        if (LOCALE === 'ar-SA') [].concat(opt.xAxis || [], opt.yAxis || []).forEach(ax => { if (ax && (ax.type === 'value' || (ax.type === undefined && !ax.data))) ax.axisLabel = { ...ax.axisLabel, formatter: v => fmt(v) }; });
       }
-      opt.textStyle = { ...(opt.textStyle || {}), fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` }; // الخط موحّد حتى لو الموديل حدد غيره
-      // الأرقام في المحاور والتلميحات بنفس شكل أرقام اللوحة
-      if (LOCALE === 'ar-SA') {
-        [].concat(opt.xAxis || [], opt.yAxis || []).forEach(ax => { if (ax && (ax.type === 'value' || ax.type === undefined && !ax.data)) ax.axisLabel = { formatter: v => fmt(v), ...(ax.axisLabel || {}) }; });
-        opt.tooltip = { valueFormatter: v => typeof v === 'number' ? fmt(v) : v, ...(opt.tooltip || {}) };
-      }
-      [].concat(opt.xAxis || []).forEach(ax => { if (ax && ax.type !== 'value' && ax.type !== 'time') { const n = (ax.data || []).length; ax.axisLabel = { interval: 0, rotate: n > 5 ? 25 : 0, ...(ax.axisLabel || {}) }; } });
+      // الدوائر: حلقة أنيقة بحد بلون الخلفية
+      [].concat(opt.series || []).forEach(s => {
+        if (s.type === 'pie') { s.itemStyle = { borderColor: '#0e2238', borderWidth: 3, borderRadius: 4, ...(s.itemStyle || {}) }; s.label = { color: '#c9d6e6', ...(s.label || {}) }; }
+        if (s.type === 'bar') s.itemStyle = { borderRadius: [4, 4, 0, 0], ...(s.itemStyle || {}) };
+        if (s.type === 'line') { s.lineStyle = { width: 3, ...(s.lineStyle || {}) }; s.symbolSize ??= 7; }
+        delete s.itemStyle?.color;
+      });
       ch.setOption(opt); charts.push(ch);
-    } catch (e) { col.querySelector('.chart').innerHTML = `<div class="text-danger">تعذّر الرسم: ${esc(e.message)}</div>`; }
+    } catch (e) { box.innerHTML = `<div style="color:var(--bad)">تعذّر الرسم: ${esc(e.message)}</div>`; }
   });
   addEventListener('resize', () => charts.forEach(c => c.resize()));
 
+  // ملخص نورة (مثل «ملخص الأداء» في التقارير التنفيذية)
+  if (spec.insights?.length) {
+    // الملخص يعبّي الفراغ اللي تتركه الرسوم في آخر صف (أو ياخذ صف كامل)
+    const used = spec.charts.reduce((a, c) => a + (c.span === 2 ? 2 : 1), 0) % 3;
+    const p = panel(used === 0 ? 'full' : used === 1 ? 'span2' : '', 'ملخص نورة');
+    p.classList.add('summary');
+    p.insertAdjacentHTML('beforeend', `<ul>${spec.insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`);
+  }
+
   // الجداول (Tabulator: فرز، بحث، صفحات)
-  spec.tables.forEach((t, i) => {
-    const card = document.createElement('div');
-    card.className = 'card mt-3';
-    card.style.animationDelay = `${600 + i * 120}ms`;
-    card.innerHTML = `<div class="card-header"><h3 class="card-title">${esc(t.title)}</h3><div class="ms-auto text-secondary small">${t.rows.length} صف</div></div><div class="card-body p-0"><div></div></div>`;
-    $('#tables').append(card);
-    const fields = t.columns.map((_, n) => `c${n}`);
-    const data = t.rows.map(r => Object.fromEntries(fields.map((f, n) => [f, Array.isArray(r) ? r[n] : r[t.columns[n]]])));
-    new Tabulator(card.querySelector('.card-body > div'), {
+  spec.tables.forEach(t => {
+    const p = panel('full', t.title, `<span class="count">${fmt(t.rows.length)} صف</span>`);
+    const box = document.createElement('div'); p.append(box);
+    const fields = t.columns.map((_, i) => `c${i}`);
+    const data = t.rows.map(r => Object.fromEntries(fields.map((f, i) => [f, Array.isArray(r) ? r[i] : r[t.columns[i]]])));
+    new Tabulator(box, {
       data, layout: 'fitColumns', textDirection: 'rtl', pagination: data.length > 12, paginationSize: 12, placeholder: 'لا توجد بيانات',
-      columns: t.columns.map((name, n) => ({ title: name, field: fields[n], headerFilter: 'input', headerFilterPlaceholder: 'بحث…',
-        sorter: data.every(d => d[fields[n]] === '' || !isNaN(+d[fields[n]])) ? 'number' : 'string',
-        formatter: cell => { const v = cell.getValue(); return typeof v === 'number' ? fmt(v) : esc(v); } })),
+      columns: t.columns.map((name, i) => {
+        const numeric = data.length && data.every(d => d[fields[i]] === '' || d[fields[i]] == null || !isNaN(+d[fields[i]]));
+        return { title: name, field: fields[i], headerFilter: 'input', headerFilterPlaceholder: 'بحث…', sorter: numeric ? 'number' : 'string',
+          formatter: cell => { const v = cell.getValue(); return numeric && v !== '' && v != null ? `<span class="num">${fmt(+v)}</span>` : esc(v); } };
+      }),
     });
   });
-
-  // ملاحظات نورة
-  if (spec.insights?.length) {
-    const col = document.createElement('div'); col.className = 'col-12';
-    col.innerHTML = `<div class="card" style="animation-delay:800ms"><div class="card-header"><h3 class="card-title">✦ ملاحظات نورة</h3></div><div class="card-body">${spec.insights.map(s => `<div class="insight">${esc(s)}</div>`).join('')}</div></div>`;
-    $('#insights').append(col);
-  }
 })();
 </script>
 </body>
