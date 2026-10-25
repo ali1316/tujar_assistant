@@ -119,8 +119,13 @@ function countUp(el, to, unit) {
       // كل التسميات تظهر (بدون ما يخفي ECharts بعضها)، ونميّلها لو كثيرة
       [].concat(opt.legend || []).forEach(l => { if (l) { l.itemGap ??= 22; l.textStyle = { padding: [0, 6], ...(l.textStyle || {}) }; } });
       // لو وسيلة الإيضاح تحت، نوسّع المساحة عشان ما تركب على تسميات المحور
-      if (opt.xAxis && [].concat(opt.legend || []).some(l => l && l.bottom !== undefined)) opt.grid = { containLabel: true, bottom: 64, ...(opt.grid || {}) };
-      else if (opt.xAxis) opt.grid = { containLabel: true, ...(opt.grid || {}) };
+      if (opt.xAxis || opt.yAxis) {
+        // تخطيط ثابت للرسوم ذات المحاور: وسيلة الإيضاح تحت في المنتصف، ومساحة كافية لها ولتسميات المحور
+        const hasLegend = !!opt.legend;
+        if (hasLegend) opt.legend = [].concat(opt.legend).map(l => ({ ...l, top: undefined, left: 'center', right: undefined, bottom: 0, orient: 'horizontal' }));
+        const g = Array.isArray(opt.grid) ? opt.grid[0] : (opt.grid || {});
+        opt.grid = { ...g, containLabel: true, top: 28, left: 12, right: 16, bottom: hasLegend ? 44 : 12 };
+      }
       opt.textStyle = { ...(opt.textStyle || {}), fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` }; // الخط موحّد حتى لو الموديل حدد غيره
       // الأرقام في المحاور والتلميحات بنفس شكل أرقام اللوحة
       if (LOCALE === 'ar-SA') {
