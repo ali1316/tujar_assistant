@@ -88,7 +88,16 @@ export async function ingestDocument(doc, buffer) {
 const colIdx = (ds, name) => {
   if (name == null || name === '') return -1;
   let i = ds.columns.indexOf(name);
-  if (i < 0) { const n = String(name).trim().toLowerCase(); i = ds.columns.findIndex(c => c.toLowerCase() === n); if (i < 0) i = ds.columns.findIndex(c => c.toLowerCase().includes(n) || n.includes(c.toLowerCase())); }
+  if (i < 0) {
+    // مطابقة متسامحة: _ بدل المسافة، وحدات بين قوسين، همزات/تاء مربوطة، «ال» التعريف
+    const nz = x => String(x).toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[_\-]+/g, ' ').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\u064B-\u0652\u0640]/g, '').replace(/\s+/g, ' ').trim();
+    const strip = x => nz(x).split(' ').map(w => w.length > 4 && w.startsWith('ال') ? w.slice(2) : w).join(' ');
+    const n = nz(name), ns = strip(name);
+    i = ds.columns.findIndex(c => nz(c) === n);
+    if (i < 0) i = ds.columns.findIndex(c => strip(c) === ns);
+    if (i < 0) i = ds.columns.findIndex(c => nz(c).includes(n) || n.includes(nz(c)) || strip(c).includes(ns));
+    if (i < 0) { const ws = ns.split(' ').filter(w => w.length > 1); i = ds.columns.findIndex(c => { const cw = strip(c) + ' ' + nz(c); return ws.length && ws.every(w => cw.includes(w)); }); }
+  }
   return i;
 };
 const cellNum = (r, i) => toNum(r[i]);
@@ -210,7 +219,14 @@ async function resolveDs({ dataset_id, sheet, group_by, measure, series_by, filt
   const list = await datasetsLatest();
   const pick = (sheet && list.find(d => d.sheet === sheet || d.sheet.includes(sheet))) || list.find(fits);
   if (pick && fits(pick)) return pick;
-  if (need.length) { const any = (await datasetsRecent(40)).find(fits); if (any) return any; }
+  if (need.length) {
+    const recent = await datasetsRecent(40);
+    const any = recent.find(fits); if (any) return any;
+    // لا يوجد تطابق كامل: الأقرب = أكثر جدول فيه أعمدة مطابقة (عشان رسالة الخطأ تعرض أعمدة الملف الصحيح)
+    const score = d => need.filter(c => colIdx(d, c) >= 0).length;
+    const best = recent.reduce((a, d) => (score(d) > score(a) ? d : a), recent[0]);
+    if (best && score(best) > 0) return best;
+  }
   if (dataset_id) { const d = await datasetGet(dataset_id); if (d) return d; }
   if (!list.length) throw new Error('ما فيه ملف بيانات (Excel/CSV) مرفوع للحين');
   return pick || list[0];
@@ -235,6 +251,7 @@ export const datasetTools = {
     declaration: { name: 'data_chart', description: 'ترسم فوراً أي شارت من بيانات الملف المرفوع بأرقام محسوبة ويظهر على الشاشة الرئيسية مكان البيانات. استخدميها لما يطلب شارت عن بيانات الملف.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, chart_type: { type: 'STRING', enum: ['bar', 'hbar', 'stacked', 'line', 'area', 'pie', 'donut'] }, ...QP }, required: ['title', 'chart_type'] } },
     run: async ({ title, chart_type = 'bar', ...args }) => {
       const ds = await resolveDs(args); const r = runQuery(ds, args);
+      if (!/[\u0600-\u06FF]/.test(title || '')) title = `${AGG_AR[r.agg] || ''} ${r.measure} حسب ${r.group_by || ''}`.replace(/\s+/g, ' ').trim();
       const total = r.rows.reduce((a, x) => a + x.total, 0);
       const sorted = [...r.rows].sort((a, b) => b.total - a.total), top1 = sorted[0], low = sorted.at(-1);
       const n = x => new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(x);
