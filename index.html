@@ -361,7 +361,7 @@ const screenToolsExtra = {
     const AGG = { sum: 'مجموع', avg: 'متوسط', count: 'عدد', min: 'أقل', max: 'أعلى', distinct: 'عدد مميز' };
     const q = apiJson('/api/tools/query_data', args);
     if (!args.group_by) return q;
-    const title = `${AGG[args.agg || (args.measure ? 'sum' : 'count')] || ''} ${args.measure || 'الطلبات'} حسب ${args.group_by}`.trim();
+    const title = `${AGG[args.agg || (args.measure ? 'sum' : 'count')] || ''} ${args.measure || args.about || 'السجلات'} حسب ${args.group_by}`.trim();
     const [r, c] = await Promise.all([q, apiJson('/api/tools/data_chart', { ...args, title })]);
     if (!c.error) await hud.showVisual({ title: c.title, subtitle: c.subtitle, vega_lite: c.vega_lite, kpis: c.kpis, insights: c.insights });
     return { ...r, shown_on_screen: !c.error };

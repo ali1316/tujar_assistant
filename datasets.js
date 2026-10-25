@@ -135,8 +135,10 @@ function agg(values, fn) {
 // group_by + measure(+agg) + series_by اختياري → صفوف مجمّعة
 export function runQuery(ds, { group_by, measure, agg: fn = measure ? 'sum' : 'count', series_by, filters, sort = 'desc', top, date_unit } = {}) {
   let rows = applyFilters(ds, ds.rows, filters);
-  const gi = colIdx(ds, group_by), mi = colIdx(ds, measure), si = colIdx(ds, series_by);
+  const gi = colIdx(ds, group_by); let mi = colIdx(ds, measure); const si = colIdx(ds, series_by); 
   if (measure && mi < 0) throw new Error(`ما لقيت العمود «${measure}». الأعمدة: ${ds.columns.join('، ')}`);
+  // عمود نصي ما ينجمع (يطلع أصفار) → نعدّ الصفوف بدله
+  if (mi >= 0 && ['sum', 'avg', 'min', 'max'].includes(fn) && ds.profile?.columns[mi]?.type !== 'number') { mi = -1; fn = 'count'; }
   if (group_by && gi < 0) throw new Error(`ما لقيت العمود «${group_by}». الأعمدة: ${ds.columns.join('، ')}`);
   const isDate = gi >= 0 && ds.profile?.columns[gi]?.type === 'date';
   const key = r => gi < 0 ? 'الإجمالي' : isDate ? bucket(toDate(r[gi]), date_unit || 'month') : String(r[gi] ?? 'غير محدد').trim() || 'غير محدد';
@@ -212,11 +214,22 @@ export function catalogText(list) {
 }
 export async function latestCatalog() { return catalogText(await datasetsLatest().catch(() => [])); }
 
-async function resolveDs({ dataset_id, sheet, group_by, measure, series_by, filters } = {}) {
+const nzT = x => String(x ?? '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\u064B-\u0652\u0640_\-]/g, ' ').split(/\s+/).filter(w => w.length > 2).map(w => (w.length > 4 && w.startsWith('ال') ? w.slice(2) : w));
+async function resolveDs({ dataset_id, sheet, group_by, measure, series_by, filters, title, about } = {}) {
   // الأعمدة المطلوبة: لو الجدول المختار ما فيه أعمدة السؤال، ندوّر تلقائياً على الملف اللي فيه (أحدث أولاً)
   const need = [group_by, measure, series_by, ...(filters || []).map(f => f?.column)].filter(Boolean);
   const fits = d => d && need.every(c => colIdx(d, c) >= 0);
   if (dataset_id) { const d = await datasetGet(dataset_id); if (d && fits(d)) return d; }
+  // أكثر من جدول فيه نفس الأعمدة (مثلاً «الحالة» في الطلبات والعقود): نختار اللي اسمه يطابق موضوع السؤال
+  const hint = nzT(`${about || ''} ${title || ''}`);
+  if (hint.length && need.length) {
+    const cands = (await datasetsRecent(40)).filter(fits);
+    if (cands.length > 1) {
+      const sc = d => { const n = nzT(`${d.sheet} ${d.doc_name}`).join(' '); return hint.filter(w => n.includes(w)).length; };
+      const best = cands.reduce((a, d) => (sc(d) > sc(a) ? d : a), cands[0]);
+      if (sc(best) > 0) return best;
+    }
+  }
   const list = await datasetsLatest();
   const pick = (sheet && list.find(d => d.sheet === sheet || d.sheet.includes(sheet))) || list.find(fits);
   if (pick && fits(pick)) return pick;
@@ -241,6 +254,7 @@ const QP = {
   agg: { type: 'STRING', enum: ['sum', 'avg', 'count', 'min', 'max', 'distinct'] },
   series_by: { type: 'STRING', description: 'عمود ثاني يقسم كل عمود لسلاسل (اختياري)' },
   filters: { type: 'ARRAY', items: { type: 'OBJECT', properties: { column: { type: 'STRING' }, op: { type: 'STRING', enum: ['=', '!=', '>', '<', '>=', '<=', 'contains'] }, value: { type: 'STRING' } } } },
+  about: { type: 'STRING', description: 'موضوع الجدول بكلمة (مثل: الطلبات، العقود، المخاطر) عشان نختار الجدول الصح لو أكثر من ملف فيه نفس العمود' },
   top: { type: 'INTEGER' }, date_unit: { type: 'STRING', enum: ['day', 'month', 'quarter', 'year'] },
 };
 export const datasetTools = {
@@ -251,7 +265,8 @@ export const datasetTools = {
   data_chart: {
     declaration: { name: 'data_chart', description: 'ترسم فوراً أي شارت من بيانات الملف المرفوع بأرقام محسوبة ويظهر على الشاشة الرئيسية مكان البيانات. استخدميها لما يطلب شارت عن بيانات الملف.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, chart_type: { type: 'STRING', enum: ['bar', 'hbar', 'stacked', 'line', 'area', 'pie', 'donut'] }, ...QP }, required: ['title', 'chart_type'] } },
     run: async ({ title, chart_type = 'bar', ...args }) => {
-      const ds = await resolveDs(args); const r = runQuery(ds, args);
+      const ds = await resolveDs({ ...args, title }); const r = runQuery(ds, args);
+      if (args.measure && r.measure === 'العدد') title = `العدد حسب ${r.group_by || ''}`.trim(); // العمود نصي فتحوّل لعدّ
       if (!/[\u0600-\u06FF]/.test(title || '')) title = `${AGG_AR[r.agg] || ''} ${r.measure} حسب ${r.group_by || ''}`.replace(/\s+/g, ' ').trim();
       const total = r.rows.reduce((a, x) => a + x.total, 0);
       const sorted = [...r.rows].sort((a, b) => b.total - a.total), top1 = sorted[0], low = sorted.at(-1);
