@@ -5,6 +5,10 @@ import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { db, tools as dataTools } from './db.js';
 import { docTools, extractText, saveDocument } from './docs.js';
+import { initStore, kvGet, kvSet, backend } from './store.js';
+import { memoryTools, memoryBlock, initMemory, listForUI } from './memory.js';
+import { dashboardTools, dashGet, dashList } from './dashboards.js';
+import { memDelete } from './store.js';
 
 const PORT = process.env.PORT || 3000;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-live';
@@ -19,7 +23,7 @@ const ACCESS_CODE = process.env.ACCESS_CODE || ''; // لو فاضي = بدون �
 const MY_VOICE_ID = process.env.MY_VOICE_ID || 'voice_xb1ye60p9o3i'; // صوت فواز المستنسخ في Gemini
 const TTS_MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
-const tools = { ...dataTools, ...docTools };
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools };
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
 const visualDeclarations = [
@@ -104,10 +108,21 @@ const uiDeclarations = [
   { name: 'get_ui_state', description: 'يرجّع إعدادات الواجهة الحالية (الخط، الألوان، الأحجام...).', parameters: { type: 'OBJECT', properties: {} } },
 ];
 
+// أدوات المساعد في المتصفح (فتح تطبيقات/روابط/داشبوردات)
+const APP_LIST = ['whatsapp', 'gmail', 'calendar', 'drive', 'youtube', 'google', 'maps', 'notion', 'linkedin', 'x', 'github', 'claude', 'chatgpt', 'metricool', 'aistudio', 'render', 'outlook', 'teams'];
+const assistantDeclarations = [
+  {
+    name: 'open_app', description: 'تفتح تطبيق ويب أو موقع في تبويب جديد. واتساب: phone + message تفتح محادثة مع مسودة جاهزة (المستخدم يضغط إرسال بنفسه). query للبحث داخل التطبيق (google, youtube, maps, gmail, drive, x, github, linkedin). url لأي رابط https.',
+    parameters: { type: 'OBJECT', properties: { app: { type: 'STRING', enum: APP_LIST }, query: { type: 'STRING' }, url: { type: 'STRING' }, phone: { type: 'STRING', description: 'رقم الجوال مثل 0501234567' }, message: { type: 'STRING' } } },
+  },
+  { name: 'open_dashboard', description: 'تفتح داشبورد محفوظ سابقاً برقمه.', parameters: { type: 'OBJECT', properties: { id: { type: 'INTEGER' } }, required: ['id'] } },
+];
+
 const activeDeclarations = () => [
   ...Object.entries(tools).filter(([, t]) => ALLOW_WRITES || !t.write).map(([, t]) => t.declaration),
   ...visualDeclarations,
   ...uiDeclarations,
+  ...assistantDeclarations,
 ].map(d => ({ ...d, behavior: 'BLOCKING' }));
 
 const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لمنصة متابعة مشاريع التحول الرقمي. أنثى، واثقة، حماسية وودودة.
@@ -127,6 +142,15 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
   * نفّذي مباشرة بدون استئذان (التعديلات الشكلية آمنة وتنتراجع)، وبعدها قولي بالتفصيل وش تغيّر.
   * لو الطلب أكبر من الشكل (ميزة جديدة، صفحة، تكامل، تعديل بالبيانات أو الباك اند) → request_dev_change
     واكتبي التفاصيل كاملة، وقولي له إن الطلب انسجّل برقم كذا عند فريق التطوير.
+- أنتِ مساعدة فواز الشخصية:
+  * "افتحي واتساب/جيميل/يوتيوب..." → open_app. "أرسلي لفلان على واتساب كذا" → open_app بـ phone و message (مسودة؛ هو يضغط إرسال).
+    لو رجع opened=false قولي له يضغط زر «افتح» اللي طلع على الشاشة.
+  * "سوّي لي داشبورد/لوحة/تقرير عن كذا" → اجلبي البيانات بالأدوات ثم build_dashboard بتصميم غني (بطاقات + رسوم ECharts متنوعة + جدول + ملاحظات)،
+    وقولي له إنه انفتح برقم كذا. "افتحي الداشبورد رقم كذا" → open_dashboard، "وش الداشبوردات اللي سويتيها" → list_dashboards.
+- أنتِ تتعلمين وتتذكرين:
+  * لما فواز يقول "تذكّري"، أو يصحّحك، أو يذكر تفضيل أو أسلوب أو مصطلح خاص ومعناه، أو شخص ودوره → remember فوراً، وقولي "حفظتها" بكلمة.
+  * لو احتجتِ معلومة شخصية مو موجودة في ملخص الذاكرة تحت → recall. "انسي كذا" → forget. "وش تتذكرين عني" → list_memories.
+  * طبّقي الذاكرة بهدوء في كل رد (أسلوبه، مصطلحاته)، بدون ما تقولين "حسب ذاكرتي".
 - أي رقم أو اسم أو حالة لازم تجيبه من الأدوات؛ لا تخمّن ولا تألّف بيانات.
 - المبالغ بالريال، اقرأها بشكل طبيعي (مثلاً "مليون ومية ألف").
 - قبل أي إضافة أو تعديل في البيانات، أكّد مع المستخدم بجملة وحدة وانتظر موافقته.
@@ -142,11 +166,11 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const promptFor = mode => mode === 'mine'
   ? SYSTEM_PROMPT + '\n- ردك بيتحوّل لصوت، فاكتب كلام منطوق طبيعي بدون رموز أو نقاط أو جداول أو إيموجي.'
   : SYSTEM_PROMPT;
-function buildSetup(mode, voice = VOICE) {
+function buildSetup(mode, voice = VOICE, sys = promptFor(mode)) {
   return {
     model: `models/${MODEL}`,
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
-    systemInstruction: { parts: [{ text: promptFor(mode) }] },
+    systemInstruction: { parts: [{ text: sys }] },
     tools: [{ functionDeclarations: activeDeclarations() }],
     inputAudioTranscription: {},
     outputAudioTranscription: {},
@@ -158,9 +182,10 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 
 // الواجهة (ملفات محددة فقط)
-for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js'])
+for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js', 'assistant.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.' }));
 app.get('/health', (req, res) => res.send('ok'));
+app.get('/d/:id', (req, res) => res.sendFile('dash.html', { root: '.' }));
 
 // رمز الدخول لكل /api
 app.use('/api', (req, res, next) => {
@@ -175,6 +200,7 @@ app.get('/api/session', async (req, res) => {
   const apiVersion = req.query.v || API_VERSION;
   const mode = req.query.mode === 'mine' ? 'mine' : 'live';
   try {
+    const sys = promptFor(mode) + await memoryBlock(); // ذاكرة نورة تنحقن مع كل جلسة
     const now = Date.now();
     const config = {
       uses: 1,
@@ -187,13 +213,13 @@ app.get('/api/session', async (req, res) => {
         model: MODEL,
         config: {
           responseModalities: ['AUDIO'],
-          systemInstruction: promptFor(mode),
+          systemInstruction: sys,
           tools: [{ functionDeclarations: activeDeclarations() }],
         },
       };
     }
     const token = await ai.authTokens.create({ config });
-    res.json({ token: token.name, apiVersion, mode, voice: pickVoice(req.query.voice), setup: buildSetup(mode, pickVoice(req.query.voice)) });
+    res.json({ token: token.name, apiVersion, mode, voice: pickVoice(req.query.voice), setup: buildSetup(mode, pickVoice(req.query.voice), sys) });
   } catch (e) {
     console.error('token error:', e.message);
     res.status(500).json({ error: e.message });
@@ -201,12 +227,12 @@ app.get('/api/session', async (req, res) => {
 });
 
 // 2) تنفيذ الأدوات
-app.post('/api/tools/:name', (req, res) => {
+app.post('/api/tools/:name', async (req, res) => {
   const tool = tools[req.params.name];
   if (!tool) return res.status(404).json({ error: 'أداة غير معروفة' });
   if (tool.write && !ALLOW_WRITES) return res.status(403).json({ error: 'التعديل مقفل' });
   try {
-    const result = tool.run(req.body || {});
+    const result = await tool.run(req.body || {});
     console.log(`[tool] ${req.params.name}`, JSON.stringify(req.body), '→', JSON.stringify(result).slice(0, 200));
     res.json(result);
   } catch (e) {
@@ -246,15 +272,19 @@ app.post('/api/speak', async (req, res) => {
 });
 
 // إعدادات الواجهة (نورة تحفظها هنا)
-app.get('/api/ui', (req, res) => {
-  const r = db.prepare("SELECT value FROM settings WHERE key='ui'").get();
-  res.json(r ? JSON.parse(r.value) : {});
-});
-app.post('/api/ui', (req, res) => {
-  const v = JSON.stringify(req.body || {});
-  if (v.length > 20000) return res.status(413).json({ error: 'كبير' });
-  db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('ui', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at").run(v);
+app.get('/api/ui', async (req, res) => res.json((await kvGet('ui')) || {}));
+app.post('/api/ui', async (req, res) => {
+  if (JSON.stringify(req.body || {}).length > 20000) return res.status(413).json({ error: 'كبير' });
+  await kvSet('ui', req.body || {});
   res.json({ ok: true });
+});
+
+// الذاكرة والداشبوردات
+app.get('/api/memories', async (req, res) => res.json({ memories: await listForUI() }));
+app.delete('/api/memories/:id', async (req, res) => res.json({ ok: !!(await memDelete(+req.params.id)) }));
+app.get('/api/dashboards/:id', async (req, res) => {
+  const d = await dashGet(+req.params.id);
+  d ? res.json(d) : res.status(404).json({ error: 'غير موجود' });
 });
 
 app.get('/api/voices', (req, res) => res.json({ voices: NORA_VOICES, default: VOICE }));
@@ -275,8 +305,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 });
 
 // 4) بيانات اللوحة
-app.get('/api/dashboard', (req, res) => {
+app.get('/api/dashboard', async (req, res) => {
   res.json({
+    dashboards: await dashList(),
+    memories: await listForUI(),
     summary: dataTools.get_dashboard_summary.run(),
     projects: db.prepare('SELECT * FROM projects').all(),
     tickets: dataTools.list_tickets.run().tickets,
@@ -285,4 +317,7 @@ app.get('/api/dashboard', (req, res) => {
   });
 });
 
-app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'})`));
+initMemory(ai);
+initStore()
+  .catch(e => console.error('[store] init failed:', e.message))
+  .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend})`)));
