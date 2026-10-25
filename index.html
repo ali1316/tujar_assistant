@@ -63,6 +63,8 @@
     <div class="card" style="margin-bottom:16px"><h2>المشاريع</h2><table id="projects"></table></div>
     <div class="card" style="margin-bottom:16px"><h2>التذاكر</h2><table id="tickets"></table></div>
     <div class="card docs"><h2>📁 الملفات المرفوعة (اسحب ملف هنا أو اضغط 📎)</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
+    <div class="card docs" style="margin-top:16px"><h2>📊 داشبوردات نورة (قل لها: «سوّي لي داشبورد عن…»)</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
+    <div class="card docs" style="margin-top:16px"><h2>🧠 ذاكرة نورة (تتعلم أسلوبك ومصطلحاتك)</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
     <div class="card docs" style="margin-top:16px"><h2>🛠️ طلبات التطوير (نورة تسجّلها لفريق التطوير)</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
   </section>
   <aside class="card agent">
@@ -79,6 +81,7 @@
 import { GeminiLiveAgent } from './gemini-live-agent.js';
 import { createHUD } from './hud.js';
 import { createUIControl } from './ui-control.js';
+import { createAssistant } from './assistant.js';
 const $ = s => document.querySelector(s);
 const sar = n => new Intl.NumberFormat('ar-SA').format(n);
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
@@ -109,6 +112,11 @@ async function loadDashboard(flash) {
   $('#tickets').innerHTML = '<tr><th>#</th><th>العنوان</th><th>المشروع</th><th>الأولوية</th><th>الحالة</th></tr>' +
     d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td>${t.id}</td><td>${t.title}</td><td>${t.project_name}</td>
       <td><span class="tag ${t.priority}">${t.priority}</span></td><td><span class="tag ${t.status}">${t.status}</span></td></tr>`).join('');
+  if (d.dashboards?.length) $('#dashes').innerHTML = d.dashboards.map(x =>
+    `<li><a href="/d/${x.id}" target="_blank" style="color:var(--acc)">#${x.id} ${esc(x.title)}</a><small>${String(x.created_at).slice(0, 16).replace('T', ' ')}</small></li>`).join('');
+  if (d.memories?.length) $('#mems').innerHTML = d.memories.map(m =>
+    `<li><span><small>[${m.category}]</small> ${esc(m.content)}</span><button class="memdel" data-id="${m.id}" title="انسيها" style="background:none;border:none;color:var(--mute);cursor:pointer">✕</button></li>`).join('');
+  else $('#mems').innerHTML = '<li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li>';
   if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
     `<li><span>#${r.id} ${r.title}</span><small>${r.status} · ${r.created_at.slice(0, 16)}</small></li>`).join('');
   if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
@@ -131,17 +139,23 @@ window.hud = hud;
 const apiJson = async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json();
 const ui = createUIControl({ api: apiJson, hud });
 window.ui = ui;
+const assistant = createAssistant({ api: apiJson, hud, note: t => note(t) });
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('.memdel'); if (!b) return;
+  await api(`/api/memories/${b.dataset.id}`, { method: 'DELETE' }); loadDashboard();
+});
 
 const agent = new GeminiLiveAgent({
   headers: H,
-  clientTools: { ...hud.tools, ...ui.tools },
+  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools },
   on: {
     status: t => $('#status').textContent = t,
     userText: (t, typed) => { if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { bubble('a', t); cur.u = null; },
     turnComplete: () => { cur = { u: null, a: null }; },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
-    toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
   },
