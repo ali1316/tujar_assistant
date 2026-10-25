@@ -54,6 +54,7 @@
 const $ = s => document.querySelector(s);
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 let LOCALE = 'ar-SA';
+let FONT = 'IBM Plex Sans Arabic', ACC = '#3ee6ff';
 const fmt = n => new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 }).format(n);
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
 const id = location.pathname.split('/').pop();
@@ -70,9 +71,15 @@ function countUp(el, to, unit) {
   try {
     const ui = await (await fetch('/api/ui', { headers: { 'x-access-code': CODE } })).json();
     if (ui.numerals === 'latin') LOCALE = 'ar-SA-u-nu-latn';
-    if (ui.numFont) {
-      document.head.insertAdjacentHTML('beforeend', `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(ui.numFont).replace(/%20/g, '+')}:wght@400;700&display=swap"><style>.kpi-val{font-family:'${ui.numFont.replace(/'/g, '')}',sans-serif}</style>`);
-    }
+    const clean = f => String(f || '').replace(/[^\p{L}\p{N} ]/gu, '');
+    const gf = f => `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;500;600;700&display=swap">`;
+    if (ui.font) FONT = clean(ui.font);
+    if (/^#[0-9a-f]{6}$/i.test(ui.colors?.acc || '')) ACC = ui.colors.acc;
+    const NUMF = ui.numFont ? clean(ui.numFont) : FONT;
+    // نفس هوية اللوحة الرئيسية: الخط، خط الأرقام، اللون الرئيسي
+    document.head.insertAdjacentHTML('beforeend', gf(FONT) + (NUMF !== FONT ? gf(NUMF) : '') +
+      `<style>:root{--tblr-font-sans-serif:'${FONT}','IBM Plex Sans Arabic',system-ui,sans-serif;--glow:${ACC}}body,.tabulator{font-family:'${FONT}','IBM Plex Sans Arabic',sans-serif}.kpi-val{font-family:'${NUMF}','${FONT}',sans-serif}.kpi-val small{font-family:'${FONT}',sans-serif}</style>`);
+    await document.fonts.load(`16px '${FONT}'`).catch(() => {});
   } catch {}
   const r = await fetch(`/api/dashboards/${id}`, { headers: { 'x-access-code': CODE } });
   if (!r.ok) { $('#title').textContent = r.status === 401 ? 'افتح لوحة نورة وادخل رمز الدخول أول' : 'الداشبورد غير موجود'; return; }
@@ -106,10 +113,16 @@ function countUp(el, to, unit) {
     $('#charts').append(col);
     try {
       const ch = echarts.init(col.querySelector('.chart'), 'dark', { renderer: 'canvas' });
-      const opt = Object.assign({ backgroundColor: 'transparent', textStyle: { fontFamily: 'IBM Plex Sans Arabic' },
-        color: ['#3ee6ff', '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'], animationDuration: 1400, animationEasing: 'cubicOut',
+      const opt = Object.assign({ backgroundColor: 'transparent', textStyle: { fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` },
+        color: [ACC, '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'], animationDuration: 1400, animationEasing: 'cubicOut',
         tooltip: { trigger: 'item' } }, c.option);
       // كل التسميات تظهر (بدون ما يخفي ECharts بعضها)، ونميّلها لو كثيرة
+      opt.textStyle = { ...(opt.textStyle || {}), fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` }; // الخط موحّد حتى لو الموديل حدد غيره
+      // الأرقام في المحاور والتلميحات بنفس شكل أرقام اللوحة
+      if (LOCALE === 'ar-SA') {
+        [].concat(opt.xAxis || [], opt.yAxis || []).forEach(ax => { if (ax && (ax.type === 'value' || ax.type === undefined && !ax.data)) ax.axisLabel = { formatter: v => fmt(v), ...(ax.axisLabel || {}) }; });
+        opt.tooltip = { valueFormatter: v => typeof v === 'number' ? fmt(v) : v, ...(opt.tooltip || {}) };
+      }
       [].concat(opt.xAxis || []).forEach(ax => { if (ax && ax.type !== 'value' && ax.type !== 'time') { const n = (ax.data || []).length; ax.axisLabel = { interval: 0, rotate: n > 5 ? 25 : 0, ...(ax.axisLabel || {}) }; } });
       ch.setOption(opt); charts.push(ch);
     } catch (e) { col.querySelector('.chart').innerHTML = `<div class="text-danger">تعذّر الرسم: ${esc(e.message)}</div>`; }
