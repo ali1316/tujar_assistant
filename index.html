@@ -371,7 +371,7 @@ const screenToolsExtra = {
     const r = await apiJson('/api/tools/find_knowledge', args);
     const e = r.results?.[0];
     if (!e) return r;
-    const lines = String(e.summary || e.purpose || '').split(/؛|\.\s+|\n+/).map(t => t.trim()).filter(t => t.length > 3);
+    const lines = String(e.summary || e.purpose || '').split(/(؛|\.\s+|\n+)/).reduce((a, t) => { const open = a.length && (a.at(-1).match(/\(/g) || []).length > (a.at(-1).match(/\)/g) || []).length; if (open) a[a.length - 1] += t; else if (!/^(؛|\.\s+|\n+)$/.test(t)) a.push(t); return a; }, []).map(t => t.trim()).filter(t => t.length > 3);
     const secs = (e.sections || []).map(x => typeof x === 'string' ? x : x.section);
     if (e.status && !/كاملة/.test(e.status)) lines.push('⚠️ ' + e.status);
     hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
