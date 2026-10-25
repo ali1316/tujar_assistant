@@ -35,7 +35,14 @@
   h2{font-size:calc(15px*var(--fs-titles));margin:0 0 12px;color:var(--mute);font-weight:600} .flash{animation:fl 1.2s} @keyframes fl{from{background:#2b3f22}}
   /* لوحة الملف داخل الشاشة الرئيسية */
   #filedash{margin-bottom:16px;padding:0;overflow:hidden;border-color:#2b4a6c}
-  #filedash[hidden]{display:none} #filedash,#view{scroll-margin-top:80px}
+  #filedash[hidden]{display:none} [data-v][hidden],#empty[hidden]{display:none!important} .sec{margin-bottom:16px}
+  /* الشاشة الفاضية (مثل ChatGPT): ترحيب في النص وشريط الكلام تحته */
+  #empty{position:fixed;inset-inline:0;top:30vh;text-align:center;padding:0 16px}
+  #empty h2{font-size:30px;color:var(--ink);font-weight:700;margin:0 0 8px} #empty p{color:var(--mute);margin:0;font-size:14px}
+  body.blank #dock{bottom:auto;top:calc(30vh + 100px);background:none}
+  @media(max-width:600px){#empty h2{font-size:23px} body.blank #dock{top:calc(30vh + 120px)}}
+  body.blank main{padding-bottom:40px}
+  header.top h1{cursor:pointer} #filedash,#view{scroll-margin-top:80px}
   .fd-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
   .fd-head h2{margin:0;color:var(--ink);font-size:calc(16px*var(--fs-titles))} .fd-head small{color:var(--mute)}
   .fd-head a,.fd-head button{background:transparent;color:var(--acc);border:1px solid #2b4a6c;border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;text-decoration:none;cursor:pointer}
@@ -99,21 +106,21 @@
 <div id="gate"><form id="gf"><h2 style="text-align:center;color:var(--ink)">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
 <main>
   <section id="home">
-    <div class="card" id="filedash" hidden>
+    <div id="empty"><h2 id="hello">هلا فواز، وش نسوي اليوم؟</h2><p>اطلب بالصوت أو بالكتابة — المشاريع، مهامك، ملف ترفعه، داشبورد، رسالة واتساب…</p></div>
+    <div class="card" id="filedash" data-v="file_dashboard" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
       <div id="fdWait" class="fd-wait" hidden><b>✦ نورة تحلل الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
       <iframe id="fdFrame" title="لوحة الملف"></iframe>
     </div>
-    <div class="kpis" id="kpis"></div>
-    <div class="card" style="margin-bottom:16px"><h2>المشاريع</h2><table id="projects"></table></div>
-    <div class="card" style="margin-bottom:16px"><h2>التذاكر</h2><table id="tickets"></table></div>
-    <div class="two">
-      <div class="card docs"><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
-      <div class="card docs"><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
-      <div class="card docs"><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
-      <div class="card docs"><h2>طلبات التطوير · ينفّذها Claude</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
-    </div>
+    <div class="kpis" id="kpis" data-v="overview" hidden></div>
+    <div class="card sec" data-v="overview projects" hidden><h2>المشاريع</h2><table id="projects"></table></div>
+    <div class="card sec" data-v="overview tickets" hidden><h2>التذاكر</h2><table id="tickets"></table></div>
+    <div class="card sec" data-v="tasks" hidden><h2>مهامي</h2><table id="tasks"></table></div>
+    <div class="card docs sec" data-v="files" hidden><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
+    <div class="card docs sec" data-v="dashboards" hidden><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
+    <div class="card docs sec" data-v="memory" hidden><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
+    <div class="card docs sec" data-v="dev_requests" hidden><h2>طلبات التطوير · ينفّذها Claude</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
   </section>
   <section id="view" hidden></section>
 </main>
@@ -177,6 +184,10 @@ async function loadDashboard(flash) {
   if (d.memories?.length) $('#mems').innerHTML = d.memories.map(m =>
     `<li><span><small>[${m.category}]</small> ${esc(m.content)}</span><button class="memdel" data-id="${m.id}" title="انسيها" style="background:none;border:none;color:var(--mute);cursor:pointer">✕</button></li>`).join('');
   else $('#mems').innerHTML = '<li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li>';
+  const T = d.tasks || [];
+  $('#tasks').innerHTML = T.length ? '<tr><th>#</th><th>المهمة</th><th>الأولوية</th><th>الموعد</th><th>الحالة</th></tr>' + T.map(t =>
+    `<tr style="${t.status === 'منجزة' || t.status === 'ملغاة' ? 'opacity:.5' : ''}"><td class="num">${num(t.id)}</td><td>${esc(t.title)}${t.notes ? `<br><small style="color:var(--mute)">${esc(t.notes)}</small>` : ''}</td><td><span class="tag ${t.priority}">${t.priority}</span></td><td class="num">${t.due_date || '—'}</td><td><span class="tag ${t.status === 'منجزة' ? 'مكتمل' : ''}">${t.status}</span></td></tr>`).join('')
+    : '<tr><td><small style="color:var(--mute)">ما فيه مهام — قل: «سجّل لي مهمة…»</small></td></tr>';
   if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
     `<li><span>#${r.id} ${esc(r.title)}${r.dev_note ? `<br><small style="color:var(--sand)">✦ Claude: ${esc(r.dev_note)}</small>` : ''}</span><small>${esc(r.status)} · ${(r.updated_at || r.created_at).slice(0, 16)}</small></li>`).join('');
   if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
@@ -210,16 +221,32 @@ $('#txt').addEventListener('input', () => { $('#send').hidden = !$('#txt').value
 function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; }
 
 // HUD: النوافذ المنبثقة (نورة تفتحها بأدوات show_*)
+// ===== الشاشة تبدأ فاضية؛ المساعد يعرض الأقسام لما تطلبها (show_screen) =====
+let VIEW = null, CUR_DASH = null;
+const VIEW_LABEL = { overview: 'لوحة المشاريع', projects: 'المشاريع', tickets: 'التذاكر', tasks: 'مهامي', files: 'الملفات', dashboards: 'الداشبوردات', memory: 'الذاكرة', dev_requests: 'طلبات التطوير', file_dashboard: 'لوحة الملف' };
+function renderView() {
+  document.querySelectorAll('#home [data-v]').forEach(el => el.hidden = !VIEW || !el.dataset.v.split(' ').includes(VIEW));
+  $('#empty').hidden = !!VIEW;
+  document.body.classList.toggle('blank', !VIEW && $('#view').hidden);
+  $('#crumb').textContent = VIEW ? '‹ ' + VIEW_LABEL[VIEW] : '';
+}
+window.showView = v => {
+  if (!VIEW_LABEL[v]) return { error: 'قسم غير معروف' };
+  if (v === 'file_dashboard' && !CUR_DASH) return { error: 'ما فيه لوحة ملف — يرفع ملف أول' };
+  hud.closeAll(); VIEW = v; renderView(); scrollTo({ top: 0, behavior: 'smooth' });
+  return { shown_on_screen: VIEW_LABEL[v] };
+};
 // الرسوم تنعرض داخل الشاشة الرئيسية نفسها مكان البيانات، و«رجوع للرئيسية» يرجّع البيانات الأساسية
 const hud = createHUD({
   api: async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json(),
   mount: {
     el: $('#view'),
-    show: title => { $('#home').hidden = true; $('#view').hidden = false; $('#crumb').textContent = '‹ ' + title; scrollTo({ top: 0, behavior: 'smooth' }); },
-    home: () => { $('#view').hidden = true; $('#home').hidden = false; $('#crumb').textContent = ''; },
+    show: title => { $('#home').hidden = true; $('#view').hidden = false; document.body.classList.remove('blank'); $('#crumb').textContent = '‹ ' + title; scrollTo({ top: 0, behavior: 'smooth' }); },
+    home: () => { $('#view').hidden = true; $('#home').hidden = false; VIEW = null; renderView(); },
   },
 });
 window.hud = hud;
+renderView();
 // تحكم نورة بالواجهة (خطوط/ألوان/أحجام/جداول/CSS)
 const apiJson = async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json();
 const ui = createUIControl({ api: apiJson, hud });
@@ -270,27 +297,28 @@ async function loadHistory() {
 }
 
 // ===== لوحة الملف داخل الشاشة الرئيسية =====
-window.showDash = async (id, title = '', sub = '', save = true) => {
+window.showDash = async (id, title = '', sub = '', save = true, show = true) => {
   if (!id) return;
-  hud.closeAll();
-  $('#filedash').hidden = false; $('#fdWait').hidden = true; $('#fdFrame').hidden = false;
+  CUR_DASH = { id, title };
+  $('#fdWait').hidden = true; $('#fdFrame').hidden = false;
   $('#fdTitle').textContent = '✦ لوحة الملف'; $('#fdSub').textContent = sub || title || '';
   $('#fdOpen').href = `/d/${id}`;
   $('#fdFrame').src = `/d/${id}?embed=1`;
-  $('#filedash').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (show) showView('file_dashboard');
   if (save) apiJson('/api/current-dash', { id, title, doc_name: sub.replace(/^من ملف: /, '') || undefined }).catch(() => {});
   return { shown_on_main_screen: true, id };
 };
 function dashWaiting(name) {
-  hud.closeAll();
-  $('#filedash').hidden = false; $('#fdWait').hidden = false; $('#fdFrame').hidden = true;
+  CUR_DASH ||= { id: 0 };
+  $('#fdWait').hidden = false; $('#fdFrame').hidden = true;
   $('#fdTitle').textContent = 'لوحة الملف'; $('#fdSub').textContent = name;
-  $('#filedash').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showView('file_dashboard');
 }
-$('#fdHide').onclick = () => { $('#filedash').hidden = true; apiJson('/api/current-dash', {}).catch(() => {}); };
+$('#fdHide').onclick = () => { VIEW = null; renderView(); };
+$('header.top h1').onclick = () => { hud.closeAll(); VIEW = null; renderView(); };
 addEventListener('message', e => { if (e.origin === location.origin && e.data?.noraDashHeight) $('#fdFrame').style.height = Math.min(Math.max(e.data.noraDashHeight, 300), 3000) + 'px'; });
 async function loadCurrentDash() {
-  try { const c = await apiJson('/api/current-dash'); if (c?.id) showDash(c.id, c.title, c.doc_name ? 'من ملف: ' + c.doc_name : '', false); } catch {}
+  try { const c = await apiJson('/api/current-dash'); if (c?.id) showDash(c.id, c.title, c.doc_name ? 'من ملف: ' + c.doc_name : '', false, false); } catch {}
 }
 
 // نورة «تشوف» الشاشة: تقرأ اللي قدام فواز الحين من الصفحة نفسها
@@ -304,12 +332,13 @@ const screenToolsExtra = {
   },
 };
 const screenTools = {
+  show_screen: ({ view }) => showView(view),
   look_at_screen() {
     const rows = sel => [...document.querySelectorAll(sel + ' tr')].slice(1).map(tr => [...tr.cells].map(c => c.innerText.trim()).filter(Boolean).join(' | '));
     const list = sel => [...document.querySelectorAll(sel + ' li')].map(li => li.innerText.replace(/\s+/g, ' ').trim()).slice(0, 12);
     return {
       page: document.querySelector('header h1')?.innerText,
-      view: $('#view').hidden ? 'الشاشة الرئيسية (البيانات الأساسية)' : 'رسم معروض مكان البيانات: ' + hud.current().join('، ') + ' — «رجوع» يرجّع البيانات',
+      view: !$('#view').hidden ? 'رسم معروض: ' + hud.current().join('، ') : VIEW ? 'قسم معروض: ' + VIEW_LABEL[VIEW] : 'الشاشة فاضية (ترحيب وشريط الكلام بس)',
       kpis: [...document.querySelectorAll('.kpi')].map(k => `${k.querySelector('span')?.innerText}: ${k.querySelector('b')?.innerText}`),
       projects: rows('#projects'), tickets: rows('#tickets'),
       file_dashboard_on_screen: $('#filedash').hidden ? null : $('#fdTitle').innerText + ' ' + $('#fdSub').innerText,
@@ -331,7 +360,7 @@ const agentOpts = {
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
     turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
-    toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     usage: u => trackUsage(u),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 30)}px #e0705f33`,
@@ -442,7 +471,7 @@ async function uploadFile(file) {
   dashWaiting(d.name);
   const g = await apiJson(`/api/docs/${d.id}/dashboard`, {}).catch(e => ({ error: e.message }));
   if (g.ok) { showDash(g.id, g.title, 'من ملف: ' + d.name, false); note(`📊 لوحة الملف جاهزة #${g.id}: ${g.title}`); loadDashboard(); }
-  else { $('#filedash').hidden = true; note('⚠️ ما قدرت أبني اللوحة تلقائياً: ' + (g.error || '')); }
+  else { VIEW = null; renderView(); note('⚠️ ما قدرت أبني اللوحة تلقائياً: ' + (g.error || '')); }
   // 2) نبلّغ نورة عشان تتكلم عنها وتجاوب أسئلتك
   const notice = g.ok
     ? `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وانبنت منه تلقائياً لوحة #${g.id} «${g.title}» وهي معروضة الحين في الشاشة الرئيسية. رحّبي بجملة قصيرة وقولي أبرز رقمين أو ثلاثة منها (من الملف)، وبعدها جاوبي أسئلته عنها من الملف بـ search_documents/read_document.`

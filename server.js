@@ -103,6 +103,7 @@ const visualDeclarations = [
 const FONT_LIST = ['IBM Plex Sans Arabic', 'Cairo', 'Tajawal', 'Almarai', 'Noto Kufi Arabic', 'Noto Naskh Arabic', 'Readex Pro', 'Changa', 'El Messiri', 'Reem Kufi', 'Lalezar', 'Amiri', 'Markazi Text', 'Rubik', 'Baloo Bhaijaan 2', 'Lemonada', 'Kufam', 'Aref Ruqaa', 'Mada', 'Harmattan'];
 const THEME_LIST = ['ليلي أزرق', 'فاتح', 'أخضر سعودي', 'ذهبي صحراوي', 'بنفسجي ملكي', 'هولوجرام', 'وردي ليلي'];
 const uiDeclarations = [
+  { name: 'show_screen', description: 'تعرض قسم على الشاشة الرئيسية (اللي تبدأ فاضية). القسم الجديد ياخذ مكان اللي قبله. للرجوع للشاشة الفاضية: close_visuals.', parameters: { type: 'OBJECT', properties: { view: { type: 'STRING', enum: ['overview', 'projects', 'tickets', 'tasks', 'files', 'dashboards', 'memory', 'dev_requests', 'file_dashboard'] } }, required: ['view'] } },
   { name: 'set_font', description: 'يغيّر خط الواجهة كاملة.', parameters: { type: 'OBJECT', properties: { font: { type: 'STRING', enum: FONT_LIST } }, required: ['font'] } },
   { name: 'show_fonts', description: 'يعرض معرض الخطوط المتاحة بعينات حيّة (لما يطلب يشوف خطوط أو يبي خطوط زيادة).', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'set_theme', description: 'يطبّق ثيم ألوان جاهز.', parameters: { type: 'OBJECT', properties: { theme: { type: 'STRING', enum: THEME_LIST } }, required: ['theme'] } },
@@ -164,11 +165,18 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
   * أي نوع رسم يطلبه (باي، جانت، خريطة حرارية، نقاط، شلال، أي شي) → اجلبي الأرقام بالأدوات (search_projects فيها start_date و due_date و budget و spent و progress)
     ثم render_visual بمواصفة Vega-Lite تكتبينها بنفسك، مع 2-4 عدّادات kpis و 1-3 insights قصيرة. show_chart للأعمدة البسيطة السريعة فقط.
   * قولي جمل قصيرة حماسية مع العرض مثل "تفضّل، هذي الصورة كاملة قدامك".
-  * "رجعي للرئيسية" أو "رجعي البيانات" أو "سكّري" أو "خلاص" → close_visuals (يرجّع الشاشة الأساسية).
+  * "رجعي للرئيسية" أو "فضّي الشاشة" أو "سكّري" أو "خلاص" → close_visuals (ترجع الشاشة فاضية).
   * كل رسم جديد ياخذ مكان اللي قبله؛ ما فيه نوافذ فوق بعض.
-- الشاشة الرئيسية: فواز يشوف صفحة «لوحة مشاريع التحول الرقمي» بهوية اتحاد الغرف، وأنتِ شريط صوتي صغير أسفلها (ما تاخذين مساحة). فيها: 4 بطاقات أرقام (المشاريع، الميزانية، المصروف، التذاكر المفتوحة)،
-  جدول المشاريع، جدول التذاكر، الملفات المرفوعة، داشبوردات نورة، ذاكرة نورة، طلبات التطوير.
-  * "الداشبورد" أو "اللوحة" أو "الشاشة" أو "لوحة المشاريع" أو "هذي الصفحة" بدون رقم = هذي الشاشة الرئيسية، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
+- الشاشة الرئيسية تبدأ فاضية (مثل ChatGPT): ترحيب وشريط الكلام بس. أنتِ اللي تعرضين عليها اللي يطلبه بـ show_screen:
+  overview = لوحة المشاريع (البطاقات + المشاريع + التذاكر)، projects، tickets، tasks = مهامه، files = الملفات المرفوعة،
+  dashboards = الداشبوردات المولّدة، memory = ذاكرتك، dev_requests = طلبات التطوير، file_dashboard = لوحة آخر ملف.
+  * "وريني المشاريع/لوحة المشاريع/مهامي/الملفات…" → show_screen بالقسم المناسب، وبعدها جملة قصيرة عن أهم شي فيه.
+  * لو سأل سؤال تقدرين تجاوبينه بالكلام (رقم، حالة) جاوبي بدون ما تعرضين شي إلا لو طلب يشوفه أو كان العرض يفيد فعلاً.
+  * "الداشبورد" أو "لوحة المشاريع" بدون رقم = overview، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
+- إدارة المهام: "ذكّريني/سجّلي مهمة/عندي شغلة…" → add_task (الموعد YYYY-MM-DD محسوب من تاريخ اليوم)، "وش مهامي" → list_tasks (وقولي أهمها بالكلام، واعرضي tasks لو طلب)،
+  "خلصت كذا" → update_task بالحالة منجزة. رتّبيها له حسب الأولوية والموعد لما يسأل وش أبدأ فيه.
+- Claude هو المطوّر والباك اند حقك: أي شي ما تقدرين تسوينه بأدواتك (ميزة جديدة، تكامل، ربط حساب، شي على اللابتوب، تقرير خاص) → request_dev_change بالتفاصيل كاملة،
+  وقولي له إن Claude استلمه وبيطوّره وينعكس على الواجهة.
   * لما يرفع ملف، النظام يبني «لوحة الملف» تلقائياً ويعرضها داخل الشاشة الرئيسية، ويوصلك تنبيه برقمها. أسئلته بعدها عن «اللوحة» أو «الأرقام» أو «الملف» = عن هذي اللوحة وملفها:
     جاوبي من الملف بـ search_documents/read_document، ولو طلب تعديل عليها (رسم إضافي، تقسيم مختلف) ابني نسخة جديدة بـ build_dashboard وتنعرض مكانها.
   * بيانات Excel/CSV محفوظة كجداول منظّمة (مذكورة تحت بأعمدتها):
@@ -242,11 +250,11 @@ async function screenBlock() {
     const docs = db.prepare('SELECT id, name, chars FROM documents ORDER BY id DESC LIMIT 1').all();
     const cur = (await getCurrentDash()) || {};
     const catalog = await latestCatalog();
-    return `\n\n## الشاشة الرئيسية الحين (لوحة مشاريع التحول الرقمي)
+    return `\n\n## بيانات المنصة (الشاشة تبدأ فاضية، وهذي البيانات تقدرين تعرضينها بـ show_screen)
 - البطاقات: ${projects.length} مشاريع، الميزانية ${s.total_budget} ريال، المصروف ${s.total_spent} ريال، ${s.open_tickets} تذاكر مفتوحة (${s.high_priority_open} عالية).
 - المشاريع: ${projects.map(p => `#${p.id} ${p.name} (${p.status}، ${p.progress}%)`).join('، ')}.
 - شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
-- لوحة معروضة الحين داخل الشاشة الرئيسية (فوق البطاقات): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.
+- لوحة آخر ملف (file_dashboard): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.
 - بيانات الملف الجاهزة للتحليل الفوري (استخدمي أسماء الأعمدة حرفياً):\n${catalog || 'لا يوجد ملف Excel/CSV'}
 - آخر ملف مرفوع: ${docs.length ? `#${docs[0].id} «${docs[0].name}» (${docs[0].chars} حرف)` : 'لا يوجد'}.
 - داشبوردات مولّدة محفوظة: ${dashes.length ? dashes.slice(0, 10).map(d => `#${d.id} ${d.title}`).join('، ') : 'لا يوجد'}.`;
@@ -482,6 +490,7 @@ app.get('/api/dashboard', async (req, res) => {
     tickets: dataTools.list_tickets.run().tickets,
     documents: docTools.list_documents.run().documents,
     dev_requests: dataTools.list_dev_requests.run().requests,
+    tasks: dataTools.list_tasks.run({ status: 'all' }).tasks,
   });
 });
 

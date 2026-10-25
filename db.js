@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS dev_requests (
   status TEXT NOT NULL DEFAULT 'جديد', created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`);
 
+// إدارة المهام (المساعد يضيفها ويتابعها لفواز)
+db.exec(`CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY, title TEXT NOT NULL, notes TEXT, due_date TEXT, priority TEXT NOT NULL DEFAULT 'متوسطة',
+  status TEXT NOT NULL DEFAULT 'جديدة', created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT
+);`);
+
 // ترقية: ملاحظة المطوّر (Claude) ووقت آخر تحديث لطلبات التطوير
 for (const [c, t] of [['dev_note', 'TEXT'], ['updated_at', 'TEXT']])
   if (!db.prepare('PRAGMA table_info(dev_requests)').all().some(x => x.name === c)) db.exec(`ALTER TABLE dev_requests ADD COLUMN ${c} ${t}`);
@@ -200,6 +206,44 @@ export const tools = {
     run: ({ title, details }) => {
       const r = db.prepare('INSERT INTO dev_requests (title, details) VALUES (?,?)').run(title, details);
       return { ok: true, request_id: r.lastInsertRowid, status: 'جديد' };
+    },
+  },
+
+  add_task: {
+    declaration: {
+      name: 'add_task',
+      description: 'يضيف مهمة لقائمة مهام فواز (إدارة المهام). due_date بصيغة YYYY-MM-DD لو ذكر موعد (احسبيه من تاريخ اليوم). priority: عالية/متوسطة/منخفضة.',
+      parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, notes: { type: 'STRING' }, due_date: { type: 'STRING' }, priority: { type: 'STRING', enum: ['عالية', 'متوسطة', 'منخفضة'] } }, required: ['title'] },
+    },
+    write: true,
+    run: ({ title, notes = null, due_date = null, priority = 'متوسطة' }) => {
+      const r = db.prepare('INSERT INTO tasks (title, notes, due_date, priority) VALUES (?,?,?,?)').run(title, notes, due_date, priority);
+      return { ok: true, task_id: r.lastInsertRowid };
+    },
+  },
+  list_tasks: {
+    declaration: {
+      name: 'list_tasks',
+      description: 'يعرض مهام فواز (الافتراضي: المفتوحة). status: open (جديدة/قيد التنفيذ) أو all أو done.',
+      parameters: { type: 'OBJECT', properties: { status: { type: 'STRING', enum: ['open', 'all', 'done'] } } },
+    },
+    run: ({ status = 'open' } = {}) => {
+      const where = status === 'all' ? '' : status === 'done' ? "WHERE status='منجزة'" : "WHERE status!='منجزة' AND status!='ملغاة'";
+      return { today: new Date().toISOString().slice(0, 10), tasks: db.prepare(`SELECT * FROM tasks ${where} ORDER BY CASE priority WHEN 'عالية' THEN 0 WHEN 'متوسطة' THEN 1 ELSE 2 END, COALESCE(due_date,'9999'), id`).all() };
+    },
+  },
+  update_task: {
+    declaration: {
+      name: 'update_task',
+      description: 'يحدّث مهمة: status (جديدة/قيد التنفيذ/منجزة/ملغاة) أو العنوان أو الموعد أو الأولوية أو الملاحظات.',
+      parameters: { type: 'OBJECT', properties: { id: { type: 'INTEGER' }, status: { type: 'STRING', enum: ['جديدة', 'قيد التنفيذ', 'منجزة', 'ملغاة'] }, title: { type: 'STRING' }, due_date: { type: 'STRING' }, priority: { type: 'STRING', enum: ['عالية', 'متوسطة', 'منخفضة'] }, notes: { type: 'STRING' } }, required: ['id'] },
+    },
+    write: true,
+    run: ({ id, ...f }) => {
+      const keys = ['status', 'title', 'due_date', 'priority', 'notes'].filter(k => f[k] != null);
+      if (!keys.length) return { error: 'ما فيه شي يتحدّث' };
+      const r = db.prepare(`UPDATE tasks SET ${keys.map(k => `${k}=?`).join(', ')}, updated_at=datetime('now') WHERE id=?`).run(...keys.map(k => f[k]), id);
+      return r.changes ? { ok: true, task_id: id } : { error: 'المهمة غير موجودة' };
     },
   },
 

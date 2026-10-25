@@ -4,7 +4,7 @@ import { db } from './db.js';
 import { indexDocument } from './docs.js';
 import { kvGet, kvSet, backend } from './store.js';
 
-const TABLES = ['projects', 'tickets', 'dev_requests', 'documents'];
+const TABLES = ['projects', 'tickets', 'dev_requests', 'documents', 'tasks'];
 let timer;
 
 export async function snapshot() {
