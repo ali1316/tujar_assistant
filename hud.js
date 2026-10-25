@@ -10,7 +10,7 @@ const CSS = `
   background:linear-gradient(160deg,rgba(20,60,110,.35),transparent 40%),var(--glass);
   border:1px solid rgba(62,230,255,.45);border-radius:6px;padding:20px 22px 18px;color:#dff8ff;
   box-shadow:0 0 0 1px rgba(62,230,255,.08),0 0 40px rgba(62,230,255,.25),inset 0 0 60px rgba(62,230,255,.08);
-  backdrop-filter:blur(10px);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;
+  backdrop-filter:blur(10px);font-family:var(--font),'IBM Plex Sans Arabic',system-ui,sans-serif;
   animation:hud-in .75s cubic-bezier(.2,.9,.2,1) both;transform-origin:50% 60%}
 .hud.out{animation:hud-out .35s ease-in both}
 @keyframes hud-in{0%{opacity:0;transform:rotateX(55deg) scale(.6) translateY(80px);filter:blur(8px) brightness(3)}
@@ -34,9 +34,9 @@ const CSS = `
 .hud .cell{border:1px solid rgba(62,230,255,.2);background:rgba(62,230,255,.04);border-radius:4px;padding:12px;min-width:0;
   opacity:0;animation:hud-cell .5s ease-out both}
 @keyframes hud-cell{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.hud .lbl{font-size:12px;color:#8fc9dc;letter-spacing:.04em}
-.hud .big{font:700 30px/1.1 ui-monospace,monospace;color:#fff;text-shadow:0 0 14px rgba(62,230,255,.7);font-variant-numeric:tabular-nums;margin-top:6px}
-.hud .big small{font-size:13px;color:#8fc9dc;font-weight:400}
+.hud .lbl{font-size:12px;color:#8fc9dc}
+.hud .big{font:700 30px/1.1 var(--num-font,var(--font)),'IBM Plex Sans Arabic',sans-serif;color:#fff;text-shadow:0 0 14px rgba(62,230,255,.7);font-variant-numeric:tabular-nums;margin-top:6px}
+.hud .big small{font-size:13px;color:#8fc9dc;font-weight:400;font-family:var(--font),'IBM Plex Sans Arabic',sans-serif;letter-spacing:0}
 .hud .gauge{display:grid;place-items:center;position:relative}
 .hud .gauge svg{width:150px;height:150px;transform:rotate(-90deg);filter:drop-shadow(0 0 8px rgba(62,230,255,.6))}
 .hud .gauge .val{position:absolute;text-align:center}
@@ -67,6 +67,9 @@ const fmt = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA
 // أسماء الشهور والأيام بالعربي في رسوم Vega (بدل January/Monday)
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 const AR_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+// هوية موحّدة: نفس خط الواجهة وشكل أرقامها في كل الرسوم
+const brandFont = () => { const f = getComputedStyle(document.documentElement).getPropertyValue('--font').trim().replace(/^['"]|['"]$/g, ''); return `'${f || 'IBM Plex Sans Arabic'}', 'IBM Plex Sans Arabic', sans-serif`; };
+const numLocale = () => ({ decimal: '.', thousands: ',', grouping: [3], currency: ['', ' ر.س'], ...(window.NORA_NUMERALS === 'latin' ? {} : { numerals: ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'], decimal: '٫', thousands: '٬' }) });
 const AR_TIME_LOCALE = { dateTime: '%A، %e %B %Y، %X', date: '%d/%m/%Y', time: '%H:%M:%S', periods: ['ص', 'م'],
   days: AR_DAYS, shortDays: AR_DAYS, months: AR_MONTHS, shortMonths: AR_MONTHS };
 
@@ -157,6 +160,7 @@ export function createHUD({ api }) {
   }
   function chart(el, canvas, cfg) {
     if (!window.Chart) { canvas.replaceWith(Object.assign(document.createElement('div'), { textContent: 'مكتبة الرسوم ما تحمّلت' })); return; }
+    Chart.defaults.font.family = brandFont();
     const c = new Chart(canvas, cfg); (el._charts ||= []).push(c);
   }
 
@@ -272,7 +276,8 @@ export function createHUD({ api }) {
     // الواجهة تتحكم بالحجم والشكل
     delete spec.width; delete spec.height; delete spec.background; delete spec.config; delete spec.autosize;
     if (!spec.hconcat && !spec.vconcat && !spec.concat && !spec.facet && !spec.repeat) { spec.width = 'container'; spec.height = 300; }
-    spec.config = VEGA_CONFIG;
+    const font = brandFont();
+    spec.config = { ...VEGA_CONFIG, font, axis: { ...VEGA_CONFIG.axis, labelFont: font, titleFont: font }, legend: { ...VEGA_CONFIG.legend, labelFont: font, titleFont: font }, title: { ...VEGA_CONFIG.title, font, subtitleFont: font }, text: { ...VEGA_CONFIG.text, font } };
     spec.autosize = { type: 'fit', contains: 'padding' };
     try { await loadVega(); } catch (e) { return { error: e.message }; }
 
@@ -284,7 +289,9 @@ export function createHUD({ api }) {
     }
     const box = document.createElement('div'); box.className = 'vl'; body.append(box);
     try {
-      await vegaEmbed(box, spec, { actions: false, renderer: 'svg', timeFormatLocale: AR_TIME_LOCALE });
+      await vegaEmbed(box, spec, { actions: false, renderer: 'svg', timeFormatLocale: AR_TIME_LOCALE, formatLocale: numLocale() });
+      // السنوات والتواريخ في المحاور تتبع شكل الأرقام المختار
+      if (window.NORA_NUMERALS !== 'latin') box.querySelectorAll('svg text').forEach(t => { t.textContent = t.textContent.replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]); });
     } catch (e) {
       box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
       setTimeout(() => close(el), 2500);
