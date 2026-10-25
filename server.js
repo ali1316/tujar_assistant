@@ -33,21 +33,19 @@ const SYSTEM_PROMPT = `أنت "مساعد اللوحة"، مساعد صوتي ل
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// mode = 'live' (صوت Live الأصلي، أسرع)  |  'mine' (Live يرد نص → يتحول لصوت فواز عبر Gemini TTS)
+// mode = 'live' (صوت Live الأصلي، أسرع)  |  'mine' (نص ترجمة رد Live → يتحول لصوت فواز عبر Gemini TTS)
+// ملاحظة: gemini-3.8-live ما يدعم TEXT كمخرج، فنخليه AUDIO ونستخدم outputAudioTranscription
 const promptFor = mode => mode === 'mine'
   ? SYSTEM_PROMPT + '\n- ردك بيتحوّل لصوت، فاكتب كلام منطوق طبيعي بدون رموز أو نقاط أو جداول أو إيموجي.'
   : SYSTEM_PROMPT;
 function buildSetup(mode) {
-  const audio = mode !== 'mine';
   return {
     model: `models/${MODEL}`,
-    generationConfig: audio
-      ? { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } } }
-      : { responseModalities: ['TEXT'] },
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } } },
     systemInstruction: { parts: [{ text: promptFor(mode) }] },
     tools: [{ functionDeclarations: activeDeclarations() }],
     inputAudioTranscription: {},
-    ...(audio ? { outputAudioTranscription: {} } : {}),
+    outputAudioTranscription: {},
     realtimeInputConfig: { automaticActivityDetection: { silenceDurationMs: 700, prefixPaddingMs: 40 } },
   };
 }
@@ -84,7 +82,7 @@ app.get('/api/session', async (req, res) => {
       config.liveConnectConstraints = {
         model: MODEL,
         config: {
-          responseModalities: [mode === 'mine' ? 'TEXT' : 'AUDIO'],
+          responseModalities: ['AUDIO'],
           systemInstruction: promptFor(mode),
           tools: [{ functionDeclarations: activeDeclarations() }],
         },
