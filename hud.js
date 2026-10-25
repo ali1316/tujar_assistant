@@ -48,6 +48,15 @@ const CSS = `
 .hud ul.tk{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;font-size:13px}
 .hud ul.tk li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed rgba(62,230,255,.15);padding-bottom:5px}
 .hud .typing{font-size:13px;color:var(--c);min-height:1.2em;margin-top:12px;font-family:ui-monospace,monospace;direction:ltr;text-align:right}
+
+.hud .vl{width:100%;min-height:300px;animation:hud-reveal 1.3s .35s cubic-bezier(.3,.8,.2,1) both;filter:drop-shadow(0 0 6px rgba(62,230,255,.35))}
+@keyframes hud-reveal{from{clip-path:inset(0 0 0 100%);opacity:.3}to{clip-path:inset(0 0 0 0);opacity:1}}
+.hud .vl,.hud .vl .vega-embed{width:100%;direction:ltr}.hud .vl details{display:none}
+.hud .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.hud ul.ins{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.hud ul.ins li{font-size:14px;color:#dff8ff;opacity:0;animation:hud-cell .5s ease-out both;padding-inline-start:14px;position:relative}
+.hud ul.ins li::before{content:"▸";position:absolute;inset-inline-start:0;color:var(--c)}
+.hud .err{color:var(--bad);font-family:ui-monospace,monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap}
 @media (prefers-reduced-motion:reduce){.hud,.hud .cell,.hud::after{animation:none!important;opacity:1}}
 `;
 
@@ -225,11 +234,71 @@ export function createHUD({ api }) {
     return { shown: true, projects: d.projects.length, total_budget: s.total_budget, total_spent: s.total_spent, open_tickets: s.open_tickets };
   }
 
+  // ===== رسم يُولّد في اللحظة: نورة تكتب مواصفة Vega-Lite =====
+  let vegaReady;
+  const loadScript = src => new Promise((ok, bad) => { const t = document.createElement('script'); t.src = src; t.onload = ok; t.onerror = () => bad(new Error('تعذّر تحميل ' + src)); document.head.append(t); });
+  function loadVega() {
+    return vegaReady ??= (async () => {
+      await loadScript('https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js');
+      await loadScript('https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js');
+      await loadScript('https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js');
+    })();
+  }
+  const VEGA_CONFIG = {
+    background: null, padding: 6,
+    font: "'IBM Plex Sans Arabic', system-ui, sans-serif",
+    view: { stroke: null },
+    axis: { labelColor: '#bfe9f5', titleColor: '#8fc9dc', gridColor: 'rgba(62,230,255,.12)', domainColor: 'rgba(62,230,255,.35)', tickColor: 'rgba(62,230,255,.35)', labelFontSize: 12, titleFontSize: 12, labelLimit: 220 },
+    legend: { labelColor: '#dff8ff', titleColor: '#8fc9dc', labelFontSize: 12, symbolType: 'square', labelLimit: 220 },
+    title: { color: '#dff8ff' },
+    range: { category: PALETTE, ramp: ['#0b2a4a', '#1b5f8f', '#3ee6ff', '#c9fbff'], heatmap: ['#0b2a4a', '#1b5f8f', '#3ee6ff', '#c9fbff'] },
+    mark: { color: '#3ee6ff' },
+    bar: { cornerRadiusEnd: 3, stroke: '#3ee6ff', strokeOpacity: .6 },
+    arc: { stroke: '#081830', strokeWidth: 3 },
+    line: { strokeWidth: 3 }, point: { filled: true, size: 70 },
+    text: { color: '#ffffff', fontSize: 12 },
+  };
+
+  async function showVisual({ title, subtitle = '', vega_lite, kpis = [], insights = [] }) {
+    let spec;
+    try { spec = typeof vega_lite === 'string' ? JSON.parse(vega_lite) : vega_lite; }
+    catch (e) { return { error: 'vega_lite مو JSON صالح: ' + e.message }; }
+    if (!spec || typeof spec !== 'object') return { error: 'vega_lite فاضي' };
+    // الواجهة تتحكم بالحجم والشكل
+    delete spec.width; delete spec.height; delete spec.background; delete spec.config; delete spec.autosize;
+    if (!spec.hconcat && !spec.vconcat && !spec.concat && !spec.facet && !spec.repeat) { spec.width = 'container'; spec.height = 300; }
+    spec.config = VEGA_CONFIG;
+    spec.autosize = { type: 'fit', contains: 'padding' };
+    try { await loadVega(); } catch (e) { return { error: e.message }; }
+
+    const el = panel('LIVE · RENDER', title, subtitle);
+    const body = el.querySelector('.body');
+    if (kpis.length) {
+      const k = document.createElement('div'); k.className = 'kpis'; body.append(k);
+      kpis.slice(0, 4).forEach((x, i) => cell(k, `<div class="lbl">${esc(x.label)}</div><div class="big" data-count="${+x.value || 0}" data-suffix=" <small>${esc(x.unit || '')}</small>">0</div>`, 150 + i * 120));
+    }
+    const box = document.createElement('div'); box.className = 'vl'; body.append(box);
+    try {
+      await vegaEmbed(box, spec, { actions: false, renderer: 'svg' });
+    } catch (e) {
+      box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+      setTimeout(() => close(el), 2500);
+      return { error: 'فشل الرسم: ' + e.message };
+    }
+    if (insights.length) {
+      const ul = document.createElement('ul'); ul.className = 'ins'; body.append(ul);
+      insights.slice(0, 3).forEach((t, i) => { const li = document.createElement('li'); li.textContent = t; li.style.animationDelay = `${1300 + i * 450}ms`; ul.append(li); });
+    }
+    animate(el);
+    return { shown: true, title };
+  }
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 
   return {
-    showProject, showChart, showOverview, closeAll,
+    showProject, showChart, showOverview, showVisual, closeAll,
     // جاهزة كـ clientTools للوكيل
-    tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, close_visuals: closeAll },
+    tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll },
   };
 }
