@@ -35,6 +35,9 @@
   .drop{outline:2px dashed var(--acc);outline-offset:-6px}
   #gate{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:9}
   #gate form{flex-direction:column;width:300px} #gate input{padding:12px} #gate button{padding:10px}
+  .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;align-self:center}
+  .seg button{background:none;border:none;color:var(--mute);padding:6px 12px;border-radius:7px;cursor:pointer;font:inherit;font-size:13px}
+  .seg button.on{background:var(--acc);color:#fff}
 </style>
 </head>
 <body>
@@ -48,6 +51,7 @@
     <div class="card docs"><h2>📁 الملفات المرفوعة (اسحب ملف هنا أو اضغط 📎)</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
   </section>
   <aside class="card agent">
+    <div class="seg" id="seg"><button data-m="live">⚡ صوت Live</button><button data-m="mine">🗣️ صوتي</button></div>
     <button class="mic" id="mic" title="ابدأ المحادثة">🎙️</button>
     <div id="status">اضغط المايك وتكلّم — مثلاً: «وش وضع المشاريع المتأخرة؟»</div>
     <div id="log"></div>
@@ -115,14 +119,23 @@ const agent = new GeminiLiveAgent({
 });
 
 let running = false;
+let MODE = 'live'; try { MODE = localStorage.getItem('voiceMode') || 'live'; } catch {}
+const paintSeg = () => document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.m === MODE));
+paintSeg();
+document.querySelectorAll('#seg button').forEach(b => b.onclick = async () => {
+  if (b.dataset.m === MODE) return;
+  MODE = b.dataset.m; try { localStorage.setItem('voiceMode', MODE); } catch {} paintSeg();
+  note(MODE === 'mine' ? '🗣️ صار يرد بصوتك (أبطأ شوي)' : '⚡ رجع لصوت Live السريع');
+  if (running) { agent.stop(); try { await agent.start({ mode: MODE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
+});
 $('#mic').onclick = async () => {
   if (running) { agent.stop(); running = false; $('#mic').classList.remove('on'); return; }
-  try { await agent.start(); running = true; $('#mic').classList.add('on'); }
+  try { await agent.start({ mode: MODE }); running = true; $('#mic').classList.add('on'); }
   catch (e) { $('#status').textContent = '❌ ' + e.message; }
 };
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
-  if (!running) { try { await agent.start({ mic: false }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
+  if (!running) { try { await agent.start({ mic: false, mode: MODE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
   agent.sendText(t); $('#txt').value = '';
 };
 
