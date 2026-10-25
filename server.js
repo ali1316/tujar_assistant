@@ -78,9 +78,36 @@ const visualDeclarations = [
   },
 ];
 
+// أدوات «التحكم بالواجهة»: تنفّذ في المتصفح وتنحفظ في /api/ui
+const FONT_LIST = ['IBM Plex Sans Arabic', 'Cairo', 'Tajawal', 'Almarai', 'Noto Kufi Arabic', 'Noto Naskh Arabic', 'Readex Pro', 'Changa', 'El Messiri', 'Reem Kufi', 'Lalezar', 'Amiri', 'Markazi Text', 'Rubik', 'Baloo Bhaijaan 2', 'Lemonada', 'Kufam', 'Aref Ruqaa', 'Mada', 'Harmattan'];
+const THEME_LIST = ['ليلي أزرق', 'فاتح', 'أخضر سعودي', 'ذهبي صحراوي', 'بنفسجي ملكي', 'هولوجرام', 'وردي ليلي'];
+const uiDeclarations = [
+  { name: 'set_font', description: 'يغيّر خط الواجهة كاملة.', parameters: { type: 'OBJECT', properties: { font: { type: 'STRING', enum: FONT_LIST } }, required: ['font'] } },
+  { name: 'show_fonts', description: 'يعرض معرض الخطوط المتاحة بعينات حيّة (لما يطلب يشوف خطوط أو يبي خطوط زيادة).', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'set_theme', description: 'يطبّق ثيم ألوان جاهز.', parameters: { type: 'OBJECT', properties: { theme: { type: 'STRING', enum: THEME_LIST } }, required: ['theme'] } },
+  {
+    name: 'set_colors', description: 'يغيّر ألوان محددة بصيغة hex. bg=الخلفية، card=البطاقات، line=الحدود، ink=النص، mute=النص الثانوي، acc=اللون الرئيسي، ok/warn/bad=ألوان الحالات.',
+    parameters: { type: 'OBJECT', properties: Object.fromEntries(['bg', 'card', 'line', 'ink', 'mute', 'acc', 'ok', 'warn', 'bad'].map(k => [k, { type: 'STRING' }])) },
+  },
+  {
+    name: 'set_text_size', description: 'يكبّر أو يصغّر الخط. scale من 0.6 إلى 2.2 (1 = الطبيعي، 1.2 = أكبر 20٪).',
+    parameters: { type: 'OBJECT', properties: { target: { type: 'STRING', enum: ['all', 'table', 'kpi', 'chat', 'header', 'titles'] }, scale: { type: 'NUMBER' } }, required: ['scale'] },
+  },
+  { name: 'set_table_style', description: 'يغيّر شكل الجداول.', parameters: { type: 'OBJECT', properties: { style: { type: 'STRING', enum: ['default', 'striped', 'compact', 'bordered', 'glass', 'cards'] } }, required: ['style'] } },
+  { name: 'set_corners', description: 'استدارة زوايا البطاقات بالبكسل (0 حادة، 24 دائرية).', parameters: { type: 'OBJECT', properties: { radius: { type: 'NUMBER' } }, required: ['radius'] } },
+  {
+    name: 'apply_custom_css', description: 'لأي تعديل شكلي ما تغطيه الأدوات الثانية: اكتبي CSS. المحددات المتاحة: header, h1, h2, .kpi, .kpi b, .card, table, th, td, .tag, .bar i, .mic, #log, .m.u, .m.a, aside.agent. المتغيرات: --bg --card --line --ink --mute --acc. ممنوع روابط خارجية.',
+    parameters: { type: 'OBJECT', properties: { css: { type: 'STRING' }, description: { type: 'STRING', description: 'وصف قصير بالعربي للتعديل' } }, required: ['css', 'description'] },
+  },
+  { name: 'undo_ui', description: 'يتراجع عن آخر تغيير في الواجهة.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'reset_ui', description: 'يرجّع الواجهة لشكلها الأصلي.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'get_ui_state', description: 'يرجّع إعدادات الواجهة الحالية (الخط، الألوان، الأحجام...).', parameters: { type: 'OBJECT', properties: {} } },
+];
+
 const activeDeclarations = () => [
   ...Object.entries(tools).filter(([, t]) => ALLOW_WRITES || !t.write).map(([, t]) => t.declaration),
   ...visualDeclarations,
+  ...uiDeclarations,
 ].map(d => ({ ...d, behavior: 'BLOCKING' }));
 
 const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لمنصة متابعة مشاريع التحول الرقمي. أنثى، واثقة، حماسية وودودة.
@@ -93,6 +120,13 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
     ثم render_visual بمواصفة Vega-Lite تكتبينها بنفسك، مع 2-4 عدّادات kpis و 1-3 insights قصيرة. show_chart للأعمدة البسيطة السريعة فقط.
   * قولي جمل قصيرة حماسية مع العرض مثل "تفضّل، هذي الصورة كاملة قدامك".
   * "سكّري" أو "قفّلي الشاشات" → close_visuals.
+- أنتِ الواجهة اللي تدير الشركة: تقدرين تعدّلين شكل اللوحة نفسها فوراً:
+  * خط → set_font، "وريني خطوط"/"أبي خطوط زيادة" → show_fonts، ألوان أو ثيم → set_theme أو set_colors،
+    "كبّري/صغّري" → set_text_size، شكل الجداول → set_table_style، الزوايا → set_corners،
+    أي تعديل شكلي ثاني → apply_custom_css، "رجّعي" → undo_ui، "الشكل الأصلي" → reset_ui.
+  * نفّذي مباشرة بدون استئذان (التعديلات الشكلية آمنة وتنتراجع)، وبعدها قولي بالتفصيل وش تغيّر.
+  * لو الطلب أكبر من الشكل (ميزة جديدة، صفحة، تكامل، تعديل بالبيانات أو الباك اند) → request_dev_change
+    واكتبي التفاصيل كاملة، وقولي له إن الطلب انسجّل برقم كذا عند فريق التطوير.
 - أي رقم أو اسم أو حالة لازم تجيبه من الأدوات؛ لا تخمّن ولا تألّف بيانات.
 - المبالغ بالريال، اقرأها بشكل طبيعي (مثلاً "مليون ومية ألف").
 - قبل أي إضافة أو تعديل في البيانات، أكّد مع المستخدم بجملة وحدة وانتظر موافقته.
@@ -124,7 +158,7 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 
 // الواجهة (ملفات محددة فقط)
-for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js'])
+for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.' }));
 app.get('/health', (req, res) => res.send('ok'));
 
@@ -211,6 +245,18 @@ app.post('/api/speak', async (req, res) => {
   }
 });
 
+// إعدادات الواجهة (نورة تحفظها هنا)
+app.get('/api/ui', (req, res) => {
+  const r = db.prepare("SELECT value FROM settings WHERE key='ui'").get();
+  res.json(r ? JSON.parse(r.value) : {});
+});
+app.post('/api/ui', (req, res) => {
+  const v = JSON.stringify(req.body || {});
+  if (v.length > 20000) return res.status(413).json({ error: 'كبير' });
+  db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('ui', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at").run(v);
+  res.json({ ok: true });
+});
+
 app.get('/api/voices', (req, res) => res.json({ voices: NORA_VOICES, default: VOICE }));
 
 // 3) رفع ملف → استخراج النص → الداتابيس
@@ -235,6 +281,7 @@ app.get('/api/dashboard', (req, res) => {
     projects: db.prepare('SELECT * FROM projects').all(),
     tickets: dataTools.list_tickets.run().tickets,
     documents: docTools.list_documents.run().documents,
+    dev_requests: dataTools.list_dev_requests.run().requests,
   });
 });
 
