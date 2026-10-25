@@ -262,7 +262,10 @@ async function uploadFile(file) {
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
   loadDashboard();
   // نعلم المساعد إن فيه ملف جديد عشان يقدر يسأل عنه مباشرة
-  if (agent.connected) agent.sendText(`[تنبيه النظام] رفع المستخدم ملف جديد اسمه "${d.name}" ورقمه ${d.id} وطوله ${d.chars} حرف.`, { silent: true });
+  window.NORA_LAST_DOC = d;
+  const notice = `[تنبيه النظام] رفع المستخدم ملف جديد اسمه "${d.name}" ورقمه ${d.id} وطوله ${d.chars} حرف. أي طلب جاي (داشبورد، ملخص، شارت، تحليل) بدون ما يحدد مصدر = يقصد هذا الملف: اقرئيه كامل بـ read_document (كل الصفحات) قبل ما تبنين أي شي.`;
+  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
+  if (agent.connected) agent.sendText(notice, { silent: true });
 }
 $('#attach').onclick = () => $('#file').click();
 $('#file').onchange = e => { [...e.target.files].forEach(uploadFile); e.target.value = ''; };
