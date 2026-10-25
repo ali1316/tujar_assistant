@@ -13,6 +13,8 @@ const API_VERSION = process.env.GEMINI_API_VERSION || 'v1alpha';
 const LOCK_CONFIG = process.env.LOCK_CONFIG !== 'false';
 const ALLOW_WRITES = process.env.ALLOW_WRITES !== 'false';
 const ACCESS_CODE = process.env.ACCESS_CODE || ''; // لو فاضي = بدون رمز (للتجربة المحلية)
+const MY_VOICE_ID = process.env.MY_VOICE_ID || 'voice_xb1ye60p9o3i'; // صوت فواز المستنسخ في Gemini
+const TTS_MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
 const tools = { ...dataTools, ...docTools };
 const activeDeclarations = () => Object.entries(tools)
@@ -31,17 +33,21 @@ const SYSTEM_PROMPT = `أنت "مساعد اللوحة"، مساعد صوتي ل
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-function buildSetup() {
+// mode = 'live' (صوت Live الأصلي، أسرع)  |  'mine' (Live يرد نص → يتحول لصوت فواز عبر Gemini TTS)
+const promptFor = mode => mode === 'mine'
+  ? SYSTEM_PROMPT + '\n- ردك بيتحوّل لصوت، فاكتب كلام منطوق طبيعي بدون رموز أو نقاط أو جداول أو إيموجي.'
+  : SYSTEM_PROMPT;
+function buildSetup(mode) {
+  const audio = mode !== 'mine';
   return {
     model: `models/${MODEL}`,
-    generationConfig: {
-      responseModalities: ['AUDIO'],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } },
-    },
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    generationConfig: audio
+      ? { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } } }
+      : { responseModalities: ['TEXT'] },
+    systemInstruction: { parts: [{ text: promptFor(mode) }] },
     tools: [{ functionDeclarations: activeDeclarations() }],
     inputAudioTranscription: {},
-    outputAudioTranscription: {},
+    ...(audio ? { outputAudioTranscription: {} } : {}),
     realtimeInputConfig: { automaticActivityDetection: { silenceDurationMs: 700, prefixPaddingMs: 40 } },
   };
 }
@@ -65,6 +71,7 @@ app.get('/api/ping', (req, res) => res.json({ ok: true }));
 app.get('/api/session', async (req, res) => {
   if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY غير مضبوط' });
   const apiVersion = req.query.v || API_VERSION;
+  const mode = req.query.mode === 'mine' ? 'mine' : 'live';
   try {
     const now = Date.now();
     const config = {
@@ -77,14 +84,14 @@ app.get('/api/session', async (req, res) => {
       config.liveConnectConstraints = {
         model: MODEL,
         config: {
-          responseModalities: ['AUDIO'],
-          systemInstruction: SYSTEM_PROMPT,
+          responseModalities: [mode === 'mine' ? 'TEXT' : 'AUDIO'],
+          systemInstruction: promptFor(mode),
           tools: [{ functionDeclarations: activeDeclarations() }],
         },
       };
     }
     const token = await ai.authTokens.create({ config });
-    res.json({ token: token.name, apiVersion, setup: buildSetup() });
+    res.json({ token: token.name, apiVersion, mode, setup: buildSetup(mode) });
   } catch (e) {
     console.error('token error:', e.message);
     res.status(500).json({ error: e.message });
@@ -102,6 +109,36 @@ app.post('/api/tools/:name', (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(400).json({ error: e.message });
+  }
+});
+
+// 2.5) صوت فواز: نص → Gemini TTS (صوت مستنسخ) → PCM 24kHz يتبث للمتصفح أول بأول
+app.post('/api/speak', async (req, res) => {
+  const text = String(req.body?.text || '').trim().slice(0, 1500);
+  if (!text) return res.status(400).json({ error: 'نص فاضي' });
+  try {
+    const stream = await ai.interactions.create({
+      model: TTS_MODEL,
+      input: text,
+      response_format: { type: 'audio' },
+      generation_config: { speech_config: [{ voice: MY_VOICE_ID }] },
+      stream: true,
+    });
+    res.setHeader('Content-Type', 'audio/l16; rate=24000; channels=1');
+    let sent = 0;
+    for await (const ev of stream) {
+      if (ev.event_type === 'step.delta' && ev.delta?.type === 'audio' && ev.delta.data) {
+        const buf = Buffer.from(ev.delta.data, 'base64');
+        res.write(buf); sent += buf.length;
+      } else if (ev.event_type === 'error') {
+        console.error('[speak] stream error', JSON.stringify(ev).slice(0, 300));
+      }
+    }
+    console.log(`[speak] ${text.length} chars → ${(sent / 48000).toFixed(1)}s audio`);
+    res.end();
+  } catch (e) {
+    console.error('[speak] error:', e.message);
+    if (!res.headersSent) res.status(500).json({ error: e.message }); else res.end();
   }
 });
 
