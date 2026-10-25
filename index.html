@@ -499,6 +499,7 @@ async function uploadFile(file) {
   const r = await api('/api/upload', { method: 'POST', body: fd });
   const d = await r.json();
   if (!r.ok) return note('❌ ' + d.error);
+  if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»${k.dataset_ids?.length ? ` (جداول ${k.dataset_ids.map(i => '#' + i).join('، ')})` : ''}${k.sections ? ` · ${k.sections} قسم` : ''}`); return; }
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
   loadDashboard();
   // نعلم المساعد إن فيه ملف جديد عشان يقدر يسأل عنه مباشرة

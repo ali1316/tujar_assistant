@@ -17,6 +17,7 @@ import { agentTools, initAgent, agentStatus } from './agent.js';
 import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
 import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
+import { knowledgeTools, importBundle, knowledgeCatalog, kList } from './knowledge.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
 const PORT = process.env.PORT || 3000;
@@ -43,7 +44,7 @@ const usageTools = {
     },
   },
 };
-const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...usageTools, ...driveTools, ...agentTools };
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...knowledgeTools, ...usageTools, ...driveTools, ...agentTools };
 initAgent(tools);
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
@@ -197,6 +198,7 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
     - سؤال «في كل منطقة/حسب كذا» = كل الفئات، مو بس الأعلى.
     - لما تشرحين الشارت اذكري أسماء الفئات بنفس كتابتها على الشاشة مع أرقامها، عشان تتظلل وانتي تتكلمين.
     - لا تستدعين list_documents ولا search_documents قبل الشارت: data_chart وquery_data يختارون الملف الصحيح تلقائياً، استدعيها مباشرة كأول خطوة.
+- مكتبة المعرفة (ملفات منظّمة من Drive Data-Knowledge): سؤال عن محتوى مستند/دراسة/تقرير محفوظ أو ما تعرفين وين البيانات → find_knowledge أولاً وجاوبي من الأقسام اللي ترجع واذكري اسم الملف. لشارت من جدول في المكتبة مرّري dataset_id حقه لـ data_chart مباشرة. لو النتيجة فيها quality_pending أو الحالة «جزئية» قوليها بجملة قصيرة.
 - لو رجع data_chart بخطأ «ما لقيت العمود»، أعيدي الاستدعاء فوراً باسم العمود كما هو مكتوب في قائمة الأعمدة داخل الخطأ (بدون list_documents أو read_document). عنوان الشارت دايماً بالعربي.
 - أي شارت يطلبه عن الملف → data_chart فوراً (bar/hbar/stacked/line/area/pie/donut) ويطلع على الشاشة الرئيسية مكان البيانات. لا تستخدمين render_visual لبيانات الملف.
     - search_documents/read_document للملفات النصية (PDF/Word) أو للبحث عن نص.
@@ -274,6 +276,7 @@ async function screenBlock() {
 - شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
 - لوحة آخر ملف (file_dashboard): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.
 - بيانات الملف الجاهزة للتحليل الفوري (استخدمي أسماء الأعمدة حرفياً):\n${catalog || 'لا يوجد ملف Excel/CSV'}
+- مكتبة المعرفة:\n${(await knowledgeCatalog()) || 'فاضية'}
 - آخر ملف مرفوع: ${docs.length ? `#${docs[0].id} «${docs[0].name}» (${docs[0].chars} حرف)` : 'لا يوجد'}.
 - داشبوردات مولّدة محفوظة: ${dashes.length ? dashes.slice(0, 10).map(d => `#${d.id} ${d.title}`).join('، ') : 'لا يوجد'}.`;
   } catch (e) { return ''; }
@@ -453,6 +456,10 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ما وصل ملف' });
   const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8'); // أسماء عربية
+  if (/\.dk\.json$/i.test(name)) { // حزمة من مهارة fawaz-data-intake → مكتبة المعرفة
+    try { return res.json({ knowledge: await importBundle(JSON.parse(req.file.buffer.toString('utf8'))) }); }
+    catch (e) { return res.status(400).json({ error: e.message }); }
+  }
   try {
     const text = await extractText(req.file.buffer, name);
     const doc = saveDocument(name, req.file.mimetype, req.file.size, text);
@@ -468,6 +475,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
+
+// مكتبة المعرفة: استيراد حزمة JSON مباشرة + قائمة الملفات
+app.post('/api/knowledge/import', async (req, res) => { try { res.json(await importBundle(req.body)); } catch (e) { res.status(400).json({ error: e.message }); } });
+app.get('/api/knowledge', async (req, res) => res.json({ entries: (await kList()).map(({ sections, values, ...e }) => ({ ...e, sections: sections.length })) }));
 
 // لوحة الملف: تتولد تلقائياً بعد الرفع وتظهر داخل الشاشة الرئيسية
 app.post('/api/docs/:id/dashboard', async (req, res) => {

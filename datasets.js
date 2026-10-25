@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import path from 'node:path';
 import { datasetAdd, datasetGet, datasetsForDoc, datasetsLatest, datasetsRecent } from './store.js';
+import { qualityNote } from './knowledge.js';
 
 const MAX_ROWS = 20000;
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -245,7 +246,7 @@ const QP = {
 export const datasetTools = {
   query_data: {
     declaration: { name: 'query_data', description: 'تحسب من بيانات الملف المرفوع (Excel/CSV) أرقام دقيقة: مجموع/متوسط/عدد حسب أي عمود مع فلاتر. استخدميها لأي سؤال رقمي عن الملف بدل قراءة النص.', parameters: { type: 'OBJECT', properties: QP } },
-    run: async args => { const ds = await resolveDs(args); const r = runQuery(ds, args); return { dataset: `#${ds.id} ${ds.sheet}`, ...r, rows: r.rows.slice(0, 40).map(x => ({ [r.group_by || 'المجموعة']: x.key, ...(r.series[0] === '_' ? { [r.measure]: x.total } : x.values) })) }; },
+    run: async args => { const ds = await resolveDs(args); const r = runQuery(ds, args); const qn = await qualityNote(ds.id); return { dataset: `#${ds.id} ${ds.sheet}`, ...(qn ? { knowledge: qn } : {}), ...r, rows: r.rows.slice(0, 40).map(x => ({ [r.group_by || 'المجموعة']: x.key, ...(r.series[0] === '_' ? { [r.measure]: x.total } : x.values) })) }; },
   },
   data_chart: {
     declaration: { name: 'data_chart', description: 'ترسم فوراً أي شارت من بيانات الملف المرفوع بأرقام محسوبة ويظهر على الشاشة الرئيسية مكان البيانات. استخدميها لما يطلب شارت عن بيانات الملف.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, chart_type: { type: 'STRING', enum: ['bar', 'hbar', 'stacked', 'line', 'area', 'pie', 'donut'] }, ...QP }, required: ['title', 'chart_type'] } },
@@ -262,7 +263,8 @@ export const datasetTools = {
         ...(sorted.length > 1 ? [`الأقل: ${low.key} بـ ${n(low.total)}`] : []),
         ...(sorted.length > 2 && r.agg !== 'avg' ? [`أعلى ${Math.min(3, sorted.length)} فئات = ${Math.round(sorted.slice(0, 3).reduce((a, x) => a + x.total, 0) / total * 100)}٪ من الإجمالي`] : []),
       ] : [];
-      return { title, subtitle: `من «${ds.doc_name}» · ${ds.sheet} · ${r.matched_rows} صف`, vega_lite: toVegaLite(r, chart_type), insights,
+      const qn = await qualityNote(ds.id);
+      return { ...(qn ? { knowledge: qn } : {}), title, subtitle: `من «${ds.doc_name}» · ${ds.sheet} · ${r.matched_rows} صف`, vega_lite: toVegaLite(r, chart_type), insights,
         kpis: [{ label: r.measure === 'العدد' ? 'عدد السجلات' : `${AGG_AR[r.agg] || ''} ${r.measure}`.trim(), value: r.agg === 'avg' ? +(total / Math.max(1, r.rows.length)).toFixed(1) : total }, ...(top1 ? [{ label: `الأعلى · ${top1.key}`, value: +(+top1.total).toFixed(1) }] : []), { label: 'عدد الفئات', value: r.rows.length }],
         top: r.rows.slice(0, 5).map(x => ({ [r.group_by || '']: x.key, [r.measure]: x.total })) };
     },
