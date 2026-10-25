@@ -2,67 +2,49 @@
 // الاستخدام: const hud = createHUD({ api }); ثم hud.showProject({name}) / hud.showChart({...}) / hud.showOverview() / hud.closeAll()
 
 const CSS = `
-.hud-layer{position:fixed;inset:0;pointer-events:none;z-index:50;display:grid;place-items:center;perspective:1400px}
-.hud-dim{position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(4,18,40,.55),rgba(2,6,14,.82));opacity:0;transition:opacity .4s;pointer-events:none;z-index:49}
-.hud-dim.on{opacity:1}
-.hud{--c:#3ee6ff;--c2:#7a8cff;--warn:#ffb547;--bad:#ff5d73;--ok:#3dffa8;--glass:rgba(8,24,48,.78);
-  position:absolute;pointer-events:auto;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 60px);overflow-y:auto;overflow-x:hidden;
-  background:linear-gradient(160deg,rgba(20,60,110,.35),transparent 40%),var(--glass);
-  border:1px solid rgba(62,230,255,.45);border-radius:6px;padding:20px 22px 18px;color:#dff8ff;
-  box-shadow:0 0 0 1px rgba(62,230,255,.08),0 0 40px rgba(62,230,255,.25),inset 0 0 60px rgba(62,230,255,.08);
-  backdrop-filter:blur(10px);font-family:var(--font),'IBM Plex Sans Arabic',system-ui,sans-serif;
-  animation:hud-in .75s cubic-bezier(.2,.9,.2,1) both;transform-origin:50% 60%}
-.hud.out{animation:hud-out .35s ease-in both}
-@keyframes hud-in{0%{opacity:0;transform:rotateX(55deg) scale(.6) translateY(80px);filter:blur(8px) brightness(3)}
-  55%{opacity:1;filter:blur(0) brightness(1.6)}70%{transform:rotateX(-4deg) scale(1.02)}100%{transform:none;filter:none}}
-@keyframes hud-out{to{opacity:0;transform:scale(.85) translateY(-30px);filter:blur(6px)}}
-.hud::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:6px;
-  background:repeating-linear-gradient(0deg,rgba(62,230,255,.05) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
-.hud::after{content:"";position:absolute;left:0;right:0;height:80px;top:-80px;pointer-events:none;
-  background:linear-gradient(180deg,transparent,rgba(62,230,255,.25),transparent);animation:hud-scan 1.4s .2s ease-out 1 both}
-@keyframes hud-scan{to{top:110%}}
-.hud .crn{position:absolute;width:18px;height:18px;border:2px solid var(--c)}
-.hud .crn.a{top:-1px;right:-1px;border-left:0;border-bottom:0}.hud .crn.b{top:-1px;left:-1px;border-right:0;border-bottom:0}
-.hud .crn.c{bottom:-1px;right:-1px;border-left:0;border-top:0}.hud .crn.d{bottom:-1px;left:-1px;border-right:0;border-top:0}
-.hud header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
-.hud .eyebrow{font:600 11px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--c);direction:ltr;text-align:right}
-.hud h3{margin:6px 0 0;font-size:22px;font-weight:700;text-shadow:0 0 18px rgba(62,230,255,.6)}
-.hud .sub{color:#8fc9dc;font-size:13px;margin-top:2px}
-.hud .x{background:none;border:1px solid rgba(62,230,255,.4);color:var(--c);width:30px;height:30px;border-radius:4px;cursor:pointer;font-size:16px;flex:none}
-.hud .x:hover{background:rgba(62,230,255,.15)}
-.hud .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.hud .cell{border:1px solid rgba(62,230,255,.2);background:rgba(62,230,255,.04);border-radius:4px;padding:12px;min-width:0;
-  opacity:0;animation:hud-cell .5s ease-out both}
-@keyframes hud-cell{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.hud .lbl{font-size:12px;color:#8fc9dc}
-.hud .big{font:700 30px/1.1 var(--num-font,var(--font)),'IBM Plex Sans Arabic',sans-serif;color:#fff;text-shadow:0 0 14px rgba(62,230,255,.7);font-variant-numeric:tabular-nums;margin-top:6px}
-.hud .big small{font-size:13px;color:#8fc9dc;font-weight:400;font-family:var(--font),'IBM Plex Sans Arabic',sans-serif;letter-spacing:0}
+/* الرسوم تنعرض داخل الشاشة الرئيسية نفسها (مكان البيانات) بهوية اتحاد الغرف: كحلي + ذهبي */
+.hud{--c:#d1a65c;--c2:#5f86b3;--sand:#e8d3a8;--warn:#e6b450;--bad:#e0705f;--ok:#59c48f;--pn:#0e2238;--ln:#1d3a5a;--mt:#8ea3bd;
+  position:relative;width:100%;background:var(--pn);border:1px solid var(--ln);border-radius:12px;padding:20px 22px 22px;color:#eef2f7;
+  font-family:var(--font),'IBM Plex Sans Arabic',system-ui,sans-serif;animation:hud-in .5s cubic-bezier(.2,.9,.2,1) both}
+.hud.out{animation:hud-out .25s ease-in both}
+@keyframes hud-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes hud-out{to{opacity:0;transform:translateY(-8px)}}
+.hud header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--ln)}
+.hud .eyebrow{font-size:12px;font-weight:700;color:var(--c);letter-spacing:0}
+.hud h3{margin:6px 0 0;font-size:24px;font-weight:700;color:#fff}
+.hud .sub{color:var(--mt);font-size:13px;margin-top:4px}
+.hud .x{background:transparent;border:1px solid #2b4a6c;color:var(--c);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
+.hud .x:hover{background:rgba(209,166,92,.12)}
+.hud .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.hud .cell{border:1px solid var(--ln);background:#0b1d31;border-radius:10px;padding:14px;min-width:0;opacity:0;animation:hud-cell .45s ease-out both}
+@keyframes hud-cell{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.hud .lbl{font-size:13px;color:var(--mt)}
+.hud .big{font:700 32px/1.1 var(--num-font,var(--font)),'IBM Plex Sans Arabic',sans-serif;color:#fff;font-variant-numeric:tabular-nums;margin-top:6px}
+.hud .kpis .cell:first-child .big{color:var(--c)}
+.hud .big small{font-size:14px;color:var(--mt);font-weight:500;font-family:var(--font),'IBM Plex Sans Arabic',sans-serif}
 .hud .gauge{display:grid;place-items:center;position:relative}
-.hud .gauge svg{width:150px;height:150px;transform:rotate(-90deg);filter:drop-shadow(0 0 8px rgba(62,230,255,.6))}
+.hud .gauge svg{width:150px;height:150px;transform:rotate(-90deg)}
 .hud .gauge .val{position:absolute;text-align:center}
-.hud .bar{height:10px;background:rgba(62,230,255,.12);border-radius:2px;overflow:hidden;margin-top:10px}
-.hud .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--c2),var(--c));box-shadow:0 0 12px var(--c);transition:width 1.4s cubic-bezier(.2,.9,.2,1)}
-.hud .bar.hot i{background:linear-gradient(90deg,var(--warn),var(--bad));box-shadow:0 0 12px var(--bad)}
-.hud .pill{display:inline-block;padding:3px 10px;border-radius:2px;font-size:12px;border:1px solid currentColor}
-.hud .chart{position:relative;height:220px}
+.hud .bar{height:8px;background:#16304d;border-radius:4px;overflow:hidden;margin-top:10px}
+.hud .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--c),var(--sand));transition:width 1.2s cubic-bezier(.2,.9,.2,1)}
+.hud .bar.hot i{background:linear-gradient(90deg,var(--warn),var(--bad))}
+.hud .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;border:1px solid currentColor}
+.hud .chart{position:relative;height:240px}
 .hud ul.tk{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;font-size:13px}
-.hud ul.tk li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed rgba(62,230,255,.15);padding-bottom:5px}
-.hud .typing{font-size:13px;color:var(--c);min-height:1.2em;margin-top:12px;font-family:ui-monospace,monospace;direction:ltr;text-align:right}
-
-.hud .vl{width:100%;min-height:300px;animation:hud-reveal 1.3s .35s cubic-bezier(.3,.8,.2,1) both;filter:drop-shadow(0 0 6px rgba(62,230,255,.35))}
-@keyframes hud-reveal{from{clip-path:inset(0 0 0 100%);opacity:.3}to{clip-path:inset(0 0 0 0);opacity:1}}
+.hud ul.tk li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--ln);padding-bottom:6px}
+.hud .vl{width:100%;min-height:340px;animation:hud-cell .6s .15s ease-out both}
 .hud .vl,.hud .vl .vega-embed{width:100%;direction:ltr}.hud .vl details{display:none}
-.hud .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
-.hud ul.ins{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
-.hud ul.ins li{font-size:14px;color:#dff8ff;opacity:0;animation:hud-cell .5s ease-out both;padding-inline-start:14px;position:relative}
-.hud ul.ins li::before{content:"▸";position:absolute;inset-inline-start:0;color:var(--c)}
+.hud .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.hud ul.ins{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px}
+.hud ul.ins li{font-size:14px;line-height:1.7;background:#0b1d31;border:1px solid var(--ln);border-radius:8px;padding:9px 12px;opacity:0;animation:hud-cell .45s ease-out both}
+.hud ul.ins li::before{content:"✓";color:var(--c);margin-inline-end:8px;font-weight:700}
 .hud .err{color:var(--bad);font-family:ui-monospace,monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap}
-@media (prefers-reduced-motion:reduce){.hud,.hud .cell,.hud::after{animation:none!important;opacity:1}}
+@media (prefers-reduced-motion:reduce){.hud,.hud .cell,.hud .vl{animation:none!important;opacity:1}}
 `;
 
-const STATUS_COLOR = { 'مكتمل': 'var(--ok)', 'متأخر': 'var(--bad)', 'متوقف': 'var(--warn)', 'قيد التنفيذ': 'var(--c)' };
-const PRI_COLOR = { 'عالية': '#ff5d73', 'متوسطة': '#ffb547', 'منخفضة': '#3dffa8' };
-const PALETTE = ['#3ee6ff', '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'];
+const STATUS_COLOR = { 'مكتمل': 'var(--ok)', 'متأخر': 'var(--bad)', 'متوقف': 'var(--warn)', 'قيد التنفيذ': 'var(--c2)' };
+const PRI_COLOR = { 'عالية': '#e0705f', 'متوسطة': '#e6b450', 'منخفضة': '#59c48f' };
+const PALETTE = ['#d1a65c', '#5f86b3', '#e8d3a8', '#4fb3a9', '#c97a5b', '#8fa7c4', '#9b86c9', '#7fae6e'];
 const fmt = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA').format(Math.round(n));
 // أسماء الشهور والأيام بالعربي في رسوم Vega (بدل January/Monday)
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -73,67 +55,43 @@ const numLocale = () => ({ decimal: '.', thousands: ',', grouping: [3], currency
 const AR_TIME_LOCALE = { dateTime: '%A، %e %B %Y، %X', date: '%d/%m/%Y', time: '%H:%M:%S', periods: ['ص', 'م'],
   days: AR_DAYS, shortDays: AR_DAYS, months: AR_MONTHS, shortMonths: AR_MONTHS };
 
-export function createHUD({ api }) {
+export function createHUD({ api, mount }) {
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
-  const dim = Object.assign(document.createElement('div'), { className: 'hud-dim' });
-  const layer = Object.assign(document.createElement('div'), { className: 'hud-layer' });
-  document.body.append(dim, layer);
-  dim.addEventListener('click', () => closeAll());
+  // mount = { el: حاوية العرض داخل الشاشة الرئيسية, show(): تخفي البيانات الأساسية, home(): ترجّعها }
+  const layer = mount?.el || document.body;
   const panels = [];
-  let actx;
 
   if (window.Chart) {
-    Chart.defaults.color = '#8fc9dc';
+    Chart.defaults.color = '#8ea3bd';
     Chart.defaults.font.family = "'IBM Plex Sans Arabic', system-ui, sans-serif";
-    Chart.defaults.borderColor = 'rgba(62,230,255,.12)';
+    Chart.defaults.borderColor = '#16304d';
   }
 
-  // صوت «فتح شاشة» مُركّب (بدون ملفات)
-  function whoosh() {
-    try {
-      actx ??= new AudioContext();
-      const t = actx.currentTime;
-      const o = actx.createOscillator(), g = actx.createGain();
-      o.type = 'sawtooth'; o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(1400, t + 0.25);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-      const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900;
-      o.connect(f).connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.4);
-      const p = actx.createOscillator(), pg = actx.createGain();
-      p.type = 'sine'; p.frequency.value = 1760;
-      pg.gain.setValueAtTime(0.0001, t + 0.28); pg.gain.exponentialRampToValueAtTime(0.06, t + 0.3); pg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-      p.connect(pg).connect(actx.destination); p.start(t + 0.28); p.stop(t + 0.75);
-    } catch {}
-  }
-
+  const EYEBROW = { 'PROJECT · SCAN': 'تفاصيل مشروع', 'DATA · VISUAL': 'رسم بياني', 'PORTFOLIO · OVERVIEW': 'نظرة شاملة', 'LIVE · RENDER': 'رسم من بياناتك', 'TYPE · LIBRARY': 'مكتبة الخطوط', 'LAUNCH · READY': 'جاهز للفتح' };
+  // عرض واحد في كل مرة: الرسم الجديد ياخذ مكان اللي قبله، و«رجوع» يرجّع البيانات الأساسية
   function panel(eyebrow, title, sub) {
-    if (panels.length >= 3) close(panels[0]);
+    [...panels].forEach(p => close(p, true));
     const el = document.createElement('section');
     el.className = 'hud';
-    el.innerHTML = `<i class="crn a"></i><i class="crn b"></i><i class="crn c"></i><i class="crn d"></i>
-      <header><div><div class="eyebrow">${eyebrow}</div><h3></h3><div class="sub"></div></div><button class="x" aria-label="إغلاق">✕</button></header>
-      <div class="body"></div><div class="typing"></div>`;
+    el.innerHTML = `<header><div><div class="eyebrow"></div><h3></h3><div class="sub"></div></div><button class="x" type="button">↩ رجوع للرئيسية</button></header><div class="body"></div>`;
+    el.querySelector('.eyebrow').textContent = '✦ ' + (EYEBROW[eyebrow] || eyebrow);
     el.querySelector('h3').textContent = title;
     el.querySelector('.sub').textContent = sub || '';
-    el.querySelector('.x').onclick = () => close(el);
-    // تكديس بسيط: كل نافذة جديدة تنزاح شوي
-    const k = panels.length;
-    el.style.transform = '';
-    el.style.marginTop = `${k * 34}px`; el.style.marginInlineStart = `${k * 34}px`;
-    layer.append(el); panels.push(el); dim.classList.add('on');
-    whoosh();
-    typeLine(el.querySelector('.typing'), `> NORA://render ${eyebrow.toLowerCase()} … OK`);
+    el.querySelector('.x').onclick = () => closeAll();
+    layer.append(el); panels.push(el);
+    mount?.show?.(title);
     return el;
   }
-  function close(el) {
+  function close(el, replacing) {
     const i = panels.indexOf(el); if (i < 0) return;
     panels.splice(i, 1);
     el._charts?.forEach(c => c.destroy());
-    el.classList.add('out'); setTimeout(() => el.remove(), 350);
-    if (!panels.length) dim.classList.remove('on');
+    if (replacing) el.remove(); else { el.classList.add('out'); setTimeout(() => el.remove(), 250); }
+    if (!panels.length && !replacing) mount?.home?.();
   }
-  function closeAll() { [...panels].forEach(close); return { closed: true }; }
+  function closeAll() { const had = panels.length; [...panels].forEach(p => close(p)); if (!had) mount?.home?.(); return { back_to_main_screen: true }; }
+  const current = () => panels.map(p => p.querySelector('h3').textContent);
 
-  function typeLine(el, text) { let i = 0; const t = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(t); }, 22); }
   function countUp(el, to, suffix = '') {
     const t0 = performance.now(), d = 1300;
     const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3); el.innerHTML = fmt(to * e) + suffix; if (p < 1) requestAnimationFrame(step); };
@@ -146,9 +104,9 @@ export function createHUD({ api }) {
   }
   function gauge(pct) {
     const r = 62, C = 2 * Math.PI * r;
-    return `<div class="gauge"><svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="${r}" fill="none" stroke="rgba(62,230,255,.12)" stroke-width="12"/>
+    return `<div class="gauge"><svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="${r}" fill="none" stroke="#16304d" stroke-width="12"/>
       <circle class="arc" cx="75" cy="75" r="${r}" fill="none" stroke="url(#hg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" style="transition:stroke-dashoffset 1.6s cubic-bezier(.2,.9,.2,1)" data-to="${C * (1 - pct / 100)}"/>
-      <defs><linearGradient id="hg"><stop offset="0" stop-color="#7a8cff"/><stop offset="1" stop-color="#3ee6ff"/></linearGradient></defs></svg>
+      <defs><linearGradient id="hg"><stop offset="0" stop-color="#d1a65c"/><stop offset="1" stop-color="#e8d3a8"/></linearGradient></defs></svg>
       <div class="val"><div class="big" data-count="${pct}" data-suffix="<small>٪</small>">0</div><div class="lbl">نسبة الإنجاز</div></div></div>`;
   }
   function animate(el) {
@@ -184,7 +142,7 @@ export function createHUD({ api }) {
     const pri = ['عالية', 'متوسطة', 'منخفضة'];
     chart(el, tc.querySelector('canvas'), {
       type: 'doughnut',
-      data: { labels: pri, datasets: [{ data: pri.map(x => tickets.filter(t => t.priority === x).length), backgroundColor: pri.map(x => PRI_COLOR[x]), borderColor: 'rgba(8,24,48,1)', borderWidth: 3 }] },
+      data: { labels: pri, datasets: [{ data: pri.map(x => tickets.filter(t => t.priority === x).length), backgroundColor: pri.map(x => PRI_COLOR[x]), borderColor: '#0e2238', borderWidth: 3 }] },
       options: { maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'right' } }, animation: { animateRotate: true, duration: 1400 } },
     });
     if (tickets.length) cell(g, `<div class="lbl">آخر التذاكر</div><ul class="tk">${tickets.slice(0, 5).map(t =>
@@ -201,13 +159,13 @@ export function createHUD({ api }) {
     chart(el, c.querySelector('canvas'), {
       type: chart_type,
       data: { labels, datasets: [{ label: title, data: values,
-        backgroundColor: round ? labels.map((_, i) => PALETTE[i % PALETTE.length]) : 'rgba(62,230,255,.35)',
-        borderColor: round ? 'rgba(8,24,48,1)' : '#3ee6ff', borderWidth: round ? 3 : 2, borderRadius: 3, fill: true, tension: .35,
-        pointBackgroundColor: '#fff', pointRadius: 4 }] },
+        backgroundColor: round ? labels.map((_, i) => PALETTE[i % PALETTE.length]) : chart_type === 'line' ? 'rgba(209,166,92,.18)' : '#d1a65c',
+        borderColor: round ? '#0e2238' : '#d1a65c', borderWidth: round ? 3 : 2, borderRadius: 4, maxBarThickness: 46, fill: true, tension: .35,
+        pointBackgroundColor: '#e8d3a8', maxBarThickness: 46, pointRadius: 4 }] },
       options: { maintainAspectRatio: false, animation: { duration: 1500, easing: 'easeOutQuart' },
         plugins: { legend: { display: round || chart_type === 'radar' }, tooltip: { callbacks: { label: x => `${fmt(x.raw)} ${unit}` } } },
-        scales: round ? {} : chart_type === 'radar' ? { r: { grid: { color: 'rgba(62,230,255,.15)' }, angleLines: { color: 'rgba(62,230,255,.15)' }, pointLabels: { color: '#dff8ff' }, ticks: { display: false } } }
-          : { x: { ticks: { color: '#dff8ff' } }, y: { ticks: { callback: v => fmt(v) } } } },
+        scales: round ? {} : chart_type === 'radar' ? { r: { grid: { color: '#16304d' }, angleLines: { color: '#16304d' }, pointLabels: { color: '#c9d6e6' }, ticks: { display: false } } }
+          : { x: { ticks: { color: '#c9d6e6' } }, y: { ticks: { callback: v => fmt(v) } } } },
     });
     return { shown: true, title };
   }
@@ -221,23 +179,23 @@ export function createHUD({ api }) {
     cell(g, `<div class="lbl">إجمالي الميزانية</div><div class="big" data-count="${s.total_budget}" data-suffix=" <small>ر.س</small>">0</div>
       <div class="lbl" style="margin-top:6px">المصروف ${used}٪</div><div class="bar"><i data-w="${used}"></i></div>`, 150);
     const risky = d.projects.filter(p => ['متأخر', 'متوقف'].includes(p.status));
-    cell(g, `<div class="lbl">تذاكر عالية الأولوية مفتوحة</div><div class="big" data-count="${s.high_priority_open}" style="color:#ff5d73">0</div>
+    cell(g, `<div class="lbl">تذاكر عالية الأولوية مفتوحة</div><div class="big" data-count="${s.high_priority_open}" style="color:#e0705f">0</div>
       <div class="lbl" style="margin-top:12px">تحتاج انتباه</div><ul class="tk">${risky.map(p =>
       `<li><span>${p.name}</span><span class="pill" style="color:${STATUS_COLOR[p.status]}">${p.status}</span></li>`).join('')}</ul>`, 250);
     const c1 = cell(g, `<div class="lbl">المشاريع حسب الحالة</div><div class="chart" style="height:180px"><canvas></canvas></div>`, 350);
     chart(el, c1.querySelector('canvas'), {
       type: 'doughnut',
       data: { labels: s.projects_by_status.map(x => x.status), datasets: [{ data: s.projects_by_status.map(x => x.count),
-        backgroundColor: s.projects_by_status.map(x => ({ 'مكتمل': '#3dffa8', 'متأخر': '#ff5d73', 'متوقف': '#ffb547' })[x.status] || '#3ee6ff'), borderColor: 'rgba(8,24,48,1)', borderWidth: 3 }] },
+        backgroundColor: s.projects_by_status.map(x => ({ 'مكتمل': '#59c48f', 'متأخر': '#e0705f', 'متوقف': '#e6b450' })[x.status] || '#5f86b3'), borderColor: '#0e2238', borderWidth: 3 }] },
       options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right' } } },
     });
     const c2 = cell(g, `<div class="lbl">الميزانية مقابل المصروف لكل مشروع (ر.س)</div><div class="chart" style="height:230px"><canvas></canvas></div>`, 500, true);
     chart(el, c2.querySelector('canvas'), {
       type: 'bar',
       data: { labels: d.projects.map(p => p.name), datasets: [
-        { label: 'الميزانية', data: d.projects.map(p => p.budget), backgroundColor: 'rgba(122,140,255,.45)', borderColor: '#7a8cff', borderWidth: 1, borderRadius: 3 },
-        { label: 'المصروف', data: d.projects.map(p => p.spent), backgroundColor: 'rgba(62,230,255,.6)', borderColor: '#3ee6ff', borderWidth: 1, borderRadius: 3 }] },
-      options: { maintainAspectRatio: false, animation: { duration: 1500 }, scales: { x: { ticks: { color: '#dff8ff', font: { size: 11 } } }, y: { ticks: { callback: v => fmt(v / 1000) + 'K' } } } },
+        { label: 'الميزانية', data: d.projects.map(p => p.budget), backgroundColor: '#5f86b3', borderRadius: 4, maxBarThickness: 40 },
+        { label: 'المصروف', data: d.projects.map(p => p.spent), backgroundColor: '#d1a65c', borderRadius: 4, maxBarThickness: 40 }] },
+      options: { maintainAspectRatio: false, animation: { duration: 1500 }, scales: { x: { ticks: { color: '#c9d6e6', font: { size: 11 } } }, y: { ticks: { callback: v => fmt(v / 1000) + 'K' } } } },
     });
     animate(el);
     return { shown: true, projects: d.projects.length, total_budget: s.total_budget, total_spent: s.total_spent, open_tickets: s.open_tickets };
@@ -257,15 +215,16 @@ export function createHUD({ api }) {
     background: null, padding: 6,
     font: "'IBM Plex Sans Arabic', system-ui, sans-serif",
     view: { stroke: null },
-    axis: { labelColor: '#bfe9f5', titleColor: '#8fc9dc', gridColor: 'rgba(62,230,255,.12)', domainColor: 'rgba(62,230,255,.35)', tickColor: 'rgba(62,230,255,.35)', labelFontSize: 12, titleFontSize: 12, labelLimit: 220 },
-    legend: { labelColor: '#dff8ff', titleColor: '#8fc9dc', labelFontSize: 12, symbolType: 'square', labelLimit: 220 },
-    title: { color: '#dff8ff' },
-    range: { category: PALETTE, ramp: ['#0b2a4a', '#1b5f8f', '#3ee6ff', '#c9fbff'], heatmap: ['#0b2a4a', '#1b5f8f', '#3ee6ff', '#c9fbff'] },
-    mark: { color: '#3ee6ff' },
-    bar: { cornerRadiusEnd: 3, stroke: '#3ee6ff', strokeOpacity: .6 },
-    arc: { stroke: '#081830', strokeWidth: 3 },
+    axis: { labelColor: '#8ea3bd', titleColor: '#8ea3bd', gridColor: '#16304d', domainColor: '#2b4a6c', tickColor: '#2b4a6c', labelFontSize: 13, titleFontSize: 13, labelLimit: 220, titlePadding: 10 },
+    legend: { labelColor: '#c9d6e6', titleColor: '#8ea3bd', labelFontSize: 13, symbolType: 'square', labelLimit: 220, orient: 'bottom', direction: 'horizontal', columnPadding: 18 },
+    title: { color: '#eef2f7' },
+    range: { category: PALETTE, ramp: ['#16304d', '#5f86b3', '#d1a65c', '#e8d3a8'], heatmap: ['#16304d', '#5f86b3', '#d1a65c', '#e8d3a8'] },
+    mark: { color: '#d1a65c' },
+    bar: { cornerRadiusEnd: 4, discreteBandSize: { band: 0.7 } },
+    arc: { stroke: '#0e2238', strokeWidth: 3 },
+    area: { opacity: 0.35, line: true },
     line: { strokeWidth: 3 }, point: { filled: true, size: 70 },
-    text: { color: '#ffffff', fontSize: 12 },
+    text: { color: '#e8d3a8', fontSize: 12 },
   };
 
   async function showVisual({ title, subtitle = '', vega_lite, kpis = [], insights = [] }) {
@@ -275,7 +234,7 @@ export function createHUD({ api }) {
     if (!spec || typeof spec !== 'object') return { error: 'vega_lite فاضي' };
     // الواجهة تتحكم بالحجم والشكل
     delete spec.width; delete spec.height; delete spec.background; delete spec.config; delete spec.autosize;
-    if (!spec.hconcat && !spec.vconcat && !spec.concat && !spec.facet && !spec.repeat) { spec.width = 'container'; spec.height = 300; }
+    if (!spec.hconcat && !spec.vconcat && !spec.concat && !spec.facet && !spec.repeat) { spec.width = 'container'; spec.height = Math.min(Math.max(innerHeight - 500, 280), 480); }
     const font = brandFont();
     spec.config = { ...VEGA_CONFIG, font, axis: { ...VEGA_CONFIG.axis, labelFont: font, titleFont: font }, legend: { ...VEGA_CONFIG.legend, labelFont: font, titleFont: font }, title: { ...VEGA_CONFIG.title, font, subtitleFont: font }, text: { ...VEGA_CONFIG.text, font } };
     spec.autosize = { type: 'fit', contains: 'padding' };
@@ -294,7 +253,7 @@ export function createHUD({ api }) {
       if (window.NORA_NUMERALS !== 'latin') box.querySelectorAll('svg text').forEach(t => { t.textContent = t.textContent.replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]); });
     } catch (e) {
       box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
-      setTimeout(() => close(el), 2500);
+      setTimeout(() => closeAll(), 2500);
       return { error: 'فشل الرسم: ' + e.message };
     }
     if (insights.length) {
@@ -310,7 +269,7 @@ export function createHUD({ api }) {
     const g = document.createElement('div'); g.className = 'grid'; el.querySelector('.body').append(g);
     Object.entries(fonts).forEach(([name, desc], i) => {
       const c = cell(g, `<div class="lbl" style="font-family:system-ui">${esc(name)} · ${esc(desc)}</div>
-        <div style="font-family:'${name}';font-size:24px;margin-top:6px;color:#fff">نورة تدير لوحتك ١٢٣</div>`, 80 + i * 45);
+        <div style="font-family:'${name}';font-size:24px;margin-top:6px;color:#eef2f7">نورة تدير لوحتك ١٢٣</div>`, 80 + i * 45);
       c.style.cursor = 'pointer';
       if (name === current) c.style.borderColor = 'var(--c)';
       c.onclick = () => { onPick?.(name); g.querySelectorAll('.cell').forEach(x => x.style.borderColor = ''); c.style.borderColor = 'var(--c)'; };
@@ -325,17 +284,17 @@ export function createHUD({ api }) {
     const a = document.createElement('a');
     a.href = url; a.target = '_blank'; a.rel = 'noopener';
     a.textContent = '🚀 افتح الحين';
-    a.style.cssText = 'display:block;text-align:center;padding:18px;margin-top:6px;border:1px solid var(--c);border-radius:6px;color:#fff;font-size:20px;font-weight:700;text-decoration:none;background:rgba(62,230,255,.12);box-shadow:0 0 24px rgba(62,230,255,.3)';
-    a.onclick = () => setTimeout(() => close(el), 300);
+    a.style.cssText = 'display:block;text-align:center;padding:16px;margin-top:6px;border:1px solid var(--c);border-radius:10px;color:#081726;font-size:18px;font-weight:700;text-decoration:none;background:var(--c)';
+    a.onclick = () => setTimeout(() => closeAll(), 300);
     el.querySelector('.body').append(a);
     return { shown: true };
   }
 
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && panels.length) closeAll(); });
 
   return {
-    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, closeAll,
+    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, closeAll, current,
     // جاهزة كـ clientTools للوكيل
-    tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll },
+    tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll, back_to_main: closeAll },
   };
 }

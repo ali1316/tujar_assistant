@@ -30,12 +30,12 @@ export const dashboardTools = {
       },
     },
     write: true,
-    run: async ({ title, subtitle = '', kicker, kpis = [], charts = [], tables = [], insights = [] }) => {
+    run: async ({ title, subtitle = '', kicker, designed_by, kpis = [], charts = [], tables = [], insights = [] }) => {
       try {
         const spec = {
-          title, subtitle, kicker,
+          title, subtitle, kicker, designed_by,
           kpis: kpis.slice(0, 6),
-          charts: charts.slice(0, 6).map(c => ({ title: c.title, span: c.span === 2 ? 2 : 1, option: j(c.echarts_option, `الرسم «${c.title}»`) })),
+          charts: charts.slice(0, 6).map(c => ({ title: c.title, span: c.span === 2 ? 2 : 1, size: c.size, option: j(c.echarts_option, `الرسم «${c.title}»`) })),
           tables: tables.slice(0, 3).map(t => {
             const rows = j(t.rows_json, `الجدول «${t.title}»`);
             if (!Array.isArray(rows)) throw new Error(`الجدول «${t.title}»: rows_json لازم مصفوفة`);

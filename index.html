@@ -7,52 +7,75 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1420;--card:#171e2e;--line:#253049;--ink:#e8edf7;--mute:#8a96b0;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d;--font:'IBM Plex Sans Arabic';--radius:12px;--fs-table:1;--fs-kpi:1;--fs-chat:1;--fs-header:1;--fs-titles:1}
+  /* هوية اتحاد الغرف التجارية السعودية: كحلي + ذهبي — نفس هوية الداشبوردات */
+  :root{--bg:#081726;--card:#0e2238;--line:#1d3a5a;--ink:#eef2f7;--mute:#8ea3bd;--acc:#d1a65c;--sand:#e8d3a8;--steel:#5f86b3;--ok:#59c48f;--warn:#e6b450;--bad:#e0705f;--font:'IBM Plex Sans Arabic';--radius:12px;--fs-table:1;--fs-kpi:1;--fs-chat:1;--fs-header:1;--fs-titles:1}
   *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font),'IBM Plex Sans Arabic',system-ui,sans-serif;transition:background .5s,color .5s}
   input,select,button,textarea{font-family:inherit}
-  header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-  h1{font-size:calc(20px*var(--fs-header));margin:0} main{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px 24px}
-  @media(max-width:900px){main{grid-template-columns:1fr}}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-  .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;transition:background .5s,border-color .5s}
+  header.top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);padding:12px 28px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px}
+  header.top .logo{height:40px;width:auto;display:block}
+  header.top .sep{width:1px;height:28px;background:var(--line)}
+  h1{font-size:calc(19px*var(--fs-header));margin:0;font-weight:700}
+  #crumb{color:var(--acc);font-size:14px;font-weight:600} #crumb:empty{display:none}
+  .nora-chip{margin-inline-start:auto;display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px}
+  .nora-chip b{color:var(--ink)} .nora-chip i{width:8px;height:8px;border-radius:50%;background:var(--mute)} .nora-chip.on i{background:var(--ok);box-shadow:0 0 0 4px #59c48f33}
+  main{padding:20px 28px 170px;max-width:1500px;margin:0 auto}
+  main>section[hidden]{display:none}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)} main{padding:16px 16px 170px} header.top{padding:10px 16px}}
+  @media(max-width:600px){h1{font-size:15px} header.top{gap:10px} header.top .logo{height:32px} .nora-chip span,#crumb,header.top .sep,.chipsel{display:none} .chipbtn{padding:4px}}
+  body{overflow-x:clip}
+  .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;transition:background .5s,border-color .5s}
   .kpi b,td.num,.num{font-family:var(--num-font,var(--font)),var(--font),sans-serif!important;font-variant-numeric:tabular-nums}
-  .kpi b{display:block;font-size:calc(22px*var(--fs-kpi));margin-top:4px} .kpi span{color:var(--mute);font-size:13px}
-  table{width:100%;border-collapse:collapse;font-size:calc(14px*var(--fs-table))} th,td{padding:8px;border-bottom:1px solid var(--line);text-align:right} th{color:var(--mute);font-weight:600}
-  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
-  .tag{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}
-  .tag.متأخر,.tag.عالية{background:#4a1f22;color:#ff9a9d}.tag.مكتمل,.tag.مغلقة{background:#163d2a;color:#7be3a8}.tag.متوقف{background:#3d3416;color:#f5cf6b}
-  h2{font-size:calc(15px*var(--fs-titles));margin:0 0 10px;color:var(--mute)} .flash{animation:fl 1.2s} @keyframes fl{from{background:#2a3d66}}
-  /* لوحة المساعد */
-  .agent{position:sticky;top:18px;display:flex;flex-direction:column;gap:10px;height:calc(100vh - 110px)}
-  .mic{width:84px;height:84px;border-radius:50%;border:none;background:var(--acc);color:#fff;font-size:34px;cursor:pointer;align-self:center;transition:.2s;box-shadow:0 0 0 0 #4f8cff66}
-  .mic.on{background:var(--bad)} #status{text-align:center;color:var(--mute);font-size:13px}
-  #log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
-  .m{padding:8px 12px;border-radius:10px;font-size:calc(14px*var(--fs-chat));line-height:1.6;max-width:92%}
-  .m.u{background:#22304d;align-self:flex-start}.m.a{background:#1d2a22;align-self:flex-end}
-  .m.old{opacity:.55}
+  .kpi b{display:block;font-size:calc(26px*var(--fs-kpi));margin-top:6px} .kpi span{color:var(--mute);font-size:13px}
+  .kpi:first-child b{color:var(--acc)}
+  table{width:100%;border-collapse:collapse;font-size:calc(14px*var(--fs-table))} th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right} th{color:var(--mute);font-weight:600}
+  .bar{height:6px;background:#16304d;border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+  .tag{padding:2px 9px;border-radius:99px;font-size:12px;background:#1b3553;color:var(--sand)}
+  .tag.متأخر,.tag.عالية{background:#3d2226;color:#f0a093}.tag.مكتمل,.tag.مغلقة{background:#16392e;color:#8fe0b6}.tag.متوقف{background:#3a3018;color:#f0cf7a}
+  h2{font-size:calc(15px*var(--fs-titles));margin:0 0 12px;color:var(--mute);font-weight:600} .flash{animation:fl 1.2s} @keyframes fl{from{background:#2b3f22}}
   /* لوحة الملف داخل الشاشة الرئيسية */
-  #filedash{margin-bottom:16px;padding:0;overflow:hidden;border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
-  #filedash[hidden]{display:none}
-  .fd-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  #filedash{margin-bottom:16px;padding:0;overflow:hidden;border-color:#2b4a6c}
+  #filedash[hidden]{display:none} #filedash,#view{scroll-margin-top:80px}
+  .fd-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
   .fd-head h2{margin:0;color:var(--ink);font-size:calc(16px*var(--fs-titles))} .fd-head small{color:var(--mute)}
-  .fd-head a,.fd-head button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;text-decoration:none;cursor:pointer}
+  .fd-head a,.fd-head button{background:transparent;color:var(--acc);border:1px solid #2b4a6c;border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;text-decoration:none;cursor:pointer}
   #fdFrame{width:100%;height:520px;border:0;display:block;background:transparent}
   #fdFrame[hidden],#fdWait[hidden]{display:none}
-  .fd-wait{padding:40px;text-align:center;color:var(--mute)} .fd-wait b{display:block;color:var(--acc);font-size:18px;margin-bottom:6px}
-  .m.t{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:12px;font-family:monospace;unicode-bidi:plaintext;text-align:start;align-self:stretch;word-break:break-word;max-width:100%}
-  form{display:flex;gap:6px} input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit}
-  form button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:0 12px;cursor:pointer}
-  .docs li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .fd-wait{padding:48px;text-align:center;color:var(--mute)} .fd-wait b{display:block;color:var(--acc);font-size:18px;margin-bottom:6px}
+  .docs li{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
   .docs ul{list-style:none;margin:0;padding:0} .docs small{color:var(--mute)}
-  .attach{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:0 10px;cursor:pointer;font-size:18px}
-  .drop{outline:2px dashed var(--acc);outline-offset:-6px}
-  #gate{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:9}
-  #gate form{flex-direction:column;width:300px} #gate input{padding:12px} #gate button{padding:10px}
-  .nora{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap}
-  .nora b{font-size:18px;letter-spacing:.02em} .nora span{color:var(--mute);font-size:12px}
-  .vsel{display:flex;gap:6px;align-items:center;justify-content:center}
-  .vsel select{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
-  .vsel button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit;font-size:13px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px} @media(max-width:900px){.two{grid-template-columns:1fr}}
+  .drop main{outline:2px dashed var(--acc);outline-offset:-10px}
+  #gate{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:30}
+  #gate form{display:flex;gap:8px;flex-direction:column;width:300px} #gate input{padding:12px;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px} #gate button{padding:10px;background:var(--acc);color:#081726;border:0;border-radius:10px;font-weight:700}
+  /* ===== نورة: شريط صوتي صغير أسفل الشاشة (مثل ChatGPT) ===== */
+  #dock{position:fixed;inset-inline:0;bottom:0;z-index:20;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 16px 14px;pointer-events:none;
+    background:linear-gradient(to top,var(--bg) 55%,transparent)}
+  #dock>*{pointer-events:auto;width:min(780px,100%)}
+  .composer{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid #2b4a6c;border-radius:30px;padding:7px 8px;box-shadow:0 10px 30px #0006}
+  .composer input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--ink);font-size:16px;padding:8px 6px}
+  .composer input::placeholder{color:var(--mute)}
+  .ic{width:42px;height:42px;flex:none;border-radius:50%;border:0;background:transparent;color:var(--ink);cursor:pointer;display:grid;place-items:center;font-size:22px;line-height:1}
+  .ic:hover{background:#ffffff10} .ic svg{width:20px;height:20px}
+  .ic.mic{background:var(--acc);color:#081726;transition:box-shadow .1s} .ic.mic.on{background:var(--bad);color:#fff}
+  .ic.send[hidden]{display:none}
+  .chipsel{background:transparent;color:var(--mute);border:0;font-size:13px;padding:6px 4px;cursor:pointer;max-width:120px} .chipsel option{background:var(--card);color:var(--ink)}
+  .chipbtn{background:transparent;color:var(--mute);border:0;font-size:13px;cursor:pointer;padding:6px} .chipbtn:hover{color:var(--ink)}
+  #status{color:var(--mute);font-size:12px;text-align:center;min-height:16px}
+  #caption{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:calc(15px*var(--fs-chat));line-height:1.7;cursor:pointer;max-height:150px;overflow:auto;box-shadow:0 10px 30px #0005;animation:capin .25s ease-out}
+  #caption[hidden]{display:none} #caption .cu{color:var(--mute);font-size:13px} #caption .cu:empty{display:none} #caption .ca::before{content:"✦ نورة: ";color:var(--acc);font-weight:700}
+  #caption .ca:empty{display:none}
+  @keyframes capin{from{opacity:0;transform:translateY(6px)}}
+  #drawer{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px #0007;display:flex;flex-direction:column;max-height:min(55vh,520px)}
+  #drawer[hidden]{display:none}
+  .dr-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mute)}
+  .dr-head b{color:var(--ink);font-size:14px;margin-inline-end:auto}
+  .dr-head button{background:transparent;border:1px solid #2b4a6c;color:var(--acc);border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px}
+  #log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:12px}
+  .m{padding:8px 12px;border-radius:12px;font-size:calc(14px*var(--fs-chat));line-height:1.6;max-width:88%}
+  .m.u{background:#1b3553;align-self:flex-start}.m.a{background:#0b1d31;border:1px solid var(--line);align-self:flex-end}
+  .m.old{opacity:.55}
+  .m.t{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:12px;font-family:monospace;unicode-bidi:plaintext;text-align:start;align-self:stretch;word-break:break-word;max-width:100%}
   /* أنماط الجداول (نورة تبدّل بينها) */
   body.tbl-striped tbody tr:nth-child(even) td, body.tbl-striped table tr:nth-child(even) td{background:color-mix(in srgb,var(--acc) 7%,transparent)}
   body.tbl-compact th, body.tbl-compact td{padding:4px 6px}
@@ -66,34 +89,50 @@
 <style id="nora-css"></style>
 </head>
 <body>
-<header><h1>📊 لوحة مشاريع التحول الرقمي</h1><span style="color:var(--mute);font-size:13px">نورة · Gemini Live · تجربة</span></header>
-<div id="gate"><form id="gf"><h2 style="text-align:center">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
+<header class="top">
+  <img class="logo" src="/brand/fsc-logo-dark.svg" alt="اتحاد الغرف التجارية السعودية">
+  <span class="sep"></span>
+  <h1>لوحة مشاريع التحول الرقمي</h1>
+  <span id="crumb"></span>
+  <div class="nora-chip" id="chip"><i></i><b>نورة</b><span>المساعدة الذكية</span></div>
+</header>
+<div id="gate"><form id="gf"><h2 style="text-align:center;color:var(--ink)">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
 <main>
-  <section>
+  <section id="home">
     <div class="card" id="filedash" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
-      <div id="fdWait" class="fd-wait" hidden><b>✦ نورة تقرأ الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
+      <div id="fdWait" class="fd-wait" hidden><b>✦ نورة تحلل الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
       <iframe id="fdFrame" title="لوحة الملف"></iframe>
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="card" style="margin-bottom:16px"><h2>المشاريع</h2><table id="projects"></table></div>
     <div class="card" style="margin-bottom:16px"><h2>التذاكر</h2><table id="tickets"></table></div>
-    <div class="card docs"><h2>📁 الملفات المرفوعة (اسحب ملف هنا أو اضغط 📎)</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
-    <div class="card docs" style="margin-top:16px"><h2>📊 داشبوردات نورة (قل لها: «سوّي لي داشبورد عن…»)</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
-    <div class="card docs" style="margin-top:16px"><h2>🧠 ذاكرة نورة (تتعلم أسلوبك ومصطلحاتك)</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
-    <div class="card docs" style="margin-top:16px"><h2>🛠️ طلبات التطوير (نورة تسجّلها لفريق التطوير)</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
+    <div class="two">
+      <div class="card docs"><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
+      <div class="card docs"><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
+      <div class="card docs"><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
+      <div class="card docs"><h2>طلبات التطوير</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
+    </div>
   </section>
-  <aside class="card agent">
-    <div class="nora"><b>✦ نورة</b><span>المساعدة الذكية</span></div>
-    <div class="vsel"><label for="voice" style="font-size:12px;color:var(--mute)">صوتها</label><select id="voice"></select><button id="preview" type="button">▶ اسمعها</button></div>
-    <button class="mic" id="mic" title="ابدأ المحادثة">🎙️</button>
-    <div id="status">اضغط المايك وكلّم نورة — جرّب: «عطيني تفاصيل مشروع بوابة الخدمات»</div>
-    <div id="log"></div>
-    <form id="f"><button type="button" class="attach" id="attach" title="إرفاق ملف">📎</button><input id="txt" placeholder="اسأل نورة… مثلاً: عطيني تفاصيل بوابة الخدمات"><button>إرسال</button></form>
-    <input type="file" id="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
-  </aside>
+  <section id="view" hidden></section>
 </main>
+<div id="dock">
+  <div id="drawer" hidden>
+    <div class="dr-head"><b>سجل المحادثة</b><span>صوتها</span><select id="voice" class="chipsel"></select><button id="preview" type="button">▶ اسمعها</button><button id="drClose" type="button">✕</button></div>
+    <div id="log"></div>
+  </div>
+  <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
+  <form id="f" class="composer">
+    <button type="button" class="ic" id="attach" title="إرفاق ملف">+</button>
+    <input id="txt" placeholder="اسأل نورة…" autocomplete="off">
+    <button type="button" class="chipbtn" id="logBtn" title="سجل المحادثة">السجل</button>
+    <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
+    <button class="ic send" id="send" title="إرسال" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+  </form>
+  <div id="status">اضغط زر الصوت وكلّم نورة، أو اكتب سؤالك</div>
+  <input type="file" id="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
+</div>
 <script type="module">
 import { GeminiLiveAgent } from './gemini-live-agent.js';
 import { createHUD } from './hud.js';
@@ -148,11 +187,34 @@ let cur = { u: null, a: null };
 function bubble(kind, text, append = true) {
   if (!append || !cur[kind]) { cur[kind] = Object.assign(document.createElement('div'), { className: 'm ' + kind }); $('#log').append(cur[kind]); }
   cur[kind].textContent += text; $('#log').scrollTop = 1e9;
+  caption(kind, cur[kind].textContent);
 }
+// الشريط يعرض آخر سطر فقط (سؤالك + رد نورة)، والسجل الكامل ينفتح بزر «السجل»
+let capTimer;
+function caption(kind, text) {
+  if (!$('#drawer').hidden) return;
+  const c = $('#caption'); clearTimeout(capTimer);
+  if (kind === 'u' && c.dataset.done) { c.querySelector('.ca').textContent = ''; delete c.dataset.done; }
+  c.querySelector(kind === 'u' ? '.cu' : '.ca').textContent = text; c.hidden = false; c.scrollTop = 1e9;
+}
+function captionDone() { const c = $('#caption'); c.dataset.done = 1; clearTimeout(capTimer); capTimer = setTimeout(() => { c.hidden = true; c.querySelector('.cu').textContent = ''; c.querySelector('.ca').textContent = ''; }, 14000); }
+const openLog = open => { $('#drawer').hidden = !open; if (open) { $('#caption').hidden = true; $('#log').scrollTop = 1e9; } };
+$('#logBtn').onclick = () => openLog($('#drawer').hidden);
+$('#drClose').onclick = () => openLog(false);
+$('#caption').onclick = () => openLog(true);
+$('#txt').addEventListener('input', () => { $('#send').hidden = !$('#txt').value.trim(); });
 function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; }
 
 // HUD: النوافذ المنبثقة (نورة تفتحها بأدوات show_*)
-const hud = createHUD({ api: async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json() });
+// الرسوم تنعرض داخل الشاشة الرئيسية نفسها مكان البيانات، و«رجوع للرئيسية» يرجّع البيانات الأساسية
+const hud = createHUD({
+  api: async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json(),
+  mount: {
+    el: $('#view'),
+    show: title => { $('#home').hidden = true; $('#view').hidden = false; $('#crumb').textContent = '‹ ' + title; scrollTo({ top: 0, behavior: 'smooth' }); },
+    home: () => { $('#view').hidden = true; $('#home').hidden = false; $('#crumb').textContent = ''; },
+  },
+});
 window.hud = hud;
 // تحكم نورة بالواجهة (خطوط/ألوان/أحجام/جداول/CSS)
 const apiJson = async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json();
@@ -206,8 +268,9 @@ async function loadHistory() {
 // ===== لوحة الملف داخل الشاشة الرئيسية =====
 window.showDash = async (id, title = '', sub = '', save = true) => {
   if (!id) return;
+  hud.closeAll();
   $('#filedash').hidden = false; $('#fdWait').hidden = true; $('#fdFrame').hidden = false;
-  $('#fdTitle').textContent = '📊 ' + (title || `داشبورد #${id}`); $('#fdSub').textContent = sub || '';
+  $('#fdTitle').textContent = '✦ لوحة الملف'; $('#fdSub').textContent = sub || title || '';
   $('#fdOpen').href = `/d/${id}`;
   $('#fdFrame').src = `/d/${id}?embed=1`;
   $('#filedash').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -215,8 +278,9 @@ window.showDash = async (id, title = '', sub = '', save = true) => {
   return { shown_on_main_screen: true, id };
 };
 function dashWaiting(name) {
+  hud.closeAll();
   $('#filedash').hidden = false; $('#fdWait').hidden = false; $('#fdFrame').hidden = true;
-  $('#fdTitle').textContent = '📊 لوحة الملف'; $('#fdSub').textContent = name;
+  $('#fdTitle').textContent = 'لوحة الملف'; $('#fdSub').textContent = name;
   $('#filedash').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 $('#fdHide').onclick = () => { $('#filedash').hidden = true; apiJson('/api/current-dash', {}).catch(() => {}); };
@@ -241,11 +305,11 @@ const screenTools = {
     const list = sel => [...document.querySelectorAll(sel + ' li')].map(li => li.innerText.replace(/\s+/g, ' ').trim()).slice(0, 12);
     return {
       page: document.querySelector('header h1')?.innerText,
+      view: $('#view').hidden ? 'الشاشة الرئيسية (البيانات الأساسية)' : 'رسم معروض مكان البيانات: ' + hud.current().join('، ') + ' — «رجوع» يرجّع البيانات',
       kpis: [...document.querySelectorAll('.kpi')].map(k => `${k.querySelector('span')?.innerText}: ${k.querySelector('b')?.innerText}`),
       projects: rows('#projects'), tickets: rows('#tickets'),
       file_dashboard_on_screen: $('#filedash').hidden ? null : $('#fdTitle').innerText + ' ' + $('#fdSub').innerText,
       files: list('#docs'), generated_dashboards: list('#dashes'), memories_count: document.querySelectorAll('#mems .memdel').length, dev_requests: list('#devreq'),
-      open_popups: [...document.querySelectorAll('section.hud h3')].map(h => h.innerText),
       style: { font: ui.state.font, digits: ui.state.numerals || 'arabic', numbers_font: ui.state.numFont || ui.state.font, table: ui.state.table, theme_colors: ui.state.colors, custom_css: (ui.state.css || []).map(c => c.description) },
     };
   },
@@ -256,15 +320,15 @@ const agent = new GeminiLiveAgent({
   headers: H,
   clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools, ...screenToolsExtra },
   on: {
-    status: t => $('#status').textContent = t,
-    closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); },
+    status: t => { $('#status').textContent = t; setTimeout(() => $('#chip').classList.toggle('on', !!agent.connected), 0); },
+    closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); $('#chip').classList.remove('on'); },
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
-    turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; },
+    turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
-    level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
+    level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 30)}px #e0705f33`,
   },
 });
 
@@ -306,7 +370,7 @@ $('#mic').onclick = async () => {
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
   if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
-  agent.sendText(t); $('#txt').value = '';
+  agent.sendText(t); $('#txt').value = ''; $('#send').hidden = true;
 };
 
 // ===== رفع الملفات =====

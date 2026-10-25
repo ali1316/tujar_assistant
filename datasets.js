@@ -158,7 +158,7 @@ export function toECharts(res, type = 'bar') {
   const multi = res.series.length > 1 || res.series[0] !== '_';
   const names = multi ? res.series : [res.measure];
   if (type === 'pie' || type === 'donut') {
-    return { legend: { bottom: 0, type: 'scroll' }, series: [{ type: 'pie', radius: type === 'donut' ? ['45%', '70%'] : '68%', center: ['50%', '45%'], data: res.rows.map(r => ({ name: r.key, value: r.total })), label: { formatter: '{b}\n{d}%' } }] };
+    return { legend: { bottom: 0, type: 'scroll' }, series: [{ type: 'pie', radius: type === 'donut' ? ['40%', '62%'] : '60%', center: ['50%', '45%'], minAngle: 3, data: res.rows.map(r => ({ name: r.key, value: r.total })), label: { formatter: '{b}\n{d}%', overflow: 'none' }, labelLine: { length: 10, length2: 8 } }] };
   }
   const horizontal = type === 'hbar';
   const series = names.map((n, i) => ({ name: n, type: type === 'line' || type === 'area' ? 'line' : 'bar', smooth: type === 'area',
@@ -212,7 +212,7 @@ export const datasetTools = {
     run: async args => { const ds = await resolveDs(args); const r = runQuery(ds, args); return { dataset: `#${ds.id} ${ds.sheet}`, ...r, rows: r.rows.slice(0, 40).map(x => ({ [r.group_by || 'المجموعة']: x.key, ...(r.series[0] === '_' ? { [r.measure]: x.total } : x.values) })) }; },
   },
   data_chart: {
-    declaration: { name: 'data_chart', description: 'ترسم فوراً أي شارت من بيانات الملف المرفوع بأرقام محسوبة ويظهر كنافذة منبثقة. استخدميها لما يطلب شارت عن بيانات الملف.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, chart_type: { type: 'STRING', enum: ['bar', 'hbar', 'stacked', 'line', 'area', 'pie', 'donut'] }, ...QP }, required: ['title', 'chart_type'] } },
+    declaration: { name: 'data_chart', description: 'ترسم فوراً أي شارت من بيانات الملف المرفوع بأرقام محسوبة ويظهر على الشاشة الرئيسية مكان البيانات. استخدميها لما يطلب شارت عن بيانات الملف.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, chart_type: { type: 'STRING', enum: ['bar', 'hbar', 'stacked', 'line', 'area', 'pie', 'donut'] }, ...QP }, required: ['title', 'chart_type'] } },
     run: async ({ title, chart_type = 'bar', ...args }) => {
       const ds = await resolveDs(args); const r = runQuery(ds, args);
       const total = r.rows.reduce((a, x) => a + x.total, 0);

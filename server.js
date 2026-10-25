@@ -11,6 +11,7 @@ import { dashboardTools, dashGet, dashList } from './dashboards.js';
 import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
+import { designerName } from './designer.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
@@ -33,12 +34,12 @@ const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ..
 const visualDeclarations = [
   {
     name: 'show_project_visual',
-    description: 'يعرض للمستخدم نافذة منبثقة سينمائية لمشروع: عدّاد الإنجاز، الميزانية مقابل المصروف، التذاكر حسب الأولوية، والأيام المتبقية. استخدمها كل ما سأل المستخدم عن تفاصيل أو وضع مشروع معيّن.',
+    description: 'يعرض على الشاشة الرئيسية تفاصيل مشروع: عدّاد الإنجاز، الميزانية مقابل المصروف، التذاكر حسب الأولوية، والأيام المتبقية. استخدمها كل ما سأل المستخدم عن تفاصيل أو وضع مشروع معيّن.',
     parameters: { type: 'OBJECT', properties: { project_id: { type: 'INTEGER' }, name: { type: 'STRING', description: 'جزء من اسم المشروع' } } },
   },
   {
     name: 'show_chart',
-    description: 'يرسم رسم بياني منبثق من أرقام حقيقية جبتها من الأدوات (للمقارنات والتوزيعات). لا تخترع أرقام.',
+    description: 'يرسم رسم بياني على الشاشة الرئيسية من أرقام حقيقية جبتها من الأدوات (للمقارنات والتوزيعات). لا تخترع أرقام.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -53,7 +54,7 @@ const visualDeclarations = [
   },
   {
     name: 'render_visual',
-    description: `يرسم أي رسم بياني تطلبه في اللحظة (دائري، جانت، خريطة حرارية، نقاط، مساحات، شلال، مركّب...) في نافذة HUD سينمائية مع عدّادات ووصف.
+    description: `يرسم أي رسم بياني تطلبه في اللحظة (دائري، جانت، خريطة حرارية، نقاط، مساحات، شلال، مركّب...) على الشاشة الرئيسية مع عدّادات ووصف.
 اكتب مواصفة Vega-Lite v5 كاملة كنص JSON في vega_lite، والبيانات داخلها في data.values (أرقام حقيقية من الأدوات فقط).
 لا تحط width/height/background/config — الواجهة تضبطها. للعناوين العربية استخدم title في المعطيات وليس داخل المواصفة.
 أمثلة: دائري = mark:"arc" مع theta و color. جانت = mark:"bar" مع y=name (nominal) و x=start_date (temporal) و x2=due_date.
@@ -76,12 +77,12 @@ const visualDeclarations = [
   },
   {
     name: 'show_overview',
-    description: 'يعرض لوحة منبثقة شاملة لكل المشاريع (الحالات، الميزانيات، التذاكر). استخدمها لما يطلب نظرة عامة أو ملخص.',
+    description: 'يعرض على الشاشة الرئيسية نظرة شاملة لكل المشاريع (الحالات، الميزانيات، التذاكر). استخدمها لما يطلب نظرة عامة أو ملخص.',
     parameters: { type: 'OBJECT', properties: {} },
   },
   {
     name: 'close_visuals',
-    description: 'يقفل كل النوافذ المنبثقة لما يطلب المستخدم يقفلها أو يخلص منها.',
+    description: 'يرجّع الشاشة الرئيسية (البيانات الأساسية) مكان الرسم المعروض. لما يقول: رجعي/ارجعي للرئيسية/للبيانات/الشاشة الأساسية/سكّري/خلاص.',
     parameters: { type: 'OBJECT', properties: {} },
   },
 ];
@@ -104,14 +105,14 @@ const uiDeclarations = [
   { name: 'set_table_style', description: 'يغيّر شكل الجداول.', parameters: { type: 'OBJECT', properties: { style: { type: 'STRING', enum: ['default', 'striped', 'compact', 'bordered', 'glass', 'cards'] } }, required: ['style'] } },
   { name: 'set_corners', description: 'استدارة زوايا البطاقات بالبكسل (0 حادة، 24 دائرية).', parameters: { type: 'OBJECT', properties: { radius: { type: 'NUMBER' } }, required: ['radius'] } },
   {
-    name: 'apply_custom_css', description: 'لأي تعديل شكلي ما تغطيه الأدوات الثانية: اكتبي CSS. المحددات المتاحة: header, h1, h2, .kpi, .kpi b, .card, table, th, td, .tag, .bar i, .mic, #log, .m.u, .m.a, aside.agent. المتغيرات: --bg --card --line --ink --mute --acc. ممنوع روابط خارجية.',
+    name: 'apply_custom_css', description: 'لأي تعديل شكلي ما تغطيه الأدوات الثانية: اكتبي CSS. المحددات المتاحة: header.top, h1, h2, .kpi, .kpi b, .card, table, th, td, .tag, .bar i, .composer, #caption, #log, .m.u, .m.a, .hud. المتغيرات: --bg --card --line --ink --mute --acc. ممنوع روابط خارجية.',
     parameters: { type: 'OBJECT', properties: { css: { type: 'STRING' }, description: { type: 'STRING', description: 'وصف قصير بالعربي للتعديل' } }, required: ['css', 'description'] },
   },
   {
     name: 'set_number_style', description: 'شكل الأرقام في الشاشة الرئيسية: digits=arabic (٥٣٠) أو latin (530)، و font خط مخصص للأرقام فقط (اختياري).',
     parameters: { type: 'OBJECT', properties: { digits: { type: 'STRING', enum: ['arabic', 'latin'] }, font: { type: 'STRING', enum: FONT_LIST } } },
   },
-  { name: 'look_at_screen', description: 'تشوفين الشاشة اللي قدام فواز الحين: العنوان، البطاقات والأرقام، جدول المشاريع والتذاكر، الخط والألوان الحالية، النوافذ المفتوحة. استخدميها كل ما تكلّم عن "الشاشة/اللوحة/الداشبورد/هذي الصفحة".', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'look_at_screen', description: 'تشوفين الشاشة اللي قدام فواز الحين: العنوان، البطاقات والأرقام، جدول المشاريع والتذاكر، الخط والألوان الحالية، والرسم المعروض حالياً (لو فيه). استخدميها كل ما تكلّم عن "الشاشة/اللوحة/الداشبورد/هذي الصفحة".', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'undo_ui', description: 'يتراجع عن آخر تغيير في الواجهة.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'reset_ui', description: 'يرجّع الواجهة لشكلها الأصلي.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'get_ui_state', description: 'يرجّع إعدادات الواجهة الحالية (الخط، الألوان، الأحجام...).', parameters: { type: 'OBJECT', properties: {} } },
@@ -137,21 +138,22 @@ const activeDeclarations = () => [
 const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لمنصة متابعة مشاريع التحول الرقمي. أنثى، واثقة، حماسية وودودة.
 - عرّفي بنفسك باسم نورة لو أحد سألك مين أنتِ.
 - تكلّمي باللهجة السعودية البيضاء بصيغة المؤنث، بإيجاز وحماس، وجمل قصيرة تناسب الكلام.
-- أنتِ تقدرين تعرضين نوافذ منبثقة ورسوم بيانية على الشاشة (مثل أفلام الخيال العلمي):
+- أنتِ تقدرين تعرضين رسوم وتفاصيل على الشاشة الرئيسية نفسها (تاخذ مكان البيانات الأساسية مؤقتاً، بهوية الاتحاد، بدون نوافذ منبثقة):
   * سؤال عن مشروع معيّن → نادي show_project_visual فوراً، وبعدها لخّصي أهم نقطتين بصوتك.
   * طلب نظرة عامة أو ملخص → show_overview.
   * أي نوع رسم يطلبه (باي، جانت، خريطة حرارية، نقاط، شلال، أي شي) → اجلبي الأرقام بالأدوات (search_projects فيها start_date و due_date و budget و spent و progress)
     ثم render_visual بمواصفة Vega-Lite تكتبينها بنفسك، مع 2-4 عدّادات kpis و 1-3 insights قصيرة. show_chart للأعمدة البسيطة السريعة فقط.
   * قولي جمل قصيرة حماسية مع العرض مثل "تفضّل، هذي الصورة كاملة قدامك".
-  * "سكّري" أو "قفّلي الشاشات" → close_visuals.
-- الشاشة الرئيسية: فواز يشوف صفحة «📊 لوحة مشاريع التحول الرقمي» وأنتِ لوحة جانبية داخلها. فيها: 4 بطاقات أرقام (المشاريع، الميزانية، المصروف، التذاكر المفتوحة)،
+  * "رجعي للرئيسية" أو "رجعي البيانات" أو "سكّري" أو "خلاص" → close_visuals (يرجّع الشاشة الأساسية).
+  * كل رسم جديد ياخذ مكان اللي قبله؛ ما فيه نوافذ فوق بعض.
+- الشاشة الرئيسية: فواز يشوف صفحة «لوحة مشاريع التحول الرقمي» بهوية اتحاد الغرف، وأنتِ شريط صوتي صغير أسفلها (ما تاخذين مساحة). فيها: 4 بطاقات أرقام (المشاريع، الميزانية، المصروف، التذاكر المفتوحة)،
   جدول المشاريع، جدول التذاكر، الملفات المرفوعة، داشبوردات نورة، ذاكرة نورة، طلبات التطوير.
   * "الداشبورد" أو "اللوحة" أو "الشاشة" أو "لوحة المشاريع" أو "هذي الصفحة" بدون رقم = هذي الشاشة الرئيسية، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
   * لما يرفع ملف، النظام يبني «لوحة الملف» تلقائياً ويعرضها داخل الشاشة الرئيسية، ويوصلك تنبيه برقمها. أسئلته بعدها عن «اللوحة» أو «الأرقام» أو «الملف» = عن هذي اللوحة وملفها:
     جاوبي من الملف بـ search_documents/read_document، ولو طلب تعديل عليها (رسم إضافي، تقسيم مختلف) ابني نسخة جديدة بـ build_dashboard وتنعرض مكانها.
   * بيانات Excel/CSV محفوظة كجداول منظّمة (مذكورة تحت بأعمدتها):
     - أي سؤال رقمي عنها (كم، مجموع، متوسط، الأعلى، حسب كذا، بشرط كذا) → query_data، وجاوبي بالأرقام اللي ترجع بالضبط.
-    - أي شارت يطلبه عن الملف → data_chart فوراً (bar/hbar/stacked/line/area/pie/donut) ويطلع نافذة منبثقة. لا تستخدمين render_visual لبيانات الملف.
+    - أي شارت يطلبه عن الملف → data_chart فوراً (bar/hbar/stacked/line/area/pie/donut) ويطلع على الشاشة الرئيسية مكان البيانات. لا تستخدمين render_visual لبيانات الملف.
     - search_documents/read_document للملفات النصية (PDF/Word) أو للبحث عن نص.
   * أنتِ تشوفينها: لا تقولين أبداً "ما أشوف الشاشة". نادي look_at_screen وجاوبي مما فيها، ووصفها المختصر موجود تحت.
   * أي طلب تعديل على شكلها (خط، أرقام، ألوان، أحجام، جداول) نفّذيه عليها مباشرة بأدوات الواجهة. الأرقام → set_number_style.
@@ -174,7 +176,7 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
   * طبّقي الذاكرة بهدوء في كل رد (أسلوبه، مصطلحاته)، بدون ما تقولين "حسب ذاكرتي".
   * عندك تحت ملخص جلساتك السابقة وآخر كلام دار بينكم: أنتِ تتذكرين المحادثة حتى لو انقطعت أو تحدّثت الصفحة، فكمّلي من وين وقفتوا.
   * كل النصوص اللي تكتبينها في الرسوم والداشبوردات (عناوين، محاور، تسميات، ملاحظات) تكون عربي دائماً إلا لو طلب غير كذا.
-  * الهوية موحّدة: الخط والألوان وشكل الأرقام تتطبّق تلقائياً على الشاشة والنوافذ والداشبوردات، فلا تحددين خطوط أو ألوان داخل مواصفات الرسوم.
+  * الهوية موحّدة: الخط والألوان وشكل الأرقام تتطبّق تلقائياً على الشاشة والرسوم والداشبوردات، فلا تحددين خطوط أو ألوان داخل مواصفات الرسوم.
     الأرقام اللي تكتبينها داخل النصوص (ملاحظات، عناوين) تكون بنفس شكل أرقام الشاشة المذكور تحت (إنجليزية 123 أو عربية ١٢٣).
 - أي رقم أو اسم أو حالة لازم تجيبه من الأدوات؛ لا تخمّن ولا تألّف بيانات.
 - قاعدة صارمة: لا تقولين "تم" أو "سوّيت" أو "انبنى" إلا إذا ناديتي الأداة فعلاً في نفس هذا الدور ورجعت نتيجتها ok. طلب داشبورد = لازم build_dashboard كل مرة.
@@ -406,4 +408,4 @@ initHistory(ai);
 initStore()
   .then(restoreSqlite)
   .catch(e => console.error('[store] init failed:', e.message))
-  .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend})`)));
+  .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend}, designer: ${designerName()})`)));
