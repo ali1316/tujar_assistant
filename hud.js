@@ -63,7 +63,12 @@ const CSS = `
 const STATUS_COLOR = { 'مكتمل': 'var(--ok)', 'متأخر': 'var(--bad)', 'متوقف': 'var(--warn)', 'قيد التنفيذ': 'var(--c)' };
 const PRI_COLOR = { 'عالية': '#ff5d73', 'متوسطة': '#ffb547', 'منخفضة': '#3dffa8' };
 const PALETTE = ['#3ee6ff', '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'];
-const fmt = n => new Intl.NumberFormat('ar-SA').format(Math.round(n));
+const fmt = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA').format(Math.round(n));
+// أسماء الشهور والأيام بالعربي في رسوم Vega (بدل January/Monday)
+const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const AR_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const AR_TIME_LOCALE = { dateTime: '%A، %e %B %Y، %X', date: '%d/%m/%Y', time: '%H:%M:%S', periods: ['ص', 'م'],
+  days: AR_DAYS, shortDays: AR_DAYS, months: AR_MONTHS, shortMonths: AR_MONTHS };
 
 export function createHUD({ api }) {
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
@@ -279,7 +284,7 @@ export function createHUD({ api }) {
     }
     const box = document.createElement('div'); box.className = 'vl'; body.append(box);
     try {
-      await vegaEmbed(box, spec, { actions: false, renderer: 'svg' });
+      await vegaEmbed(box, spec, { actions: false, renderer: 'svg', timeFormatLocale: AR_TIME_LOCALE });
     } catch (e) {
       box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
       setTimeout(() => close(el), 2500);
