@@ -75,15 +75,17 @@ export class GeminiLiveAgent {
     if (sc) {
       if (sc.interrupted) this.#stopPlayback(); // المستخدم قاطع الموديل
       for (const part of sc.modelTurn?.parts || []) {
-        if (part.inlineData?.data) this.#play(part.inlineData.data);
-        if (part.text && this.mode === 'mine' && !part.thought) { this.emit('modelText', part.text); this.#queueText(part.text); }
+        if (part.inlineData?.data && this.mode !== 'mine') this.#play(part.inlineData.data); // في وضع «صوتي» نتجاهل صوت Live
       }
-      if (sc.turnComplete && this.mode === 'mine') this.#queueText('', true);
       if (sc.inputTranscription?.text) {
         if (this.mode === 'mine' && this.sources.size) this.#stopPlayback(); // قاطعته وهو يتكلم بصوتك
         this.emit('userText', sc.inputTranscription.text, false);
       }
-      if (sc.outputTranscription?.text) this.emit('modelText', sc.outputTranscription.text);
+      if (sc.outputTranscription?.text) {
+        this.emit('modelText', sc.outputTranscription.text);
+        if (this.mode === 'mine') this.#queueText(sc.outputTranscription.text);
+      }
+      if (sc.turnComplete && this.mode === 'mine') this.#queueText('', true);
       if (sc.turnComplete) this.emit('turnComplete');
     }
     if (msg.toolCall) {
