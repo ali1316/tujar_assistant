@@ -63,8 +63,9 @@ export class GeminiLiveAgent {
       ws.onclose = ev => {
         if (!ready) return reject(new Error(`closed before setup: ${ev.code} ${ev.reason}`));
         if (this.ws !== ws) return; // اتصال قديم انقفل بعد ما بدينا جديد
-        this.emit('status', `انقطع الاتصال (${ev.code}) ${ev.reason || ''}`);
+        this.emit('status', `انقطع الاتصال (${ev.code}) — بيرجع تلقائياً مع أول طلب`);
         this.#stopMic();
+        this.emit('closed', ev.code);
       };
     });
   }
