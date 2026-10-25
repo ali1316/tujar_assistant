@@ -87,7 +87,7 @@ function countUp(el, to, unit) {
   document.title = `${spec.title} · نورة`;
   $('#title').textContent = spec.title;
   $('#subtitle').textContent = spec.subtitle || '';
-  $('#when').textContent = new Date(spec.generated_at || created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+  $('#when').textContent = new Date(spec.generated_at || created_at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
   // بطاقات الأرقام
   const kc = Math.max(1, spec.kpis.length);
@@ -117,6 +117,7 @@ function countUp(el, to, unit) {
         color: [ACC, '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'], animationDuration: 1400, animationEasing: 'cubicOut',
         tooltip: { trigger: 'item' } }, c.option);
       // كل التسميات تظهر (بدون ما يخفي ECharts بعضها)، ونميّلها لو كثيرة
+      [].concat(opt.legend || []).forEach(l => { if (l) { l.itemGap ??= 22; l.textStyle = { padding: [0, 6], ...(l.textStyle || {}) }; } });
       opt.textStyle = { ...(opt.textStyle || {}), fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` }; // الخط موحّد حتى لو الموديل حدد غيره
       // الأرقام في المحاور والتلميحات بنفس شكل أرقام اللوحة
       if (LOCALE === 'ar-SA') {
