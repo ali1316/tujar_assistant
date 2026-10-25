@@ -28,6 +28,7 @@
   #log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
   .m{padding:8px 12px;border-radius:10px;font-size:calc(14px*var(--fs-chat));line-height:1.6;max-width:92%}
   .m.u{background:#22304d;align-self:flex-start}.m.a{background:#1d2a22;align-self:flex-end}
+  .m.old{opacity:.55}
   .m.t{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:12px;font-family:monospace;unicode-bidi:plaintext;text-align:start;align-self:stretch;word-break:break-word;max-width:100%}
   form{display:flex;gap:6px} input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit}
   form button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:0 12px;cursor:pointer}
@@ -90,7 +91,7 @@ const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...
 
 // بوابة رمز الدخول
 async function gate() {
-  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); return loadDashboard(); }
+  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); setTimeout(loadHistory, 0); return loadDashboard(); }
   $('#gate').style.display = 'flex';
 }
 $('#gf').onsubmit = async e => {
@@ -146,16 +147,44 @@ document.addEventListener('click', async e => {
   await api(`/api/memories/${b.dataset.id}`, { method: 'DELETE' }); loadDashboard();
 });
 
+// ===== سجل المحادثة: كل دور ينحفظ في الداتابيس عشان نورة تتذكر حتى بعد التحديث =====
+let pend = { u: '', a: '' };
+function takeTurns() {
+  const t = [];
+  if (pend.u.trim()) t.push({ role: 'user', text: pend.u.trim() });
+  if (pend.a.trim()) t.push({ role: 'nora', text: pend.a.trim() });
+  pend = { u: '', a: '' }; return t;
+}
+function saveTurns() {
+  const turns = takeTurns(); if (!turns.length || !agent.chatId) return;
+  apiJson(`/api/chat/${agent.chatId}/turns`, { turns }).catch(() => {});
+}
+function endChat() {
+  if (!agent.chatId) return;
+  const turns = takeTurns();
+  navigator.sendBeacon(`/api/chat/${agent.chatId}/end?code=${encodeURIComponent(CODE)}`, JSON.stringify({ turns }));
+}
+addEventListener('pagehide', endChat);
+async function loadHistory() {
+  try {
+    const { turns } = await apiJson('/api/chat/recent?limit=16');
+    if (!turns?.length || $('#log').children.length > 1) return;
+    note('— آخر محادثة —');
+    turns.forEach(t => { const d = Object.assign(document.createElement('div'), { className: 'm ' + (t.role === 'user' ? 'u' : 'a') + ' old', textContent: t.text }); $('#log').append(d); });
+    note('— نورة تتذكر هذا الكلام —');
+  } catch {}
+}
+
 const agent = new GeminiLiveAgent({
   headers: H,
   clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools },
   on: {
     status: t => $('#status').textContent = t,
-    userText: (t, typed) => { if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
-    modelText: t => { bubble('a', t); cur.u = null; },
-    turnComplete: () => { cur = { u: null, a: null }; },
+    userText: (t, typed) => { if (pend.a.trim()) saveTurns(); pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
+    modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
+    turnComplete: () => { saveTurns(); cur = { u: null, a: null }; },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
-    toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    toolResult: (fc, r) => { pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
   },
@@ -173,7 +202,7 @@ $('#voice').value = VOICE;
 $('#voice').onchange = async () => {
   VOICE = $('#voice').value; try { localStorage.setItem('noraVoice', VOICE); } catch {}
   note(`🎙️ صوت نورة صار: ${VOICE}`);
-  if (running) { agent.stop(); try { await agent.start({ voice: VOICE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
+  if (running) { endChat(); agent.stop(); try { await agent.start({ voice: VOICE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
 };
 // معاينة الصوت: جملة قصيرة عبر Gemini TTS بنفس الصوت
 $('#preview').onclick = async () => {
@@ -192,7 +221,7 @@ $('#preview').onclick = async () => {
   $('#preview').disabled = false;
 };
 $('#mic').onclick = async () => {
-  if (running) { agent.stop(); running = false; $('#mic').classList.remove('on'); return; }
+  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); return; }
   try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); }
   catch (e) { $('#status').textContent = '❌ ' + e.message; }
 };
