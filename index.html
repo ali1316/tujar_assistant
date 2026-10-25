@@ -290,7 +290,7 @@ function guardTurn(nora) {
   }
   // قالت أرقام أو بيانات والشاشة ما تعرض شي عنها → تعرضها الحين (الشاشة لازم تطابق الكلام)
   const NUM = /[0-9٠-٩]|واحد|اثنين|ثلاث|أربع|خمس|ست|سبع|ثمان|تسع|عشر|عش\b|مية|مئة|ألف|بالمية/;
-  const VISUAL = ['data_chart', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard'];
+  const VISUAL = ['data_chart', 'query_data', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard'];
   if (NUM.test(nora) && !turnTools.some(t => VISUAL.includes(t)) && !nudged && agent.connected) {
     nudged = true;
     agent.sendText('[تنبيه النظام] قلتي أرقام والشاشة ما تعرضها. اجلبي الأرقام من الأدوات (مو من الذاكرة) واعرضيها على الشاشة الحين بالأداة المناسبة (data_chart لبيانات الملف، show_chart/show_overview للمشاريع، show_screen للأقسام)، وبعدها أكّدي الرقم بجملة قصيرة.', { silent: true });
@@ -355,6 +355,16 @@ const screenToolsExtra = {
     if (r.error) return r;
     const shown = await hud.showVisual({ title: r.title, subtitle: r.subtitle, vega_lite: r.vega_lite, kpis: r.kpis, insights: r.insights });
     return { ...shown, subtitle: r.subtitle, top: r.top, kpis: r.kpis };
+  },
+  // أي حساب مجمّع (حسب عمود) ينعرض على الشاشة تلقائياً — عشان الشاشة تطابق كلامها دايماً
+  async query_data(args) {
+    const AGG = { sum: 'مجموع', avg: 'متوسط', count: 'عدد', min: 'أقل', max: 'أعلى', distinct: 'عدد مميز' };
+    const q = apiJson('/api/tools/query_data', args);
+    if (!args.group_by) return q;
+    const title = `${AGG[args.agg || (args.measure ? 'sum' : 'count')] || ''} ${args.measure || 'الطلبات'} حسب ${args.group_by}`.trim();
+    const [r, c] = await Promise.all([q, apiJson('/api/tools/data_chart', { ...args, title })]);
+    if (!c.error) await hud.showVisual({ title: c.title, subtitle: c.subtitle, vega_lite: c.vega_lite, kpis: c.kpis, insights: c.insights });
+    return { ...r, shown_on_screen: !c.error };
   },
 };
 const screenTools = {
