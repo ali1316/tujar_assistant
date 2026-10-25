@@ -292,12 +292,25 @@ export function createHUD({ api }) {
     animate(el);
     return { shown: true, title };
   }
+  // معرض الخطوط: كل خط بعينة حيّة، والضغط عليه يطبّقه
+  function showFontGallery(fonts, current, onPick) {
+    const el = panel('TYPE · LIBRARY', 'مكتبة الخطوط', `${Object.keys(fonts).length} خط عربي · الحالي: ${current}`);
+    const g = document.createElement('div'); g.className = 'grid'; el.querySelector('.body').append(g);
+    Object.entries(fonts).forEach(([name, desc], i) => {
+      const c = cell(g, `<div class="lbl" style="font-family:system-ui">${esc(name)} · ${esc(desc)}</div>
+        <div style="font-family:'${name}';font-size:24px;margin-top:6px;color:#fff">نورة تدير لوحتك ١٢٣</div>`, 80 + i * 45);
+      c.style.cursor = 'pointer';
+      if (name === current) c.style.borderColor = 'var(--c)';
+      c.onclick = () => { onPick?.(name); g.querySelectorAll('.cell').forEach(x => x.style.borderColor = ''); c.style.borderColor = 'var(--c)'; };
+    });
+    return { shown: true };
+  }
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 
   return {
-    showProject, showChart, showOverview, showVisual, closeAll,
+    showProject, showChart, showOverview, showVisual, showFontGallery, closeAll,
     // جاهزة كـ clientTools للوكيل
     tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll },
   };
