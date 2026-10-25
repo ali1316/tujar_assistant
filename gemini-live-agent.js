@@ -109,6 +109,7 @@ export class GeminiLiveAgent {
       }));
       this.#send({ toolResponse: { functionResponses } });
     }
+    if (msg.usageMetadata) this.emit('usage', { input: msg.usageMetadata.promptTokenCount || 0, output: msg.usageMetadata.responseTokenCount || msg.usageMetadata.candidatesTokenCount || 0, total: msg.usageMetadata.totalTokenCount || 0 });
     if (msg.goAway) this.emit('status', `⚠️ الجلسة بتنتهي بعد ${msg.goAway.timeLeft}`);
     if (msg.error) this.emit('error', msg.error);
   }

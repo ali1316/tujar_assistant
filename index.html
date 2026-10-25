@@ -112,21 +112,21 @@
       <div class="card docs"><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
       <div class="card docs"><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
       <div class="card docs"><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
-      <div class="card docs"><h2>طلبات التطوير</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
+      <div class="card docs"><h2>طلبات التطوير · ينفّذها Claude</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
     </div>
   </section>
   <section id="view" hidden></section>
 </main>
 <div id="dock">
   <div id="drawer" hidden>
-    <div class="dr-head"><b>سجل المحادثة</b><span>صوتها</span><select id="voice" class="chipsel"></select><button id="preview" type="button">▶ اسمعها</button><button id="drClose" type="button">✕</button></div>
+    <div class="dr-head"><b>سجل المحادثة</b><small id="usage" title="توكنز هذي الجلسة"></small><span>صوتها</span><select id="voice" class="chipsel"></select><button id="preview" type="button">▶ اسمعها</button><button id="drClose" type="button">✕</button></div>
     <div id="log"></div>
   </div>
   <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
   <form id="f" class="composer">
     <button type="button" class="ic" id="attach" title="إرفاق ملف">+</button>
     <input id="txt" placeholder="اسأل نورة…" autocomplete="off">
-    <select id="engine" class="chipsel engine" title="محرك الصوت"><option value="gemini">Gemini</option><option value="eleven">ElevenLabs</option></select>
+    <select id="engine" class="chipsel engine" title="المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option></select>
     <button type="button" class="chipbtn" id="logBtn" title="سجل المحادثة">السجل</button>
     <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
     <button class="ic send" id="send" title="إرسال" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
@@ -178,7 +178,7 @@ async function loadDashboard(flash) {
     `<li><span><small>[${m.category}]</small> ${esc(m.content)}</span><button class="memdel" data-id="${m.id}" title="انسيها" style="background:none;border:none;color:var(--mute);cursor:pointer">✕</button></li>`).join('');
   else $('#mems').innerHTML = '<li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li>';
   if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
-    `<li><span>#${r.id} ${r.title}</span><small>${r.status} · ${r.created_at.slice(0, 16)}</small></li>`).join('');
+    `<li><span>#${r.id} ${esc(r.title)}${r.dev_note ? `<br><small style="color:var(--sand)">✦ Claude: ${esc(r.dev_note)}</small>` : ''}</span><small>${esc(r.status)} · ${(r.updated_at || r.created_at).slice(0, 16)}</small></li>`).join('');
   if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
     `<li><span>📄 ${x.name}</span><small>#${x.id} · ${sar(x.chars)} حرف</small></li>`).join('');
 }
@@ -333,9 +333,18 @@ const agentOpts = {
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
+    usage: u => trackUsage(u),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 30)}px #e0705f33`,
   },
 };
+// استهلاك التوكنز: نعرضه في رأس السجل وننحفظه في السيرفر (طلب تطوير #2)
+let USAGE = { input: 0, output: 0, total: 0 }, usagePend = null, usageTimer;
+function trackUsage(u) {
+  for (const k of ['input', 'output', 'total']) USAGE[k] += u[k] || 0;
+  usagePend ||= { input: 0, output: 0, total: 0 }; for (const k of ['input', 'output', 'total']) usagePend[k] += u[k] || 0;
+  $('#usage').textContent = `التوكنز: ${num(USAGE.total)}`;
+  clearTimeout(usageTimer); usageTimer = setTimeout(() => { const d = usagePend; usagePend = null; apiJson('/api/usage', { chatId: agent.chatId, engine: ENGINE, ...d }).catch(() => {}); }, 1500);
+}
 let ENGINE = 'gemini'; try { ENGINE = localStorage.getItem('noraEngine') || 'gemini'; } catch {}
 const makeAgent = e => e === 'eleven' ? new ElevenRealtimeAgent(agentOpts) : new GeminiLiveAgent(agentOpts);
 let agent = makeAgent(ENGINE);
@@ -362,12 +371,12 @@ async function fillVoices() {
   if (ENGINE === 'eleven') {
     try {
       const r = await apiJson('/api/eleven/voices');
-      if (!r.ready) { $('#voice').innerHTML = '<option value="">أضف مفتاح ElevenLabs</option>'; $('#status').textContent = '⚠️ ElevenLabs يحتاج ELEVENLABS_API_KEY في Render'; return; }
+      if (!r.ready) { $('#voice').innerHTML = '<option value="">المحرك غير مفعّل</option>'; $('#status').textContent = '⚠️ صوت فواز يحتاج تفعيل المفتاح في السيرفر'; return; }
       ELEVEN_VOICES = r.voices || [];
       if (!EVOICE) EVOICE = r.default || ELEVEN_VOICES[0]?.id || '';
       $('#voice').innerHTML = ELEVEN_VOICES.map(v => `<option value="${v.id}">${esc(v.name.split(' - ')[0])}${v.lang ? ' · ' + v.lang : ''}${v.gender === 'female' ? ' ♀' : v.gender === 'male' ? ' ♂' : ''}</option>`).join('');
       $('#voice').value = EVOICE; VOICE = EVOICE;
-    } catch (e) { note('❌ أصوات ElevenLabs: ' + e.message); }
+    } catch (e) { note('❌ أصوات فواز: ' + e.message); }
   } else {
     $('#voice').innerHTML = VOICES.map(n => `<option value="${n}">${n} · ${VOICE_DESC[n]}</option>`).join('');
     $('#voice').value = GVOICE; VOICE = GVOICE;
@@ -379,8 +388,8 @@ $('#engine').onchange = async () => {
   ENGINE = $('#engine').value; try { localStorage.setItem('noraEngine', ENGINE); } catch {}
   agent = makeAgent(ENGINE);
   applyPersona();
-  note(`⚙️ المحرك صار: ${ENGINE === 'eleven' ? 'ElevenLabs Realtime' : 'Gemini Live'}`);
-  $('#status').textContent = `المحرك: ${ENGINE === 'eleven' ? 'ElevenLabs Realtime' : 'Gemini Live'} — اضغط زر الصوت أو اكتب`;
+  note(`⚙️ المساعد صار: ${ENGINE === 'eleven' ? 'فواز' : 'نورة'}`);
+  $('#status').textContent = `${ENGINE === 'eleven' ? 'فواز' : 'نورة'} جاهز${ENGINE === 'eleven' ? '' : 'ة'} — اضغط زر الصوت أو اكتب`;
   await fillVoices();
 };
 fillVoices();

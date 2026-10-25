@@ -29,7 +29,18 @@ const ACCESS_CODE = process.env.ACCESS_CODE || ''; // لو فاضي = بدون �
 const MY_VOICE_ID = process.env.MY_VOICE_ID || 'voice_xb1ye60p9o3i'; // صوت فواز المستنسخ في Gemini
 const TTS_MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
-const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools };
+// استهلاك التوكنز: المتصفح يرسل أرقام كل جلسة، وننحفظ مجاميع يومية
+const usageTools = {
+  get_token_usage: {
+    declaration: { name: 'get_token_usage', description: 'يعرض استهلاك التوكنز للمحادثات الصوتية: اليوم، آخر الأيام، وآخر الجلسات (لكل محرك).', parameters: { type: 'OBJECT', properties: {} } },
+    run: async () => {
+      const u = (await kvGet('usage')) || { days: {}, sessions: [] };
+      const today = new Date().toISOString().slice(0, 10);
+      return { today: u.days[today] || {}, last_days: Object.fromEntries(Object.entries(u.days).sort().slice(-7)), recent_sessions: u.sessions.slice(-8), note: 'محرك فواز ما يرجّع أرقام توكنز، فالأرقام لنورة (Gemini) بالأساس' };
+    },
+  },
+};
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...usageTools };
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
 const visualDeclarations = [
@@ -164,7 +175,9 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
     أي تعديل شكلي ثاني → apply_custom_css، "رجّعي" → undo_ui، "الشكل الأصلي" → reset_ui.
   * نفّذي مباشرة بدون استئذان (التعديلات الشكلية آمنة وتنتراجع)، وبعدها قولي بالتفصيل وش تغيّر.
   * لو الطلب أكبر من الشكل (ميزة جديدة، صفحة، تكامل، تعديل بالبيانات أو الباك اند) → request_dev_change
-    واكتبي التفاصيل كاملة، وقولي له إن الطلب انسجّل برقم كذا عند فريق التطوير.
+    واكتبي التفاصيل كاملة، وقولي له إن الطلب انسجّل برقم كذا عند Claude (المطوّر) وبيطوّره وينعكس على الواجهة.
+    "وين وصل طلبي/وش صار على طلبات التطوير" → list_dev_requests (فيها الحالة وملاحظة المطوّر).
+  * "كم استهلكنا توكنز" → get_token_usage.
 - أنتِ مساعدة فواز الشخصية:
   * "افتحي واتساب/جيميل/يوتيوب..." → open_app. "أرسلي لفلان على واتساب كذا" → open_app بـ phone و message (مسودة؛ هو يضغط إرسال).
     لو رجع opened=false قولي له يضغط زر «افتح» اللي طلع على الشاشة.
@@ -427,6 +440,31 @@ app.get('/api/current-dash', async (req, res) => res.json((await getCurrentDash(
 app.post('/api/current-dash', async (req, res) => { await setCurrentDash(req.body?.id ? req.body : {}); res.json({ ok: true }); });
 
 // 4) بيانات اللوحة
+// طلبات التطوير: Claude (المطوّر) يقرأها ويحدّث حالتها وملاحظته بعد ما يطوّرها
+app.get('/api/dev-requests', (req, res) => {
+  const rows = db.prepare('SELECT * FROM dev_requests ORDER BY id DESC').all();
+  res.json({ requests: req.query.status ? rows.filter(r => r.status === req.query.status) : rows });
+});
+app.post('/api/dev-requests/:id', (req, res) => {
+  const { status, note } = req.body || {};
+  const r = db.prepare("UPDATE dev_requests SET status=COALESCE(?, status), dev_note=COALESCE(?, dev_note), updated_at=datetime('now') WHERE id=?").run(status || null, note || null, +req.params.id);
+  snapshotSoon();
+  res.json({ ok: r.changes > 0 });
+});
+// استهلاك التوكنز (يرسله المتصفح بعد كل رد)
+app.post('/api/usage', async (req, res) => {
+  const { chatId, engine = 'gemini', input = 0, output = 0, total = 0 } = req.body || {};
+  const u = (await kvGet('usage')) || { days: {}, sessions: [] };
+  const day = new Date().toISOString().slice(0, 10);
+  const d = (u.days[day] ||= {}); const e = (d[engine] ||= { input: 0, output: 0, total: 0 });
+  e.input += +input || 0; e.output += +output || 0; e.total += +total || 0;
+  let s = u.sessions.find(x => x.chatId === chatId && x.engine === engine);
+  if (!s) { s = { chatId, engine, day, input: 0, output: 0, total: 0 }; u.sessions.push(s); u.sessions = u.sessions.slice(-50); }
+  s.input += +input || 0; s.output += +output || 0; s.total += +total || 0;
+  await kvSet('usage', u);
+  res.json({ ok: true, today: d });
+});
+
 app.get('/api/dashboard', async (req, res) => {
   res.json({
     dashboards: await dashList(),

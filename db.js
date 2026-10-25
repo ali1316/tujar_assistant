@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS dev_requests (
   status TEXT NOT NULL DEFAULT 'جديد', created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`);
 
+// ترقية: ملاحظة المطوّر (Claude) ووقت آخر تحديث لطلبات التطوير
+for (const [c, t] of [['dev_note', 'TEXT'], ['updated_at', 'TEXT']])
+  if (!db.prepare('PRAGMA table_info(dev_requests)').all().some(x => x.name === c)) db.exec(`ALTER TABLE dev_requests ADD COLUMN ${c} ${t}`);
+
 // ترقية: تاريخ بداية لكل مشروع (للجانت) — آمنة لو انعادت
 if (!db.prepare('PRAGMA table_info(projects)').all().some(c => c.name === 'start_date')) {
   db.exec('ALTER TABLE projects ADD COLUMN start_date TEXT');
@@ -185,7 +189,7 @@ export const tools = {
   request_dev_change: {
     declaration: {
       name: 'request_dev_change',
-      description: 'يسجّل طلب تطوير كبير ما تقدرين تنفذينه بأدوات الواجهة (ميزة جديدة، صفحة، تكامل، تقرير، تعديل بالباك اند). فريق التطوير (Claude) يستلمه وينفذه. اكتبي التفاصيل كاملة كما قالها المستخدم.',
+      description: 'يسجّل طلب تطوير كبير ما تقدرين تنفذينه بأدوات الواجهة (ميزة جديدة، صفحة، تكامل، تقرير، تعديل بالباك اند). المطوّر (Claude) يستلمه ويطوّره وينعكس على هذي الواجهة. اكتبي التفاصيل كاملة كما قالها المستخدم.',
       parameters: {
         type: 'OBJECT',
         properties: { title: { type: 'STRING' }, details: { type: 'STRING' } },
