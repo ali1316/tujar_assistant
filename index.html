@@ -274,6 +274,13 @@ function guardTurn(nora) {
   if (wantsDash && claimed && !turnTools.includes('build_dashboard') && !nudged && agent.connected) {
     nudged = true;
     agent.sendText('[تنبيه النظام] ما ناديتي build_dashboard في هذا الطلب، فما انبنى أي داشبورد. نفّذي الطلب الحين فعلياً بالأدوات (ولو فيه ملف مرفوع حديثاً اقرئيه أول).', { silent: true });
+    return;
+  }
+  // وعدت «لحظة/أشيك/أراجع» وخلّصت ردها بدون ما تنادي أي أداة → نخليها تكمّل فوراً
+  const promised = /لحظة|أشيك|اشيك|أراجع|اراجع|أشوف لك|بشوف|أجيب لك|خليني/.test(nora);
+  if (promised && !turnTools.length && !nudged && agent.connected) {
+    nudged = true;
+    agent.sendText('[تنبيه النظام] وعدتي فواز وما ناديتي أي أداة. نادي الأدوات الحين، واعرضي النتيجة على الشاشة، وبعدها قولي الجواب.', { silent: true });
   }
 }
 function takeTurns() {
