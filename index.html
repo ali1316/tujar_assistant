@@ -281,6 +281,14 @@ function guardTurn(nora) {
   if (promised && !turnTools.length && !nudged && agent.connected) {
     nudged = true;
     agent.sendText('[تنبيه النظام] وعدتي فواز وما ناديتي أي أداة. نادي الأدوات الحين، واعرضي النتيجة على الشاشة، وبعدها قولي الجواب.', { silent: true });
+    return;
+  }
+  // قالت أرقام أو بيانات والشاشة ما تعرض شي عنها → تعرضها الحين (الشاشة لازم تطابق الكلام)
+  const NUM = /[0-9٠-٩]|واحد|اثنين|ثلاث|أربع|خمس|ست|سبع|ثمان|تسع|عشر|عش\b|مية|مئة|ألف|بالمية/;
+  const VISUAL = ['data_chart', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard'];
+  if (NUM.test(nora) && !turnTools.some(t => VISUAL.includes(t)) && !nudged && agent.connected) {
+    nudged = true;
+    agent.sendText('[تنبيه النظام] قلتي أرقام والشاشة ما تعرضها. اجلبي الأرقام من الأدوات (مو من الذاكرة) واعرضيها على الشاشة الحين بالأداة المناسبة (data_chart لبيانات الملف، show_chart/show_overview للمشاريع، show_screen للأقسام)، وبعدها أكّدي الرقم بجملة قصيرة.', { silent: true });
   }
 }
 function takeTurns() {
