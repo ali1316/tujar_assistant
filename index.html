@@ -15,6 +15,7 @@
   @media(max-width:900px){main{grid-template-columns:1fr}}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
   .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;transition:background .5s,border-color .5s}
+  .kpi b,td.num,.num{font-family:var(--num-font,var(--font)),var(--font),sans-serif;font-variant-numeric:tabular-nums}
   .kpi b{display:block;font-size:calc(22px*var(--fs-kpi));margin-top:4px} .kpi span{color:var(--mute);font-size:13px}
   table{width:100%;border-collapse:collapse;font-size:calc(14px*var(--fs-table))} th,td{padding:8px;border-bottom:1px solid var(--line);text-align:right} th{color:var(--mute);font-weight:600}
   .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
@@ -84,7 +85,9 @@ import { createHUD } from './hud.js';
 import { createUIControl } from './ui-control.js';
 import { createAssistant } from './assistant.js';
 const $ = s => document.querySelector(s);
-const sar = n => new Intl.NumberFormat('ar-SA').format(n);
+const sar = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA').format(n ?? 0);
+const num = n => window.NORA_NUMERALS === 'latin' ? String(n) : sar(n);
+document.addEventListener('nora:numerals', () => { if ($('#gate').style.display === 'none') loadDashboard(); });
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
 const H = () => ({ 'x-access-code': CODE });
 const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...H() } });
@@ -104,14 +107,14 @@ async function loadDashboard(flash) {
   const d = await (await api('/api/dashboard')).json();
   const s = d.summary;
   $('#kpis').innerHTML = [
-    ['المشاريع', d.projects.length], ['الميزانية (ر.س)', sar(s.total_budget)],
-    ['المصروف (ر.س)', sar(s.total_spent)], ['تذاكر مفتوحة', s.open_tickets],
+    ['المشاريع', num(d.projects.length)], ['الميزانية (ر.س)', sar(s.total_budget)],
+    ['المصروف (ر.س)', sar(s.total_spent)], ['تذاكر مفتوحة', num(s.open_tickets)],
   ].map(([k, v]) => `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join('');
   $('#projects').innerHTML = '<tr><th>#</th><th>المشروع</th><th>الإدارة</th><th>الحالة</th><th>الإنجاز</th><th>المسؤول</th></tr>' +
-    d.projects.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.department}</td><td><span class="tag ${p.status}">${p.status}</span></td>
-      <td><div class="bar"><i style="width:${p.progress}%"></i></div></td><td>${p.owner}</td></tr>`).join('');
+    d.projects.map(p => `<tr><td class="num">${num(p.id)}</td><td>${p.name}</td><td>${p.department}</td><td><span class="tag ${p.status}">${p.status}</span></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="flex:1"><i style="width:${p.progress}%"></i></div><small class="num" style="color:var(--mute)">${num(p.progress)}٪</small></div></td><td>${p.owner}</td></tr>`).join('');
   $('#tickets').innerHTML = '<tr><th>#</th><th>العنوان</th><th>المشروع</th><th>الأولوية</th><th>الحالة</th></tr>' +
-    d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td>${t.id}</td><td>${t.title}</td><td>${t.project_name}</td>
+    d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td class="num">${num(t.id)}</td><td>${t.title}</td><td>${t.project_name}</td>
       <td><span class="tag ${t.priority}">${t.priority}</span></td><td><span class="tag ${t.status}">${t.status}</span></td></tr>`).join('');
   if (d.dashboards?.length) $('#dashes').innerHTML = d.dashboards.map(x =>
     `<li><a href="/d/${x.id}" target="_blank" style="color:var(--acc)">#${x.id} ${esc(x.title)}</a><small>${String(x.created_at).slice(0, 16).replace('T', ' ')}</small></li>`).join('');
@@ -175,9 +178,26 @@ async function loadHistory() {
   } catch {}
 }
 
+// نورة «تشوف» الشاشة: تقرأ اللي قدام فواز الحين من الصفحة نفسها
+const screenTools = {
+  look_at_screen() {
+    const rows = sel => [...document.querySelectorAll(sel + ' tr')].slice(1).map(tr => [...tr.cells].map(c => c.innerText.trim()).filter(Boolean).join(' | '));
+    const list = sel => [...document.querySelectorAll(sel + ' li')].map(li => li.innerText.replace(/\s+/g, ' ').trim()).slice(0, 12);
+    return {
+      page: document.querySelector('header h1')?.innerText,
+      kpis: [...document.querySelectorAll('.kpi')].map(k => `${k.querySelector('span')?.innerText}: ${k.querySelector('b')?.innerText}`),
+      projects: rows('#projects'), tickets: rows('#tickets'),
+      files: list('#docs'), generated_dashboards: list('#dashes'), memories_count: document.querySelectorAll('#mems .memdel').length, dev_requests: list('#devreq'),
+      open_popups: [...document.querySelectorAll('section.hud h3')].map(h => h.innerText),
+      style: { font: ui.state.font, digits: ui.state.numerals || 'arabic', numbers_font: ui.state.numFont || ui.state.font, table: ui.state.table, theme_colors: ui.state.colors, custom_css: (ui.state.css || []).map(c => c.description) },
+    };
+  },
+};
+
+window.__nora = { screenTools, ui };
 const agent = new GeminiLiveAgent({
   headers: H,
-  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools },
+  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools },
   on: {
     status: t => $('#status').textContent = t,
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
