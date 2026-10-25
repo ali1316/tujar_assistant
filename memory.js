@@ -9,13 +9,13 @@ const CAT_AR = { style: 'أسلوب', preference: 'تفضيل', term: 'مصطل�
 let ai;
 export function initMemory(client) { ai = client; }
 
-async function embed(text) {
+export async function embed(text) {
   try {
     const r = await ai.models.embedContent({ model: EMBED_MODEL, contents: text, config: { outputDimensionality: DIMS } });
     return r.embeddings?.[0]?.values || null;
   } catch (e) { console.warn('[memory] embed failed:', e.message); return null; }
 }
-const cos = (a, b) => { let d = 0, x = 0, y = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; x += a[i] * a[i]; y += b[i] * b[i]; } return d / (Math.sqrt(x * y) || 1); };
+export const cos = (a, b) => { let d = 0, x = 0, y = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; x += a[i] * a[i]; y += b[i] * b[i]; } return d / (Math.sqrt(x * y) || 1); };
 const norm = s => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').toLowerCase();
 const words = s => new Set(norm(s).split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2).map(w => (w.startsWith('ال') && w.length > 4 ? w.slice(2) : w)));
 const overlap = (a, b) => { const A = words(a), B = words(b); let n = 0; A.forEach(w => B.has(w) && n++); return n / (A.size || 1); }; // نسبة كلمات السؤال الموجودة
