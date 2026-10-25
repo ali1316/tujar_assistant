@@ -58,6 +58,15 @@ let FONT = 'IBM Plex Sans Arabic', ACC = '#3ee6ff';
 const fmt = n => new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 }).format(n);
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
 const id = location.pathname.split('/').pop();
+// داخل الشاشة الرئيسية (iframe): نخفي زر الرجوع ونبلّغ الصفحة الأم بالطول
+const EMBED = new URLSearchParams(location.search).has('embed');
+if (EMBED) {
+  document.documentElement.classList.add('embed');
+  document.head.insertAdjacentHTML('beforeend', '<style>.embed .page-header{display:none}.embed .page-body{margin:12px 0}.embed body,.embed .page,.embed .page-wrapper{min-height:0!important;height:auto!important}.embed body{background:transparent}</style>');
+  // نقيس طول المحتوى نفسه (مو طول النافذة) عشان ما يكبر الإطار بلا نهاية
+  const post = () => { const b = document.querySelector('.page-body'); if (b) parent.postMessage({ noraDashHeight: Math.ceil(b.getBoundingClientRect().height) + 24 }, location.origin); };
+  new ResizeObserver(post).observe(document.querySelector('.page-body')); addEventListener('load', post); setTimeout(post, 1500); setTimeout(post, 3500);
+}
 
 function countUp(el, to, unit) {
   const t0 = performance.now(), d = 1400;
