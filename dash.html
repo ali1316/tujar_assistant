@@ -209,6 +209,7 @@ function countUp(el, to, unit) {
     const data = t.rows.map(r => Object.fromEntries(fields.map((f, i) => [f, Array.isArray(r) ? r[i] : r[t.columns[i]]])));
     new Tabulator(box, {
       data, layout: 'fitColumns', textDirection: 'rtl', pagination: data.length > 12, paginationSize: 12, placeholder: 'لا توجد بيانات',
+      locale: 'ar', langs: { ar: { pagination: { first: 'الأولى', first_title: 'الصفحة الأولى', last: 'الأخيرة', last_title: 'الصفحة الأخيرة', prev: 'السابقة', prev_title: 'السابقة', next: 'التالية', next_title: 'التالية', counter: { showing: 'عرض', of: 'من', rows: 'صف', pages: 'صفحة' } } } },
       columns: t.columns.map((name, i) => {
         const numeric = data.length && data.every(d => d[fields[i]] === '' || d[fields[i]] == null || !isNaN(+d[fields[i]]));
         return { title: name, field: fields[i], headerFilter: 'input', headerFilterPlaceholder: 'بحث…', sorter: numeric ? 'number' : 'string',
