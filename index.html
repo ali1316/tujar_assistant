@@ -64,7 +64,7 @@
   #status{color:var(--mute);font-size:12px;text-align:center;min-height:16px}
   #caption{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:calc(15px*var(--fs-chat));line-height:1.7;cursor:pointer;max-height:150px;overflow:auto;box-shadow:0 10px 30px #0005;animation:capin .25s ease-out}
   #caption[hidden]{display:none} #caption .cu{color:var(--mute);font-size:13px} #caption .cu:empty{display:none} #caption .ca::before{content:"✦ نورة: ";color:var(--acc);font-weight:700}
-  #caption .ca:empty{display:none}
+  #caption .ca:empty{display:none} body.eng-eleven #caption .ca::before{content:"✦ فواز: "}
   @keyframes capin{from{opacity:0;transform:translateY(6px)}}
   #drawer{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px #0007;display:flex;flex-direction:column;max-height:min(55vh,520px)}
   #drawer[hidden]{display:none}
@@ -350,6 +350,14 @@ if (!VOICES.includes(GVOICE)) GVOICE = 'Sulafat';
 let EVOICE = ''; try { EVOICE = localStorage.getItem('noraVoiceEleven') || ''; } catch {}
 let ELEVEN_VOICES = [];
 let VOICE = ENGINE === 'eleven' ? EVOICE : GVOICE;
+// الاسم يتبع المحرك: Gemini = نورة، ElevenLabs = فواز (بصوته)
+function applyPersona() {
+  const eleven = ENGINE === 'eleven';
+  document.body.classList.toggle('eng-eleven', eleven);
+  $('#chip b').textContent = eleven ? 'فواز' : 'نورة';
+  $('#txt').placeholder = eleven ? 'اسأل فواز…' : 'اسأل نورة…';
+}
+applyPersona();
 async function fillVoices() {
   if (ENGINE === 'eleven') {
     try {
@@ -370,6 +378,7 @@ $('#engine').onchange = async () => {
   if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); }
   ENGINE = $('#engine').value; try { localStorage.setItem('noraEngine', ENGINE); } catch {}
   agent = makeAgent(ENGINE);
+  applyPersona();
   note(`⚙️ المحرك صار: ${ENGINE === 'eleven' ? 'ElevenLabs Realtime' : 'Gemini Live'}`);
   $('#status').textContent = `المحرك: ${ENGINE === 'eleven' ? 'ElevenLabs Realtime' : 'Gemini Live'} — اضغط زر الصوت أو اكتب`;
   await fillVoices();

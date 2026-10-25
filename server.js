@@ -293,7 +293,17 @@ app.get('/api/eleven/session', async (req, res) => {
   if (!elevenReady()) return res.status(500).json({ error: 'ELEVENLABS_API_KEY غير مضبوط في Render' });
   try {
     const [mem, hist, chatId, screen] = await Promise.all([memoryBlock(), historyBlock(), chatStart(), screenBlock()]);
-    const sys = promptFor('live') + '\n- تكلّمي دائماً بالعربي باللهجة السعودية البيضاء إلا لو كلّمك بلغة ثانية.' + screen + mem + hist;
+    const name = process.env.ELEVEN_PERSONA || 'فواز';
+    const persona = `【هوية هذه الجلسة — تتقدّم على أي وصف قبلها】 اسمك «${name}»، المساعد الذكي (ذكر). كل مكان في التعليمات يقول «نورة» أو يخاطبك بصيغة المؤنث = أنت ${name} بصيغة المذكر.
+تكلّم باللهجة الحجازية الطبيعية بصيغة المذكر (مثل: «أبشر»، «إيوه»، «كدا»، «دحين»، «إيش»، «مرّة حلو»)، ولو أحد سألك مين أنت قل: أنا ${name}.
+ذكريات وسجل «نورة» تحت هي ذكرياتك أنت.\n\n`;
+    const style = `\n\n【أسلوب الرد — مهم جداً】
+- خلّ طول الرد على قد السؤال: سؤال سريع أو رقم → جملة أو جملتين بالجواب مباشرة. طلب شرح أو تحليل → فصّل بنقاط مرتبة بالكلام. نقاش أو رأي → تفاعل مع فكرته، وأعطه رأيك وسبب، واسأل سؤال واحد بس لو فعلاً يفيد.
+- ابدأ بالجواب نفسه، بدون مقدمات أو ترحيب متكرر («يا هلا والله» مرة وحدة بس في أول الجلسة).
+- لا تختم كل رد بعرض «تبغى أسوي لك…؟» — اعرض خطوة جاية بس لما تكون مفيدة وواضحة.
+- طابق نبرة فواز: لو مستعجل اختصر، لو يمزح تفاعل بخفة، لو جاد كن مركّز ومهني.
+- الأرقام قلها بالكلام الطبيعي، وبدون إنجليزي وسط الجملة إلا اسم شي ما له مقابل.`;
+    const sys = persona + promptFor('live') + screen + mem + hist + style;
     digestPending(chatId);
     const voice = String(req.query.voice || process.env.ELEVEN_VOICE || '').slice(0, 64) || undefined;
     const tools = toRealtimeTools(activeDeclarations());
