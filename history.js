@@ -23,7 +23,7 @@ function scheduleDigest(id, ms = 45000) { clearTimeout(timers.get(id)); timers.s
 export function digestNow(id) { clearTimeout(timers.get(id)); return digest(id); }
 export async function digestPending(skip) { for (const { id } of await chatPending().catch(() => [])) if (id !== skip) await digest(id); }
 
-async function generate(prompt) {
+export async function generate(prompt) {
   for (const model of goodModel ? [goodModel] : MODELS) {
     try {
       const r = await ai.models.generateContent({ model, contents: prompt, config: { responseMimeType: 'application/json', temperature: 0.2 } });
