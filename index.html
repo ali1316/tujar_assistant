@@ -30,6 +30,14 @@
   .m{padding:8px 12px;border-radius:10px;font-size:calc(14px*var(--fs-chat));line-height:1.6;max-width:92%}
   .m.u{background:#22304d;align-self:flex-start}.m.a{background:#1d2a22;align-self:flex-end}
   .m.old{opacity:.55}
+  /* لوحة الملف داخل الشاشة الرئيسية */
+  #filedash{margin-bottom:16px;padding:0;overflow:hidden;border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+  #filedash[hidden]{display:none}
+  .fd-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .fd-head h2{margin:0;color:var(--ink);font-size:calc(16px*var(--fs-titles))} .fd-head small{color:var(--mute)}
+  .fd-head a,.fd-head button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;text-decoration:none;cursor:pointer}
+  #fdFrame{width:100%;height:520px;border:0;display:block;background:transparent}
+  .fd-wait{padding:40px;text-align:center;color:var(--mute)} .fd-wait b{display:block;color:var(--acc);font-size:18px;margin-bottom:6px}
   .m.t{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:12px;font-family:monospace;unicode-bidi:plaintext;text-align:start;align-self:stretch;word-break:break-word;max-width:100%}
   form{display:flex;gap:6px} input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit}
   form button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:0 12px;cursor:pointer}
@@ -61,6 +69,12 @@
 <div id="gate"><form id="gf"><h2 style="text-align:center">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
 <main>
   <section>
+    <div class="card" id="filedash" hidden>
+      <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
+        <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
+      <div id="fdWait" class="fd-wait" hidden><b>✦ نورة تقرأ الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
+      <iframe id="fdFrame" title="لوحة الملف"></iframe>
+    </div>
     <div class="kpis" id="kpis"></div>
     <div class="card" style="margin-bottom:16px"><h2>المشاريع</h2><table id="projects"></table></div>
     <div class="card" style="margin-bottom:16px"><h2>التذاكر</h2><table id="tickets"></table></div>
@@ -94,7 +108,7 @@ const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...
 
 // بوابة رمز الدخول
 async function gate() {
-  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); setTimeout(loadHistory, 0); return loadDashboard(); }
+  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); setTimeout(loadHistory, 0); setTimeout(loadCurrentDash, 0); return loadDashboard(); }
   $('#gate').style.display = 'flex';
 }
 $('#gf').onsubmit = async e => {
@@ -188,6 +202,28 @@ async function loadHistory() {
   } catch {}
 }
 
+// ===== لوحة الملف داخل الشاشة الرئيسية =====
+window.showDash = async (id, title = '', sub = '', save = true) => {
+  if (!id) return;
+  $('#filedash').hidden = false; $('#fdWait').hidden = true; $('#fdFrame').hidden = false;
+  $('#fdTitle').textContent = '📊 ' + (title || `داشبورد #${id}`); $('#fdSub').textContent = sub || '';
+  $('#fdOpen').href = `/d/${id}`;
+  $('#fdFrame').src = `/d/${id}?embed=1`;
+  $('#filedash').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (save) apiJson('/api/current-dash', { id, title, doc_name: sub.replace(/^من ملف: /, '') || undefined }).catch(() => {});
+  return { shown_on_main_screen: true, id };
+};
+function dashWaiting(name) {
+  $('#filedash').hidden = false; $('#fdWait').hidden = false; $('#fdFrame').hidden = true;
+  $('#fdTitle').textContent = '📊 لوحة الملف'; $('#fdSub').textContent = name;
+  $('#filedash').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#fdHide').onclick = () => { $('#filedash').hidden = true; apiJson('/api/current-dash', {}).catch(() => {}); };
+addEventListener('message', e => { if (e.origin === location.origin && e.data?.noraDashHeight) $('#fdFrame').style.height = Math.min(Math.max(e.data.noraDashHeight, 300), 3000) + 'px'; });
+async function loadCurrentDash() {
+  try { const c = await apiJson('/api/current-dash'); if (c?.id) showDash(c.id, c.title, c.doc_name ? 'من ملف: ' + c.doc_name : '', false); } catch {}
+}
+
 // نورة «تشوف» الشاشة: تقرأ اللي قدام فواز الحين من الصفحة نفسها
 const screenTools = {
   look_at_screen() {
@@ -197,6 +233,7 @@ const screenTools = {
       page: document.querySelector('header h1')?.innerText,
       kpis: [...document.querySelectorAll('.kpi')].map(k => `${k.querySelector('span')?.innerText}: ${k.querySelector('b')?.innerText}`),
       projects: rows('#projects'), tickets: rows('#tickets'),
+      file_dashboard_on_screen: $('#filedash').hidden ? null : $('#fdTitle').innerText + ' ' + $('#fdSub').innerText,
       files: list('#docs'), generated_dashboards: list('#dashes'), memories_count: document.querySelectorAll('#mems .memdel').length, dev_requests: list('#devreq'),
       open_popups: [...document.querySelectorAll('section.hud h3')].map(h => h.innerText),
       style: { font: ui.state.font, digits: ui.state.numerals || 'arabic', numbers_font: ui.state.numFont || ui.state.font, table: ui.state.table, theme_colors: ui.state.colors, custom_css: (ui.state.css || []).map(c => c.description) },
@@ -273,7 +310,15 @@ async function uploadFile(file) {
   loadDashboard();
   // نعلم المساعد إن فيه ملف جديد عشان يقدر يسأل عنه مباشرة
   window.NORA_LAST_DOC = d;
-  const notice = `[تنبيه النظام] رفع المستخدم ملف جديد اسمه "${d.name}" ورقمه ${d.id} وطوله ${d.chars} حرف. أي طلب جاي (داشبورد، ملخص، شارت، تحليل) بدون ما يحدد مصدر = يقصد هذا الملف: اقرئيه كامل بـ read_document (كل الصفحات) قبل ما تبنين أي شي.`;
+  // 1) نبني لوحة الملف تلقائياً ونعرضها داخل الشاشة الرئيسية
+  dashWaiting(d.name);
+  const g = await apiJson(`/api/docs/${d.id}/dashboard`, {}).catch(e => ({ error: e.message }));
+  if (g.ok) { showDash(g.id, g.title, 'من ملف: ' + d.name, false); note(`📊 لوحة الملف جاهزة #${g.id}: ${g.title}`); loadDashboard(); }
+  else { $('#filedash').hidden = true; note('⚠️ ما قدرت أبني اللوحة تلقائياً: ' + (g.error || '')); }
+  // 2) نبلّغ نورة عشان تتكلم عنها وتجاوب أسئلتك
+  const notice = g.ok
+    ? `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وانبنت منه تلقائياً لوحة #${g.id} «${g.title}» وهي معروضة الحين في الشاشة الرئيسية. رحّبي بجملة قصيرة وقولي أبرز رقمين أو ثلاثة منها (من الملف)، وبعدها جاوبي أسئلته عنها من الملف بـ search_documents/read_document.`
+    : `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وفشل البناء التلقائي. اقرئيه كامل بـ read_document وابني منه داشبورد بـ build_dashboard الحين.`;
   if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
   if (agent.connected) agent.sendText(notice, { silent: true });
 }
