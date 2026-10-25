@@ -152,6 +152,16 @@ document.addEventListener('click', async e => {
 
 // ===== سجل المحادثة: كل دور ينحفظ في الداتابيس عشان نورة تتذكر حتى بعد التحديث =====
 let pend = { u: '', a: '' };
+// حارس: لو طلب داشبورد وهي قالت «تم» بدون ما تبنيه فعلاً، نطلب منها تنفذ
+let turnTools = [], lastUser = '', nudged = false;
+function guardTurn(nora) {
+  const wantsDash = /داش\s?بورد|dashboard|لوحة بيانات/i.test(lastUser);
+  const claimed = /تم|بنيت|سويت|سوّيت|انبنى|جاهز/.test(nora);
+  if (wantsDash && claimed && !turnTools.includes('build_dashboard') && !nudged && agent.connected) {
+    nudged = true;
+    agent.sendText('[تنبيه النظام] ما ناديتي build_dashboard في هذا الطلب، فما انبنى أي داشبورد. نفّذي الطلب الحين فعلياً بالأدوات (ولو فيه ملف مرفوع حديثاً اقرئيه أول).', { silent: true });
+  }
+}
 function takeTurns() {
   const t = [];
   if (pend.u.trim()) t.push({ role: 'user', text: pend.u.trim() });
@@ -201,11 +211,11 @@ const agent = new GeminiLiveAgent({
   on: {
     status: t => $('#status').textContent = t,
     closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); },
-    userText: (t, typed) => { if (pend.a.trim()) saveTurns(); pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
+    userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
-    turnComplete: () => { saveTurns(); cur = { u: null, a: null }; },
+    turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
-    toolResult: (fc, r) => { pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
   },
