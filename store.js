@@ -14,7 +14,11 @@ export async function initStore() {
       CREATE TABLE IF NOT EXISTS memories (id SERIAL PRIMARY KEY, content TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'fact',
         embedding JSONB, hits INT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now());
       CREATE TABLE IF NOT EXISTS dashboards (id SERIAL PRIMARY KEY, title TEXT NOT NULL, spec JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now());
-      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now());`);
+      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now());
+      CREATE TABLE IF NOT EXISTS chat_sessions (id SERIAL PRIMARY KEY, started_at TIMESTAMPTZ DEFAULT now(), last_at TIMESTAMPTZ DEFAULT now(),
+        summary TEXT, embedding JSONB, turns INT NOT NULL DEFAULT 0, digested_turns INT NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS chat_turns (id SERIAL PRIMARY KEY, session_id INT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now());
+      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);`);
   } catch (e) {
     console.error('[store] postgres failed, falling back to sqlite:', e.message);
     pool = null; backend = 'sqlite';
@@ -24,7 +28,11 @@ export async function initStore() {
       CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY, content TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'fact',
         embedding TEXT, hits INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
       CREATE TABLE IF NOT EXISTS dashboards (id INTEGER PRIMARY KEY, title TEXT NOT NULL, spec TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
-      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')));`);
+      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')));
+      CREATE TABLE IF NOT EXISTS chat_sessions (id INTEGER PRIMARY KEY, started_at TEXT DEFAULT (datetime('now')), last_at TEXT DEFAULT (datetime('now')),
+        summary TEXT, embedding TEXT, turns INTEGER NOT NULL DEFAULT 0, digested_turns INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS chat_turns (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
+      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);`);
   }
   console.log(`[store] ${backend}`);
 }
@@ -80,3 +88,31 @@ export async function dashList() {
   if (pool) return (await pool.query('SELECT id, title, created_at FROM dashboards ORDER BY id DESC LIMIT 30')).rows;
   return db.prepare('SELECT id, title, created_at FROM dashboards ORDER BY id DESC LIMIT 30').all();
 }
+
+// ===== سجل المحادثات =====
+const q = async (pgSql, liteSql, args = []) => pool ? (await pool.query(pgSql, args)).rows : db.prepare(liteSql).all(...args);
+const run = async (pgSql, liteSql, args = []) => pool ? pool.query(pgSql, args) : db.prepare(liteSql).run(...args);
+
+export async function chatStart() {
+  if (pool) return (await pool.query('INSERT INTO chat_sessions DEFAULT VALUES RETURNING id')).rows[0].id;
+  return db.prepare('INSERT INTO chat_sessions DEFAULT VALUES').run().lastInsertRowid;
+}
+export async function chatAppend(sessionId, turns) {
+  for (const t of turns) await run('INSERT INTO chat_turns (session_id, role, text) VALUES ($1,$2,$3)', 'INSERT INTO chat_turns (session_id, role, text) VALUES (?,?,?)', [sessionId, t.role, t.text]);
+  await run('UPDATE chat_sessions SET turns=turns+$1, last_at=now() WHERE id=$2', "UPDATE chat_sessions SET turns=turns+?, last_at=datetime('now') WHERE id=?", [turns.length, sessionId]);
+}
+export const chatTurns = (sessionId, afterIndex = 0) =>
+  q('SELECT role, text, created_at FROM chat_turns WHERE session_id=$1 ORDER BY id OFFSET $2', 'SELECT role, text, created_at FROM chat_turns WHERE session_id=? ORDER BY id LIMIT -1 OFFSET ?', [sessionId, afterIndex]);
+export const chatRecentTurns = (limit = 30) =>
+  q('SELECT * FROM (SELECT id, session_id, role, text, created_at FROM chat_turns ORDER BY id DESC LIMIT $1) t ORDER BY id', 'SELECT * FROM (SELECT id, session_id, role, text, created_at FROM chat_turns ORDER BY id DESC LIMIT ?) ORDER BY id', [limit]);
+export const chatSessions = (limit = 50) =>
+  q('SELECT * FROM chat_sessions WHERE turns>0 ORDER BY id DESC LIMIT $1', 'SELECT * FROM chat_sessions WHERE turns>0 ORDER BY id DESC LIMIT ?', [limit]).then(r => r.map(s => ({ ...s, embedding: s.embedding ? parse(s.embedding) : null })));
+export const chatPending = () =>
+  q('SELECT id FROM chat_sessions WHERE turns > digested_turns ORDER BY id', 'SELECT id FROM chat_sessions WHERE turns > digested_turns ORDER BY id');
+export async function chatSetDigest(id, { summary, embedding, digested }) {
+  await run('UPDATE chat_sessions SET summary=$1, embedding=$2, digested_turns=$3 WHERE id=$4', 'UPDATE chat_sessions SET summary=?, embedding=?, digested_turns=? WHERE id=?',
+    [summary, embedding ? JSON.stringify(embedding) : null, digested, id]);
+}
+export const chatGet = id => q('SELECT * FROM chat_sessions WHERE id=$1', 'SELECT * FROM chat_sessions WHERE id=?', [id]).then(r => r[0] || null);
+export const chatSearchText = (word, limit = 8) =>
+  q('SELECT session_id, role, text, created_at FROM chat_turns WHERE text ILIKE $1 ORDER BY id DESC LIMIT $2', 'SELECT session_id, role, text, created_at FROM chat_turns WHERE text LIKE ? ORDER BY id DESC LIMIT ?', [`%${word}%`, limit]);
