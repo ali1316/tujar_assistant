@@ -12,6 +12,7 @@ import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { designerName } from './designer.js';
+import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
 import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
@@ -40,7 +41,7 @@ const usageTools = {
     },
   },
 };
-const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...usageTools };
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...usageTools, ...driveTools };
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
 const visualDeclarations = [
@@ -195,6 +196,7 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
     واكتبي التفاصيل كاملة، وقولي له إن الطلب انسجّل برقم كذا عند Claude (المطوّر) وبيطوّره وينعكس على الواجهة.
     "وين وصل طلبي/وش صار على طلبات التطوير" → list_dev_requests (فيها الحالة وملاحظة المطوّر).
   * "كم استهلكنا توكنز" → get_token_usage.
+- أرشيف الملفات: كل ملف يرفعه ينحفظ تلقائياً في Google Drive حقه داخل «ملفات نورة» بتصنيفه. "جيبي/وين ملف كذا" أو "وش عندي ملفات عقود" → find_files، وقولي اسمه وتصنيفه، ولو طلب يفتحه → open_app بالرابط (url).
 - أنتِ مساعدة فواز الشخصية:
   * "افتحي واتساب/جيميل/يوتيوب..." → open_app. "أرسلي لفلان على واتساب كذا" → open_app بـ phone و message (مسودة؛ هو يضغط إرسال).
     لو رجع opened=false قولي له يضغط زر «افتح» اللي طلع على الشاشة.
@@ -442,6 +444,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     let datasets = [];
     try { datasets = await ingestDocument(doc, req.file.buffer); } catch (e) { console.warn('[upload] ingest failed:', e.message); }
     console.log(`[upload] ${name} → doc #${doc.id} (${doc.chars} chars, ${datasets.length} tables)`);
+    // أرشفة في Google Drive بالتصنيف الصح (بالخلفية)
+    archiveToDrive(doc, req.file.buffer, req.file.mimetype).catch(e => console.warn('[drive] archive failed:', e.message));
     res.json({ ...doc, datasets });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -453,6 +457,7 @@ app.post('/api/docs/:id/dashboard', async (req, res) => {
   try { const r = await dashboardFromDocument(+req.params.id); res.status(r.ok ? 200 : 400).json(r); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
+app.post('/api/drive/setup', async (req, res) => { try { res.json(await driveSetup()); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/current-dash', async (req, res) => res.json((await getCurrentDash()) || {}));
 app.post('/api/current-dash', async (req, res) => { await setCurrentDash(req.body?.id ? req.body : {}); res.json({ ok: true }); });
 

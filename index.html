@@ -191,7 +191,7 @@ async function loadDashboard(flash) {
   if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
     `<li><span>#${r.id} ${esc(r.title)}${r.dev_note ? `<br><small style="color:var(--sand)">✦ Claude: ${esc(r.dev_note)}</small>` : ''}</span><small>${esc(r.status)} · ${(r.updated_at || r.created_at).slice(0, 16)}</small></li>`).join('');
   if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
-    `<li><span>📄 ${x.name}</span><small>#${x.id} · ${sar(x.chars)} حرف</small></li>`).join('');
+    `<li><span>📄 ${x.drive_url ? `<a href="${x.drive_url}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(x.name)}</a>` : esc(x.name)}${x.category ? ` <span class="tag">${esc(x.category)}</span>` : ''}</span><small>#${x.id}${x.drive_url ? ' · في Drive ✓' : ''}</small></li>`).join('');
 }
 gate();
 

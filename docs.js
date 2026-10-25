@@ -73,7 +73,7 @@ export const docTools = {
       description: 'قائمة الملفات اللي رفعها المستخدم (رقم، اسم، حجم، تاريخ).',
       parameters: { type: 'OBJECT', properties: {} },
     },
-    run: () => ({ documents: db.prepare('SELECT id, name, type, chars, uploaded_at FROM documents ORDER BY id DESC').all() }),
+    run: () => ({ documents: db.prepare('SELECT * FROM documents ORDER BY id DESC').all().map(({ content, ...d }) => d) }),
   },
   search_documents: {
     declaration: {
