@@ -173,7 +173,10 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
 - قبل أي إضافة أو تعديل في البيانات، أكّد مع المستخدم بجملة وحدة وانتظر موافقته.
 - المستخدم يقدر يرفع ملفات (PDF, Word, Excel...). لما يسأل عن ملف: استخدم search_documents للأسئلة المحددة،
   و read_document للتلخيص أو الملفات الصغيرة، و list_documents لو ما تعرف رقم الملف. اذكر اسم الملف اللي أخذت منه المعلومة.
-- إذا جاتك رسالة تبدأ بـ [تنبيه النظام] فهي إشعار برفع ملف: رحّب باختصار واسأله وش يبي يعرف عنه.
+- إذا جاتك رسالة تبدأ بـ [تنبيه النظام] فهي إشعار برفع ملف: رحّبي باختصار واسأليه وش يبي يعرف عنه.
+- الملفات هي مصدر البيانات الأول بعد رفعها: لو فواز رفع ملف (أو فيه "آخر ملف مرفوع" تحت) وطلب داشبورد أو شارت أو تحليل بدون ما يقول "المشاريع"،
+  فالمقصود الملف: read_document لكل صفحاته (page 1, 2, ...) واستخرجي منه الأرقام الحقيقية، ثم build_dashboard ببياناته هو (مو بيانات المشاريع)،
+  واذكري اسم الملف في العنوان الفرعي. لو الملف نص وأرقامه قليلة، ابني الداشبورد من محاوره (بنود، أسعار، مراحل، نسب) وقولي له وش اعتمدتي عليه.
 - إذا المستخدم تكلّم إنجليزي، رد عليه إنجليزي.`;
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -202,10 +205,12 @@ async function screenBlock() {
     const projects = db.prepare('SELECT id, name, status, progress FROM projects ORDER BY id').all();
     const ui = (await kvGet('ui')) || {};
     const dashes = await dashList();
+    const docs = db.prepare('SELECT id, name, chars FROM documents ORDER BY id DESC LIMIT 1').all();
     return `\n\n## الشاشة الرئيسية الحين (لوحة مشاريع التحول الرقمي)
 - البطاقات: ${projects.length} مشاريع، الميزانية ${s.total_budget} ريال، المصروف ${s.total_spent} ريال، ${s.open_tickets} تذاكر مفتوحة (${s.high_priority_open} عالية).
 - المشاريع: ${projects.map(p => `#${p.id} ${p.name} (${p.status}، ${p.progress}%)`).join('، ')}.
 - شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
+- آخر ملف مرفوع: ${docs.length ? `#${docs[0].id} «${docs[0].name}» (${docs[0].chars} حرف)` : 'لا يوجد'}.
 - داشبوردات مولّدة محفوظة: ${dashes.length ? dashes.slice(0, 10).map(d => `#${d.id} ${d.title}`).join('، ') : 'لا يوجد'}.`;
   } catch (e) { return ''; }
 }
