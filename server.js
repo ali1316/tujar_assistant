@@ -12,6 +12,7 @@ import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { designerName } from './designer.js';
+import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
@@ -235,7 +236,7 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 
 // الواجهة (ملفات محددة فقط)
-for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js', 'assistant.js'])
+for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js', 'assistant.js', 'eleven-agent.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.', headers: { 'Cache-Control': 'no-cache' } })); // دايماً أحدث نسخة بعد كل تحديث
 app.get('/health', (req, res) => res.send('ok'));
 // هوية اتحاد الغرف (الشعار)
@@ -285,6 +286,29 @@ app.get('/api/session', async (req, res) => {
     console.error('token error:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// 1-ب) المحرك الثاني: ElevenLabs Eleven Realtime (نفس نورة ونفس الأدوات والذاكرة — للمقارنة)
+app.get('/api/eleven/session', async (req, res) => {
+  if (!elevenReady()) return res.status(500).json({ error: 'ELEVENLABS_API_KEY غير مضبوط في Render' });
+  try {
+    const [mem, hist, chatId, screen] = await Promise.all([memoryBlock(), historyBlock(), chatStart(), screenBlock()]);
+    const sys = promptFor('live') + '\n- تكلّمي دائماً بالعربي باللهجة السعودية البيضاء إلا لو كلّمك بلغة ثانية.' + screen + mem + hist;
+    digestPending(chatId);
+    const voice = String(req.query.voice || process.env.ELEVEN_VOICE || '').slice(0, 64) || undefined;
+    const tools = toRealtimeTools(activeDeclarations());
+    const s = await mintSecret({ instructions: sys, tools, voice });
+    console.log(`[eleven] session chat #${chatId} model=${s.model} voice=${voice || '-'} tools=${tools.length}`);
+    res.json({ secret: s.secret, model: s.model, chatId, voice, url: `wss://api.elevenlabs.io/v1/convai/realtime?model=${s.model}` });
+  } catch (e) {
+    console.error('[eleven] session error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+app.get('/api/eleven/voices', async (req, res) => {
+  if (!elevenReady()) return res.json({ ready: false, voices: [] });
+  try { res.json({ ready: true, model: ELEVEN_MODEL(), default: process.env.ELEVEN_VOICE || '', voices: await listVoices() }); }
+  catch (e) { res.status(500).json({ ready: true, error: e.message, voices: [] }); }
 });
 
 // سجل المحادثة: المتصفح يرسل كل دور (فواز/نورة) بعد ما يخلص

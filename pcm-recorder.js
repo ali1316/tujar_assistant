@@ -1,8 +1,9 @@
 // AudioWorklet: ياخذ صوت المايك، ينزّله لـ 16kHz، ويحوّله PCM 16-bit (الصيغة اللي يبيها جيميناي لايف)
 class PcmRecorder extends AudioWorkletProcessor {
-  constructor() {
+  constructor(options) {
     super();
-    this.ratio = sampleRate / 16000;
+    this.target = options?.processorOptions?.rate || 16000; // جيميناي 16k، ElevenLabs 24k
+    this.ratio = sampleRate / this.target;
     this.buf = [];
     this.pos = 0;
   }
@@ -18,7 +19,7 @@ class PcmRecorder extends AudioWorkletProcessor {
       this.buf.push(s / n);
     }
     this.pos -= ch.length;
-    if (this.buf.length >= 1600) { // كل 100ms
+    if (this.buf.length >= this.target / 10) { // كل 100ms
       const out = new Int16Array(this.buf.length);
       for (let k = 0; k < this.buf.length; k++) {
         const v = Math.max(-1, Math.min(1, this.buf[k]));

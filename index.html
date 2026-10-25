@@ -22,7 +22,7 @@
   main>section[hidden]{display:none}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
   @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)} main{padding:16px 16px 170px} header.top{padding:10px 16px}}
-  @media(max-width:600px){h1{font-size:15px} header.top{gap:10px} header.top .logo{height:32px} .nora-chip span,#crumb,header.top .sep,.chipsel{display:none} .chipbtn{padding:4px}}
+  @media(max-width:600px){h1{font-size:15px} header.top{gap:10px} header.top .logo{height:32px} .nora-chip span,#crumb,header.top .sep,.chipsel:not(.engine){display:none} .chipbtn{padding:4px}}
   body{overflow-x:clip}
   .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;transition:background .5s,border-color .5s}
   .kpi b,td.num,.num{font-family:var(--num-font,var(--font)),var(--font),sans-serif!important;font-variant-numeric:tabular-nums}
@@ -59,7 +59,7 @@
   .ic:hover{background:#ffffff10} .ic svg{width:20px;height:20px}
   .ic.mic{background:var(--acc);color:#081726;transition:box-shadow .1s} .ic.mic.on{background:var(--bad);color:#fff}
   .ic.send[hidden]{display:none}
-  .chipsel{background:transparent;color:var(--mute);border:0;font-size:13px;padding:6px 4px;cursor:pointer;max-width:120px} .chipsel option{background:var(--card);color:var(--ink)}
+  .chipsel.engine{color:var(--acc);font-weight:600;border:1px solid #2b4a6c;border-radius:99px;padding:5px 8px} .chipsel{background:transparent;color:var(--mute);border:0;font-size:13px;padding:6px 4px;cursor:pointer;max-width:120px} .chipsel option{background:var(--card);color:var(--ink)}
   .chipbtn{background:transparent;color:var(--mute);border:0;font-size:13px;cursor:pointer;padding:6px} .chipbtn:hover{color:var(--ink)}
   #status{color:var(--mute);font-size:12px;text-align:center;min-height:16px}
   #caption{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:calc(15px*var(--fs-chat));line-height:1.7;cursor:pointer;max-height:150px;overflow:auto;box-shadow:0 10px 30px #0005;animation:capin .25s ease-out}
@@ -126,6 +126,7 @@
   <form id="f" class="composer">
     <button type="button" class="ic" id="attach" title="إرفاق ملف">+</button>
     <input id="txt" placeholder="اسأل نورة…" autocomplete="off">
+    <select id="engine" class="chipsel engine" title="محرك الصوت"><option value="gemini">Gemini</option><option value="eleven">ElevenLabs</option></select>
     <button type="button" class="chipbtn" id="logBtn" title="سجل المحادثة">السجل</button>
     <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
     <button class="ic send" id="send" title="إرسال" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
@@ -135,6 +136,7 @@
 </div>
 <script type="module">
 import { GeminiLiveAgent } from './gemini-live-agent.js';
+import { ElevenRealtimeAgent } from './eleven-agent.js';
 import { createHUD } from './hud.js';
 import { createUIControl } from './ui-control.js';
 import { createAssistant } from './assistant.js';
@@ -316,7 +318,8 @@ const screenTools = {
 };
 
 window.__nora = { screenTools, ui };
-const agent = new GeminiLiveAgent({
+// محركين للمقارنة: Gemini Live أو ElevenLabs Realtime — نفس نورة ونفس الأدوات والشاشة والذاكرة
+const agentOpts = {
   headers: H,
   clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools, ...screenToolsExtra },
   on: {
@@ -330,24 +333,55 @@ const agent = new GeminiLiveAgent({
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 30)}px #e0705f33`,
   },
-});
+};
+let ENGINE = 'gemini'; try { ENGINE = localStorage.getItem('noraEngine') || 'gemini'; } catch {}
+const makeAgent = e => e === 'eleven' ? new ElevenRealtimeAgent(agentOpts) : new GeminiLiveAgent(agentOpts);
+let agent = makeAgent(ENGINE);
 
 let running = false;
 const MODE = 'live';
 // أصوات نورة (نسائية) — الاختيار ينحفظ في المتصفح
 const VOICE_DESC = { Sulafat: 'دافئ', Despina: 'ناعم', Aoede: 'منساب', Leda: 'شبابي', Kore: 'حازم', Zephyr: 'مشرق', Achernar: 'هادئ', Callirrhoe: 'مريح', Autonoe: 'مشرق', Erinome: 'واضح', Laomedeia: 'مرح', Gacrux: 'ناضج', Pulcherrima: 'جريء', Vindemiatrix: 'لطيف' };
-let VOICE = 'Sulafat'; try { VOICE = localStorage.getItem('noraVoice') || 'Sulafat'; } catch {}
+let GVOICE = 'Sulafat'; try { GVOICE = localStorage.getItem('noraVoice') || 'Sulafat'; } catch {}
 const VOICES = Object.keys(VOICE_DESC);
-if (!VOICES.includes(VOICE)) VOICE = 'Sulafat';
-$('#voice').innerHTML = VOICES.map(n => `<option value="${n}">${n} · ${VOICE_DESC[n]}</option>`).join('');
-$('#voice').value = VOICE;
+if (!VOICES.includes(GVOICE)) GVOICE = 'Sulafat';
+let EVOICE = ''; try { EVOICE = localStorage.getItem('noraVoiceEleven') || ''; } catch {}
+let ELEVEN_VOICES = [];
+let VOICE = ENGINE === 'eleven' ? EVOICE : GVOICE;
+async function fillVoices() {
+  if (ENGINE === 'eleven') {
+    try {
+      const r = await apiJson('/api/eleven/voices');
+      if (!r.ready) { $('#voice').innerHTML = '<option value="">أضف مفتاح ElevenLabs</option>'; $('#status').textContent = '⚠️ ElevenLabs يحتاج ELEVENLABS_API_KEY في Render'; return; }
+      ELEVEN_VOICES = r.voices || [];
+      if (!EVOICE) EVOICE = r.default || ELEVEN_VOICES[0]?.id || '';
+      $('#voice').innerHTML = ELEVEN_VOICES.map(v => `<option value="${v.id}">${esc(v.name.split(' - ')[0])}${v.lang ? ' · ' + v.lang : ''}${v.gender === 'female' ? ' ♀' : v.gender === 'male' ? ' ♂' : ''}</option>`).join('');
+      $('#voice').value = EVOICE; VOICE = EVOICE;
+    } catch (e) { note('❌ أصوات ElevenLabs: ' + e.message); }
+  } else {
+    $('#voice').innerHTML = VOICES.map(n => `<option value="${n}">${n} · ${VOICE_DESC[n]}</option>`).join('');
+    $('#voice').value = GVOICE; VOICE = GVOICE;
+  }
+}
+$('#engine').value = ENGINE;
+$('#engine').onchange = async () => {
+  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); }
+  ENGINE = $('#engine').value; try { localStorage.setItem('noraEngine', ENGINE); } catch {}
+  agent = makeAgent(ENGINE);
+  note(`⚙️ المحرك صار: ${ENGINE === 'eleven' ? 'ElevenLabs Realtime' : 'Gemini Live'}`);
+  $('#status').textContent = `المحرك: ${ENGINE === 'eleven' ? 'ElevenLabs Realtime' : 'Gemini Live'} — اضغط زر الصوت أو اكتب`;
+  await fillVoices();
+};
+fillVoices();
 $('#voice').onchange = async () => {
-  VOICE = $('#voice').value; try { localStorage.setItem('noraVoice', VOICE); } catch {}
-  note(`🎙️ صوت نورة صار: ${VOICE}`);
+  VOICE = $('#voice').value;
+  try { if (ENGINE === 'eleven') { EVOICE = VOICE; localStorage.setItem('noraVoiceEleven', VOICE); } else { GVOICE = VOICE; localStorage.setItem('noraVoice', VOICE); } } catch {}
+  note(`🎙️ صوت نورة صار: ${$('#voice').selectedOptions[0]?.textContent || VOICE}`);
   if (running) { endChat(); agent.stop(); try { await agent.start({ voice: VOICE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
 };
 // معاينة الصوت: جملة قصيرة عبر Gemini TTS بنفس الصوت
 $('#preview').onclick = async () => {
+  if (ENGINE === 'eleven') { const v = ELEVEN_VOICES.find(x => x.id === VOICE); if (v?.preview) new Audio(v.preview).play(); return; }
   $('#preview').disabled = true;
   try {
     const r = await api('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice: VOICE, text: 'هلا والله! أنا نورة، مساعدتك الذكية. اسألني عن أي مشروع، وأطلّع لك كل شي على الشاشة.' }) });
