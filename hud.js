@@ -81,6 +81,7 @@ export function createHUD({ api, mount }) {
     Chart.defaults.color = '#8ea3bd';
     Chart.defaults.font.family = "'IBM Plex Sans Arabic', system-ui, sans-serif";
     Chart.defaults.borderColor = '#16304d';
+    Chart.defaults.layout.padding = { top: 24 }; // مساحة للأرقام فوق الأعمدة
   }
 
   const EYEBROW = { 'PROJECT · SCAN': 'تفاصيل مشروع', 'DATA · VISUAL': 'رسم بياني', 'PORTFOLIO · OVERVIEW': 'نظرة شاملة', 'LIVE · RENDER': 'رسم من بياناتك', 'TYPE · LIBRARY': 'مكتبة الخطوط', 'LAUNCH · READY': 'جاهز للفتح' };

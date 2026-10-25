@@ -268,6 +268,11 @@ document.addEventListener('click', async e => {
 let pend = { u: '', a: '' };
 // حارس: لو طلب داشبورد وهي قالت «تم» بدون ما تبنيه فعلاً، نطلب منها تنفذ
 let turnTools = [], lastUser = '', nudged = false;
+// الأرقام لازم تكون طازجة من الأدوات في نفس الدور — مو من ذاكرة المحادثة
+const DATA_TOOLS = /^(data_chart|query|list_|get_|search|find_|dashboard|portfolio|stats|project|ticket|task|usage|check_job)/;
+const freshOnly = fn => args => turnTools.some(t => DATA_TOOLS.test(t))
+  ? fn(args)
+  : { error: 'مرفوض: الأرقام لازم تنجلب من الأدوات الحين (data_chart لبيانات الملف، أو أدوات المشاريع/التذاكر)، مو من ذاكرة المحادثة. اجلبيها أول، بعدين اعرضي — ولو السؤال عن ملف استخدمي data_chart مباشرة لأنه يرسم بنفسه.' };
 function guardTurn(nora) {
   const wantsDash = /داش\s?بورد|dashboard|لوحة بيانات/i.test(lastUser);
   const claimed = /تم|بنيت|سويت|سوّيت|انبنى|جاهز/.test(nora);
@@ -373,7 +378,7 @@ window.__nora = { screenTools, ui };
 // محركين للمقارنة: Gemini Live أو ElevenLabs Realtime — نفس نورة ونفس الأدوات والشاشة والذاكرة
 const agentOpts = {
   headers: H,
-  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools, ...screenToolsExtra },
+  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools, ...screenToolsExtra, show_chart: freshOnly(hud.tools.show_chart) },
   on: {
     status: t => { $('#status').textContent = t; setTimeout(() => $('#chip').classList.toggle('on', !!agent.connected), 0); },
     closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); $('#chip').classList.remove('on'); },
