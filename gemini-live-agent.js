@@ -5,7 +5,9 @@
 const WS_BASE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage';
 
 export class GeminiLiveAgent {
-  constructor({ sessionUrl = '/api/session', toolUrl = n => `/api/tools/${n}`, speakUrl = '/api/speak', headers = () => ({}), on = {} } = {}) {
+  constructor({ sessionUrl = '/api/session', toolUrl = n => `/api/tools/${n}`, speakUrl = '/api/speak', headers = () => ({}), clientTools = {}, on = {} } = {}) {
+    this.clientTools = clientTools; // أدوات تنفّذ في المتصفح (مثل النوافذ المنبثقة)
+    this.voice = '';
     this.headers = headers;
     this.speakUrl = speakUrl;
     this.mode = 'live';      // 'live' = صوت Live | 'mine' = صوتك المستنسخ (TTS)
@@ -21,8 +23,9 @@ export class GeminiLiveAgent {
 
   emit(ev, ...a) { try { this.on[ev]?.(...a); } catch (e) { console.error(e); } }
 
-  async start({ mic = true, mode = this.mode } = {}) {
+  async start({ mic = true, mode = this.mode, voice = this.voice } = {}) {
     this.mode = mode;
+    this.voice = voice;
     this.emit('status', 'جاري الاتصال…');
     // نجرب نسخة الـ API الافتراضية، ولو فشل الإعداد نجرب الثانية تلقائياً
     try { await this.#connect(); }
@@ -35,7 +38,7 @@ export class GeminiLiveAgent {
   }
 
   async #connect(version) {
-    const q = new URLSearchParams({ mode: this.mode, ...(version ? { v: version } : {}) });
+    const q = new URLSearchParams({ mode: this.mode, ...(this.voice ? { voice: this.voice } : {}), ...(version ? { v: version } : {}) });
     const r = await fetch(`${this.sessionUrl}?${q}`, { headers: this.headers() });
     const s = await r.json();
     if (!r.ok) throw new Error(s.error || 'session error');
@@ -93,6 +96,7 @@ export class GeminiLiveAgent {
         this.emit('toolCall', fc);
         let result;
         try {
+          if (this.clientTools[fc.name]) { result = await this.clientTools[fc.name](fc.args || {}); this.emit('toolResult', fc, result); return { id: fc.id, name: fc.name, response: { result } }; }
           const r = await fetch(this.toolUrl(fc.name), {
             method: 'POST', headers: { 'Content-Type': 'application/json', ...this.headers() }, body: JSON.stringify(fc.args || {}),
           });
