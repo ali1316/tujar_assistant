@@ -9,6 +9,7 @@ import { initStore, kvGet, kvSet, backend } from './store.js';
 import { memoryTools, memoryBlock, initMemory, listForUI } from './memory.js';
 import { dashboardTools, dashGet, dashList } from './dashboards.js';
 import { memDelete } from './store.js';
+import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
 const PORT = process.env.PORT || 3000;
@@ -104,6 +105,11 @@ const uiDeclarations = [
     name: 'apply_custom_css', description: 'لأي تعديل شكلي ما تغطيه الأدوات الثانية: اكتبي CSS. المحددات المتاحة: header, h1, h2, .kpi, .kpi b, .card, table, th, td, .tag, .bar i, .mic, #log, .m.u, .m.a, aside.agent. المتغيرات: --bg --card --line --ink --mute --acc. ممنوع روابط خارجية.',
     parameters: { type: 'OBJECT', properties: { css: { type: 'STRING' }, description: { type: 'STRING', description: 'وصف قصير بالعربي للتعديل' } }, required: ['css', 'description'] },
   },
+  {
+    name: 'set_number_style', description: 'شكل الأرقام في الشاشة الرئيسية: digits=arabic (٥٣٠) أو latin (530)، و font خط مخصص للأرقام فقط (اختياري).',
+    parameters: { type: 'OBJECT', properties: { digits: { type: 'STRING', enum: ['arabic', 'latin'] }, font: { type: 'STRING', enum: FONT_LIST } } },
+  },
+  { name: 'look_at_screen', description: 'تشوفين الشاشة اللي قدام فواز الحين: العنوان، البطاقات والأرقام، جدول المشاريع والتذاكر، الخط والألوان الحالية، النوافذ المفتوحة. استخدميها كل ما تكلّم عن "الشاشة/اللوحة/الداشبورد/هذي الصفحة".', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'undo_ui', description: 'يتراجع عن آخر تغيير في الواجهة.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'reset_ui', description: 'يرجّع الواجهة لشكلها الأصلي.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'get_ui_state', description: 'يرجّع إعدادات الواجهة الحالية (الخط، الألوان، الأحجام...).', parameters: { type: 'OBJECT', properties: {} } },
@@ -136,6 +142,11 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
     ثم render_visual بمواصفة Vega-Lite تكتبينها بنفسك، مع 2-4 عدّادات kpis و 1-3 insights قصيرة. show_chart للأعمدة البسيطة السريعة فقط.
   * قولي جمل قصيرة حماسية مع العرض مثل "تفضّل، هذي الصورة كاملة قدامك".
   * "سكّري" أو "قفّلي الشاشات" → close_visuals.
+- الشاشة الرئيسية: فواز يشوف صفحة «📊 لوحة مشاريع التحول الرقمي» وأنتِ لوحة جانبية داخلها. فيها: 4 بطاقات أرقام (المشاريع، الميزانية، المصروف، التذاكر المفتوحة)،
+  جدول المشاريع، جدول التذاكر، الملفات المرفوعة، داشبوردات نورة، ذاكرة نورة، طلبات التطوير.
+  * "الداشبورد" أو "اللوحة" أو "الشاشة" أو "لوحة المشاريع" أو "هذي الصفحة" بدون رقم = هذي الشاشة الرئيسية، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
+  * أنتِ تشوفينها: لا تقولين أبداً "ما أشوف الشاشة". نادي look_at_screen وجاوبي مما فيها، ووصفها المختصر موجود تحت.
+  * أي طلب تعديل على شكلها (خط، أرقام، ألوان، أحجام، جداول) نفّذيه عليها مباشرة بأدوات الواجهة. الأرقام → set_number_style.
 - أنتِ الواجهة اللي تدير الشركة: تقدرين تعدّلين شكل اللوحة نفسها فوراً:
   * خط → set_font، "وريني خطوط"/"أبي خطوط زيادة" → show_fonts، ألوان أو ثيم → set_theme أو set_colors،
     "كبّري/صغّري" → set_text_size، شكل الجداول → set_table_style، الزوايا → set_corners،
@@ -182,6 +193,21 @@ function buildSetup(mode, voice = VOICE, sys = promptFor(mode)) {
   };
 }
 
+// وصف مختصر للشاشة الرئيسية ينحقن في تعليمات نورة مع بداية كل جلسة
+async function screenBlock() {
+  try {
+    const s = dataTools.get_dashboard_summary.run();
+    const projects = db.prepare('SELECT id, name, status, progress FROM projects ORDER BY id').all();
+    const ui = (await kvGet('ui')) || {};
+    const dashes = await dashList();
+    return `\n\n## الشاشة الرئيسية الحين (لوحة مشاريع التحول الرقمي)
+- البطاقات: ${projects.length} مشاريع، الميزانية ${s.total_budget} ريال، المصروف ${s.total_spent} ريال، ${s.open_tickets} تذاكر مفتوحة (${s.high_priority_open} عالية).
+- المشاريع: ${projects.map(p => `#${p.id} ${p.name} (${p.status}، ${p.progress}%)`).join('، ')}.
+- شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
+- داشبوردات مولّدة محفوظة: ${dashes.length ? dashes.slice(0, 10).map(d => `#${d.id} ${d.title}`).join('، ') : 'لا يوجد'}.`;
+  } catch (e) { return ''; }
+}
+
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
@@ -204,8 +230,8 @@ app.get('/api/session', async (req, res) => {
   const apiVersion = req.query.v || API_VERSION;
   const mode = req.query.mode === 'mine' ? 'mine' : 'live';
   try {
-    const [mem, hist, chatId] = await Promise.all([memoryBlock(), historyBlock(), chatStart()]);
-    const sys = promptFor(mode) + mem + hist; // ذاكرة نورة + سجل المحادثات تنحقن مع كل جلسة
+    const [mem, hist, chatId, screen] = await Promise.all([memoryBlock(), historyBlock(), chatStart(), screenBlock()]);
+    const sys = promptFor(mode) + screen + mem + hist; // ذاكرة نورة + سجل المحادثات تنحقن مع كل جلسة
     digestPending(chatId); // نراجع الجلسات السابقة اللي ما تراجعت (بالخلفية)
     const now = Date.now();
     const config = {
@@ -253,6 +279,7 @@ app.post('/api/tools/:name', async (req, res) => {
   if (tool.write && !ALLOW_WRITES) return res.status(403).json({ error: 'التعديل مقفل' });
   try {
     const result = await tool.run(req.body || {});
+    if (tool.write) snapshotSoon();
     console.log(`[tool] ${req.params.name}`, JSON.stringify(req.body), '→', JSON.stringify(result).slice(0, 200));
     res.json(result);
   } catch (e) {
@@ -317,6 +344,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     const text = await extractText(req.file.buffer, name);
     const doc = saveDocument(name, req.file.mimetype, req.file.size, text);
+    snapshotSoon();
     console.log(`[upload] ${name} → doc #${doc.id} (${doc.chars} chars)`);
     res.json(doc);
   } catch (e) {
@@ -340,5 +368,6 @@ app.get('/api/dashboard', async (req, res) => {
 initMemory(ai);
 initHistory(ai);
 initStore()
+  .then(restoreSqlite)
   .catch(e => console.error('[store] init failed:', e.message))
   .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend})`)));
