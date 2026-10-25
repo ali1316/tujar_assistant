@@ -8,7 +8,10 @@ import { docTools, extractText, saveDocument } from './docs.js';
 
 const PORT = process.env.PORT || 3000;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-live';
-const VOICE = process.env.GEMINI_VOICE || 'Kore';
+const VOICE = process.env.GEMINI_VOICE || 'Sulafat'; // صوت نورة الافتراضي
+// أصوات نسائية جاهزة يدعمها Live (نختار منها لنورة)
+const NORA_VOICES = ['Sulafat', 'Despina', 'Aoede', 'Leda', 'Kore', 'Zephyr', 'Achernar', 'Callirrhoe', 'Autonoe', 'Erinome', 'Laomedeia', 'Gacrux', 'Pulcherrima', 'Vindemiatrix'];
+const pickVoice = v => (NORA_VOICES.includes(v) ? v : VOICE);
 const API_VERSION = process.env.GEMINI_API_VERSION || 'v1alpha';
 const LOCK_CONFIG = process.env.LOCK_CONFIG !== 'false';
 const ALLOW_WRITES = process.env.ALLOW_WRITES !== 'false';
@@ -17,12 +20,55 @@ const MY_VOICE_ID = process.env.MY_VOICE_ID || 'voice_xb1ye60p9o3i'; // صوت �
 const TTS_MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
 const tools = { ...dataTools, ...docTools };
-const activeDeclarations = () => Object.entries(tools)
-  .filter(([, t]) => ALLOW_WRITES || !t.write)
-  .map(([, t]) => ({ ...t.declaration, behavior: 'BLOCKING' }));
 
-const SYSTEM_PROMPT = `أنت "مساعد اللوحة"، مساعد صوتي لمنصة متابعة مشاريع التحول الرقمي.
-- تكلّم باللهجة السعودية البيضاء، بإيجاز ووضوح، وجمل قصيرة تناسب الكلام.
+// أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
+const visualDeclarations = [
+  {
+    name: 'show_project_visual',
+    description: 'يعرض للمستخدم نافذة منبثقة سينمائية لمشروع: عدّاد الإنجاز، الميزانية مقابل المصروف، التذاكر حسب الأولوية، والأيام المتبقية. استخدمها كل ما سأل المستخدم عن تفاصيل أو وضع مشروع معيّن.',
+    parameters: { type: 'OBJECT', properties: { project_id: { type: 'INTEGER' }, name: { type: 'STRING', description: 'جزء من اسم المشروع' } } },
+  },
+  {
+    name: 'show_chart',
+    description: 'يرسم رسم بياني منبثق من أرقام حقيقية جبتها من الأدوات (للمقارنات والتوزيعات). لا تخترع أرقام.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING' },
+        chart_type: { type: 'STRING', enum: ['bar', 'doughnut', 'line', 'radar'] },
+        labels: { type: 'ARRAY', items: { type: 'STRING' } },
+        values: { type: 'ARRAY', items: { type: 'NUMBER' } },
+        unit: { type: 'STRING', description: 'مثل: ريال، ٪، تذكرة' },
+      },
+      required: ['title', 'chart_type', 'labels', 'values'],
+    },
+  },
+  {
+    name: 'show_overview',
+    description: 'يعرض لوحة منبثقة شاملة لكل المشاريع (الحالات، الميزانيات، التذاكر). استخدمها لما يطلب نظرة عامة أو ملخص.',
+    parameters: { type: 'OBJECT', properties: {} },
+  },
+  {
+    name: 'close_visuals',
+    description: 'يقفل كل النوافذ المنبثقة لما يطلب المستخدم يقفلها أو يخلص منها.',
+    parameters: { type: 'OBJECT', properties: {} },
+  },
+];
+
+const activeDeclarations = () => [
+  ...Object.entries(tools).filter(([, t]) => ALLOW_WRITES || !t.write).map(([, t]) => t.declaration),
+  ...visualDeclarations,
+].map(d => ({ ...d, behavior: 'BLOCKING' }));
+
+const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لمنصة متابعة مشاريع التحول الرقمي. أنثى، واثقة، حماسية وودودة.
+- عرّفي بنفسك باسم نورة لو أحد سألك مين أنتِ.
+- تكلّمي باللهجة السعودية البيضاء بصيغة المؤنث، بإيجاز وحماس، وجمل قصيرة تناسب الكلام.
+- أنتِ تقدرين تعرضين نوافذ منبثقة ورسوم بيانية على الشاشة (مثل أفلام الخيال العلمي):
+  * سؤال عن مشروع معيّن → نادي show_project_visual فوراً، وبعدها لخّصي أهم نقطتين بصوتك.
+  * طلب نظرة عامة أو ملخص → show_overview.
+  * مقارنة أو توزيع → اجلبي الأرقام بالأدوات ثم show_chart.
+  * قولي جمل قصيرة حماسية مع العرض مثل "تفضّل، هذي الصورة كاملة قدامك".
+  * "سكّري" أو "قفّلي الشاشات" → close_visuals.
 - أي رقم أو اسم أو حالة لازم تجيبه من الأدوات؛ لا تخمّن ولا تألّف بيانات.
 - المبالغ بالريال، اقرأها بشكل طبيعي (مثلاً "مليون ومية ألف").
 - قبل أي إضافة أو تعديل في البيانات، أكّد مع المستخدم بجملة وحدة وانتظر موافقته.
@@ -38,10 +84,10 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const promptFor = mode => mode === 'mine'
   ? SYSTEM_PROMPT + '\n- ردك بيتحوّل لصوت، فاكتب كلام منطوق طبيعي بدون رموز أو نقاط أو جداول أو إيموجي.'
   : SYSTEM_PROMPT;
-function buildSetup(mode) {
+function buildSetup(mode, voice = VOICE) {
   return {
     model: `models/${MODEL}`,
-    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } } },
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
     systemInstruction: { parts: [{ text: promptFor(mode) }] },
     tools: [{ functionDeclarations: activeDeclarations() }],
     inputAudioTranscription: {},
@@ -54,7 +100,7 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 
 // الواجهة (ملفات محددة فقط)
-for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js'])
+for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.' }));
 app.get('/health', (req, res) => res.send('ok'));
 
@@ -89,7 +135,7 @@ app.get('/api/session', async (req, res) => {
       };
     }
     const token = await ai.authTokens.create({ config });
-    res.json({ token: token.name, apiVersion, mode, setup: buildSetup(mode) });
+    res.json({ token: token.name, apiVersion, mode, voice: pickVoice(req.query.voice), setup: buildSetup(mode, pickVoice(req.query.voice)) });
   } catch (e) {
     console.error('token error:', e.message);
     res.status(500).json({ error: e.message });
@@ -113,13 +159,14 @@ app.post('/api/tools/:name', (req, res) => {
 // 2.5) صوت فواز: نص → Gemini TTS (صوت مستنسخ) → PCM 24kHz يتبث للمتصفح أول بأول
 app.post('/api/speak', async (req, res) => {
   const text = String(req.body?.text || '').trim().slice(0, 1500);
+  const voice = NORA_VOICES.includes(req.body?.voice) ? req.body.voice : MY_VOICE_ID;
   if (!text) return res.status(400).json({ error: 'نص فاضي' });
   try {
     const stream = await ai.interactions.create({
       model: TTS_MODEL,
       input: text,
       response_format: { type: 'audio' },
-      generation_config: { speech_config: [{ voice: MY_VOICE_ID }] },
+      generation_config: { speech_config: [{ voice }] },
       stream: true,
     });
     res.setHeader('Content-Type', 'audio/l16; rate=24000; channels=1');
@@ -139,6 +186,8 @@ app.post('/api/speak', async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: e.message }); else res.end();
   }
 });
+
+app.get('/api/voices', (req, res) => res.json({ voices: NORA_VOICES, default: VOICE }));
 
 // 3) رفع ملف → استخراج النص → الداتابيس
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
