@@ -507,6 +507,8 @@ function connectLive() {
     const who = j.kind === 'gpt' ? 'GPT' : 'Claude';
     if (j.status === 'قيد التنفيذ') { $('#status').textContent = `✦ ${who} شغال: ${j.step?.text || '…'}`; return; }
     note(`✦ ${who} خلّص المهمة #${j.id} (${j.status})`);
+    // النتيجة تطلع على الشاشة بنفس وقت ما نورة تقولها
+    if (j.result) hud.showNote({ eyebrow: `نتيجة ${who}`, title: `مهمة #${j.id}`, subtitle: j.status, text: j.result });
     $('#status').textContent = `✦ ${who} خلّص المهمة #${j.id}`;
     const msg = `[تنبيه النظام] ${who} خلّص المهمة رقم ${j.id} (${j.status}). النتيجة: ${String(j.result || '').slice(0, 1500)}\nقولي لفواز النتيجة باختصار بصوتك.`;
     if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch { return; } }

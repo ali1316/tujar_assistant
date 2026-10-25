@@ -264,6 +264,14 @@ export function createHUD({ api, mount }) {
     return { shown: true, title };
   }
   // معرض الخطوط: كل خط بعينة حيّة، والضغط عليه يطبّقه
+  // نتيجة نصية (مثل نتيجة مهمة Claude) تنعرض على الشاشة بنفس الهوية
+  function showNote({ title, subtitle = '', text = '', eyebrow = 'نتيجة' }) {
+    const el = panel(eyebrow, title, subtitle);
+    const ul = document.createElement('ul'); ul.className = 'ins';
+    String(text).split(/\n+/).map(t => t.trim()).filter(Boolean).forEach((t, i) => { const li = document.createElement('li'); li.textContent = t; li.style.animationDelay = `${150 + i * 200}ms`; ul.append(li); });
+    el.querySelector('.body').append(ul);
+    return { shown: true };
+  }
   function showFontGallery(fonts, current, onPick) {
     const el = panel('TYPE · LIBRARY', 'مكتبة الخطوط', `${Object.keys(fonts).length} خط عربي · الحالي: ${current}`);
     const g = document.createElement('div'); g.className = 'grid'; el.querySelector('.body').append(g);
@@ -293,7 +301,7 @@ export function createHUD({ api, mount }) {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && panels.length) closeAll(); });
 
   return {
-    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, closeAll, current,
+    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, showNote, closeAll, current,
     // جاهزة كـ clientTools للوكيل
     tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll, back_to_main: closeAll },
   };
