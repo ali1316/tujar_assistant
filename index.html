@@ -225,6 +225,15 @@ async function loadCurrentDash() {
 }
 
 // نورة «تشوف» الشاشة: تقرأ اللي قدام فواز الحين من الصفحة نفسها
+// شارت فوري من بيانات الملف: السيرفر يحسب الأرقام، والنافذة تعرضها
+const screenToolsExtra = {
+  async data_chart(args) {
+    const r = await apiJson('/api/tools/data_chart', args);
+    if (r.error) return r;
+    const shown = await hud.showVisual({ title: r.title, subtitle: r.subtitle, vega_lite: r.vega_lite, kpis: r.kpis });
+    return { ...shown, subtitle: r.subtitle, top: r.top, kpis: r.kpis };
+  },
+};
 const screenTools = {
   look_at_screen() {
     const rows = sel => [...document.querySelectorAll(sel + ' tr')].slice(1).map(tr => [...tr.cells].map(c => c.innerText.trim()).filter(Boolean).join(' | '));
@@ -244,7 +253,7 @@ const screenTools = {
 window.__nora = { screenTools, ui };
 const agent = new GeminiLiveAgent({
   headers: H,
-  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools },
+  clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools, ...screenToolsExtra },
   on: {
     status: t => $('#status').textContent = t,
     closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); },
