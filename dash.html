@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-bs-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>داشبورد · نورة</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.6.1/dist/css/tabler.rtl.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.6.1/dist/css/tabulator_bootstrap5.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.6.1/dist/js/tabulator.min.js"></script>
+<style>
+  :root{--tblr-font-sans-serif:'IBM Plex Sans Arabic',system-ui,sans-serif;--glow:#3ee6ff}
+  body{background:radial-gradient(1200px 600px at 80% -10%,rgba(62,230,255,.08),transparent),var(--tblr-body-bg)}
+  .page-header{animation:rise .6s ease-out both}
+  .card{animation:rise .7s cubic-bezier(.2,.9,.2,1) both;border-color:rgba(62,230,255,.15)}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .kpi-val{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .kpi-val small{font-size:.9rem;font-weight:500;color:var(--tblr-secondary)}
+  .chart{height:340px}
+  .nora-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .7rem;border-radius:99px;background:rgba(62,230,255,.12);color:var(--glow);font-size:.8rem}
+  .insight{border-inline-start:3px solid var(--glow);padding:.4rem .8rem;margin-bottom:.5rem;background:rgba(62,230,255,.05);border-radius:4px}
+  .tabulator{font-family:inherit;font-size:.9rem;background:transparent}
+  .tabulator .tabulator-header{background:transparent;color:var(--tblr-body-color);border-bottom-color:rgba(62,230,255,.25)}
+  .tabulator .tabulator-header .tabulator-col{background:transparent}
+  .tabulator .tabulator-header .tabulator-col input{background:rgba(255,255,255,.04);color:var(--tblr-body-color);border:1px solid var(--tblr-border-color)}
+  .tabulator .tabulator-tableholder .tabulator-table{background:transparent;color:var(--tblr-body-color)}
+  .tabulator-row,.tabulator-row.tabulator-row-even{background:transparent;color:var(--tblr-body-color)}
+  .tabulator-row.tabulator-row-even{background:rgba(255,255,255,.025)}
+  .tabulator-row.tabulator-selectable:hover{background:rgba(62,230,255,.08)}
+  .tabulator,.tabulator-row,.tabulator-row .tabulator-cell,.tabulator .tabulator-header .tabulator-col{border-color:var(--tblr-border-color)!important}
+  .tabulator .tabulator-footer{background:transparent;color:var(--tblr-body-color)}
+  html{background:var(--tblr-body-bg)} body{background-attachment:fixed;min-height:100vh}
+  @media (prefers-reduced-motion:reduce){.card,.page-header{animation:none}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-wrapper">
+    <div class="page-header d-print-none"><div class="container-xl"><div class="row g-2 align-items-center">
+      <div class="col"><div class="page-pretitle"><span class="nora-chip">✦ صمّمته نورة</span> <span id="when" class="ms-2"></span></div>
+        <h2 class="page-title mt-2" id="title">جاري التحميل…</h2><div class="text-secondary mt-1" id="subtitle"></div></div>
+      <div class="col-auto"><a href="/" class="btn btn-outline-info">← رجوع للوحة نورة</a></div>
+    </div></div></div>
+    <div class="page-body"><div class="container-xl">
+      <div class="row row-deck row-cards" id="kpis"></div>
+      <div class="row row-deck row-cards mt-1" id="charts"></div>
+      <div id="tables"></div>
+      <div class="row row-cards mt-1" id="insights"></div>
+    </div></div>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const fmt = n => new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 2 }).format(n);
+let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
+const id = location.pathname.split('/').pop();
+
+function countUp(el, to, unit) {
+  const t0 = performance.now(), d = 1400;
+  const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3);
+    el.innerHTML = fmt(to * e) + (unit ? ` <small>${esc(unit)}</small>` : ''); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+(async () => {
+  const r = await fetch(`/api/dashboards/${id}`, { headers: { 'x-access-code': CODE } });
+  if (!r.ok) { $('#title').textContent = r.status === 401 ? 'افتح لوحة نورة وادخل رمز الدخول أول' : 'الداشبورد غير موجود'; return; }
+  const { spec, created_at } = await r.json();
+  document.title = `${spec.title} · نورة`;
+  $('#title').textContent = spec.title;
+  $('#subtitle').textContent = spec.subtitle || '';
+  $('#when').textContent = new Date(spec.generated_at || created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+
+  // بطاقات الأرقام
+  const kc = Math.max(1, spec.kpis.length);
+  spec.kpis.forEach((k, i) => {
+    const col = document.createElement('div');
+    col.className = `col-sm-6 col-lg-${kc >= 4 ? 3 : 12 / kc}`;
+    const up = /^\+/.test(k.delta || ''), down = /^-/.test(k.delta || '');
+    col.innerHTML = `<div class="card" style="animation-delay:${i * 90}ms"><div class="card-body">
+      <div class="subheader">${esc(k.label)}</div>
+      <div class="d-flex align-items-baseline"><div class="kpi-val" data-v="${+k.value || 0}" data-u="${esc(k.unit || '')}">0</div>
+      ${k.delta ? `<div class="ms-auto"><span dir="ltr" class="badge ${up ? 'bg-green-lt' : down ? 'bg-red-lt' : 'bg-azure-lt'}">${esc(k.delta)}</span></div>` : ''}</div></div></div>`;
+    $('#kpis').append(col);
+  });
+  document.querySelectorAll('.kpi-val').forEach(el => countUp(el, +el.dataset.v, el.dataset.u));
+
+  // الرسوم (ECharts)
+  const charts = [];
+  spec.charts.forEach((c, i) => {
+    const col = document.createElement('div');
+    col.className = c.span === 2 ? 'col-12' : 'col-lg-6';
+    col.innerHTML = `<div class="card" style="animation-delay:${300 + i * 120}ms"><div class="card-header"><h3 class="card-title">${esc(c.title)}</h3></div>
+      <div class="card-body"><div class="chart"></div></div></div>`;
+    $('#charts').append(col);
+    try {
+      const ch = echarts.init(col.querySelector('.chart'), 'dark', { renderer: 'canvas' });
+      const opt = Object.assign({ backgroundColor: 'transparent', textStyle: { fontFamily: 'IBM Plex Sans Arabic' },
+        color: ['#3ee6ff', '#7a8cff', '#3dffa8', '#ffb547', '#ff5d73', '#c38bff', '#5ab0ff'], animationDuration: 1400, animationEasing: 'cubicOut',
+        tooltip: { trigger: 'item' } }, c.option);
+      ch.setOption(opt); charts.push(ch);
+    } catch (e) { col.querySelector('.chart').innerHTML = `<div class="text-danger">تعذّر الرسم: ${esc(e.message)}</div>`; }
+  });
+  addEventListener('resize', () => charts.forEach(c => c.resize()));
+
+  // الجداول (Tabulator: فرز، بحث، صفحات)
+  spec.tables.forEach((t, i) => {
+    const card = document.createElement('div');
+    card.className = 'card mt-3';
+    card.style.animationDelay = `${600 + i * 120}ms`;
+    card.innerHTML = `<div class="card-header"><h3 class="card-title">${esc(t.title)}</h3><div class="ms-auto text-secondary small">${t.rows.length} صف</div></div><div class="card-body p-0"><div></div></div>`;
+    $('#tables').append(card);
+    const fields = t.columns.map((_, n) => `c${n}`);
+    const data = t.rows.map(r => Object.fromEntries(fields.map((f, n) => [f, Array.isArray(r) ? r[n] : r[t.columns[n]]])));
+    new Tabulator(card.querySelector('.card-body > div'), {
+      data, layout: 'fitColumns', textDirection: 'rtl', pagination: data.length > 12, paginationSize: 12, placeholder: 'لا توجد بيانات',
+      columns: t.columns.map((name, n) => ({ title: name, field: fields[n], headerFilter: 'input', headerFilterPlaceholder: 'بحث…',
+        sorter: data.every(d => d[fields[n]] === '' || !isNaN(+d[fields[n]])) ? 'number' : 'string',
+        formatter: cell => { const v = cell.getValue(); return typeof v === 'number' ? fmt(v) : esc(v); } })),
+    });
+  });
+
+  // ملاحظات نورة
+  if (spec.insights?.length) {
+    const col = document.createElement('div'); col.className = 'col-12';
+    col.innerHTML = `<div class="card" style="animation-delay:800ms"><div class="card-header"><h3 class="card-title">✦ ملاحظات نورة</h3></div><div class="card-body">${spec.insights.map(s => `<div class="insight">${esc(s)}</div>`).join('')}</div></div>`;
+    $('#insights').append(col);
+  }
+})();
+</script>
+</body>
+</html>
