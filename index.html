@@ -200,6 +200,7 @@ const agent = new GeminiLiveAgent({
   clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools },
   on: {
     status: t => $('#status').textContent = t,
+    closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); },
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
     turnComplete: () => { saveTurns(); cur = { u: null, a: null }; },
@@ -247,7 +248,7 @@ $('#mic').onclick = async () => {
 };
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
-  if (!running) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
+  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
   agent.sendText(t); $('#txt').value = '';
 };
 
