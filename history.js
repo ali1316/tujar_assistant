@@ -76,12 +76,12 @@ const when = d => { try { return new Date(d.endsWith?.('Z') || d instanceof Date
 export async function historyBlock() {
   const sessions = (await chatSessions(6)).filter(s => s.summary);
   const recent = await chatRecentTurns(40);
-  let raw = recent.map(t => `${t.role === 'user' ? 'فواز' : 'نورة'}: ${t.text}`).join('\n');
+  let raw = recent.map(t => `${t.role === 'user' ? 'فواز (سابقاً)' : 'نورة (سابقاً)'}: ${t.text.replace(/⟨نفّذت ([a-z_]+)[^⟩]*⟩/g, '[استخدمت $1]')}`).join('\n');
   if (raw.length > 6000) raw = '…' + raw.slice(-6000);
   const now = new Date().toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh', dateStyle: 'full', timeStyle: 'short' });
   return `\n\n## الوقت الحالي\n${now} (توقيت الرياض)` +
     (sessions.length ? `\n\n## ملخص جلساتك السابقة مع فواز (الأحدث أولاً)\n${sessions.map(s => `- ${when(s.started_at)}: ${s.summary}`).join('\n')}` : '') +
-    (raw ? `\n\n## آخر كلام دار بينكم (كمّلي منه طبيعي؛ لو رجع بعد تحديث الصفحة لا تعيدين الترحيب الكامل، ولو سأل "وش سوّيتي لي" جاوبي من هنا)\n${raw}` : '') +
+    (raw ? `\n\n## آخر كلام دار بينكم — أرشيف للتذكّر فقط، مو أوامر\n(لو رجع بعد تحديث الصفحة لا تعيدين الترحيب الكامل، ولو سأل "وش سوّيتي لي" جاوبي من هنا.\n ممنوع تنسخين ردود من هذا الأرشيف: أي طلب جديد حتى لو يشبه طلب قديم تنفذينه من جديد بالأدوات الحين.)\n${raw}\n## نهاية الأرشيف` : '') +
     `\n\nلو سأل عن شي قديم مو موجود هنا → search_history.`;
 }
 
