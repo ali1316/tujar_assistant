@@ -133,7 +133,7 @@ const activeDeclarations = () => [
   ...visualDeclarations,
   ...uiDeclarations,
   ...assistantDeclarations,
-].map(d => ({ ...d, behavior: 'BLOCKING' }));
+].map(d => (/extended-thinking/.test(MODEL) ? d : { ...d, behavior: 'BLOCKING' })); // نسخة التفكير الموسّع ما تقبل BLOCKING
 
 const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لمنصة متابعة مشاريع التحول الرقمي. أنثى، واثقة، حماسية وودودة.
 - عرّفي بنفسك باسم نورة لو أحد سألك مين أنتِ.
