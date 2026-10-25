@@ -118,6 +118,9 @@ function countUp(el, to, unit) {
         tooltip: { trigger: 'item' } }, c.option);
       // كل التسميات تظهر (بدون ما يخفي ECharts بعضها)، ونميّلها لو كثيرة
       [].concat(opt.legend || []).forEach(l => { if (l) { l.itemGap ??= 22; l.textStyle = { padding: [0, 6], ...(l.textStyle || {}) }; } });
+      // لو وسيلة الإيضاح تحت، نوسّع المساحة عشان ما تركب على تسميات المحور
+      if (opt.xAxis && [].concat(opt.legend || []).some(l => l && l.bottom !== undefined)) opt.grid = { containLabel: true, bottom: 64, ...(opt.grid || {}) };
+      else if (opt.xAxis) opt.grid = { containLabel: true, ...(opt.grid || {}) };
       opt.textStyle = { ...(opt.textStyle || {}), fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` }; // الخط موحّد حتى لو الموديل حدد غيره
       // الأرقام في المحاور والتلميحات بنفس شكل أرقام اللوحة
       if (LOCALE === 'ar-SA') {
