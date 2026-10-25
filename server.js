@@ -273,6 +273,7 @@ app.get('/api/session', async (req, res) => {
         model: MODEL,
         config: {
           responseModalities: ['AUDIO'],
+          ...(/extended-thinking/.test(MODEL) ? { thinkingConfig: { thinkingLevel: process.env.THINKING_LEVEL || 'medium' } } : {}),
           systemInstruction: sys,
           tools: [{ functionDeclarations: activeDeclarations() }],
         },
