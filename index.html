@@ -359,7 +359,7 @@ const agentOpts = {
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
     turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
-    toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
+    toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ عرض: ${fc.args?.title || VIEW_LABEL[fc.args?.view] || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     usage: u => trackUsage(u),
