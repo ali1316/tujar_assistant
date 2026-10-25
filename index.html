@@ -36,6 +36,8 @@
   /* لوحة الملف داخل الشاشة الرئيسية */
   #filedash{margin-bottom:16px;padding:0;overflow:hidden;border-color:#2b4a6c}
   #filedash[hidden]{display:none} [data-v][hidden],#empty[hidden]{display:none!important} .sec{margin-bottom:16px}
+  .pc{border:1px solid var(--acc);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:#0b1d31} .pc p{margin:6px 0;font-size:14px;color:var(--mute)} .pc .res{color:var(--ink);white-space:pre-wrap}
+  .pc a{color:var(--acc);margin-inline-end:12px} .pc button{border:1px solid #2b4a6c;background:transparent;color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;margin-inline-end:6px} .pc button.ok{background:var(--acc);color:#081726;border:0;font-weight:700}
   /* الشاشة الفاضية (مثل ChatGPT): ترحيب في النص وشريط الكلام تحته */
   #empty{position:fixed;inset-inline:0;top:30vh;text-align:center;padding:0 16px}
   #empty h2{font-size:30px;color:var(--ink);font-weight:700;margin:0 0 8px} #empty p{color:var(--mute);margin:0;font-size:14px}
@@ -157,7 +159,7 @@ const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...
 
 // بوابة رمز الدخول
 async function gate() {
-  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); setTimeout(loadHistory, 0); setTimeout(loadCurrentDash, 0); return loadDashboard(); }
+  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); setTimeout(loadHistory, 0); setTimeout(loadCurrentDash, 0); setTimeout(connectLive, 0); return loadDashboard(); }
   $('#gate').style.display = 'flex';
 }
 $('#gf').onsubmit = async e => {
@@ -450,7 +452,7 @@ $('#preview').onclick = async () => {
   $('#preview').disabled = false;
 };
 $('#mic').onclick = async () => {
-  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); return; }
+  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); if (pendingReload) location.reload(); return; }
   try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); }
   catch (e) { $('#status').textContent = '❌ ' + e.message; }
 };
@@ -488,6 +490,31 @@ $('#file').onchange = e => { [...e.target.files].forEach(uploadFile); e.target.v
 document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drop'); });
 document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drop'); });
 document.addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('drop'); [...e.dataTransfer.files].forEach(uploadFile); });
+
+// ===== قناة لحظية مع السيرفر: البيانات تتحدث فوراً، وشغل Claude بالخلفية يوصل لنورة، والنسخة الجديدة تنطبق تلقائياً =====
+let BOOT = null, pendingReload = false, liveTimer;
+function connectLive() {
+  if (window.__live) return;
+  const es = window.__live = new EventSource(`/api/events?code=${encodeURIComponent(CODE)}`);
+  es.addEventListener('hello', e => {
+    const { boot } = JSON.parse(e.data);
+    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; $('#status').textContent = '✦ فيه تحديث جديد — ينطبق بعد ما تخلص المحادثة'; } else location.reload(); }
+    BOOT ||= boot;
+  });
+  es.addEventListener('data', () => { clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });
+  es.addEventListener('job', async e => {
+    const j = JSON.parse(e.data);
+    const who = j.kind === 'gpt' ? 'GPT' : 'Claude';
+    if (j.status === 'قيد التنفيذ') { $('#status').textContent = `✦ ${who} شغال: ${j.step?.text || '…'}`; return; }
+    note(`✦ ${who} خلّص المهمة #${j.id} (${j.status})`);
+    $('#status').textContent = `✦ ${who} خلّص المهمة #${j.id}`;
+    const msg = `[تنبيه النظام] ${who} خلّص المهمة رقم ${j.id} (${j.status}). النتيجة: ${String(j.result || '').slice(0, 1500)}\nقولي لفواز النتيجة باختصار بصوتك.`;
+    if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch { return; } }
+    agent.sendText(msg, { silent: true });
+  });
+}
+const _origClosed = agentOpts.on.closed;
+agentOpts.on.closed = (...a) => { _origClosed(...a); if (pendingReload) location.reload(); };
 </script>
 </body>
 </html>

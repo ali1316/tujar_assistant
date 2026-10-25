@@ -12,6 +12,8 @@ import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { designerName } from './designer.js';
+import { sseRoute, BOOT_ID } from './events.js';
+import { agentTools, initAgent, agentStatus } from './agent.js';
 import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
 import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
@@ -41,7 +43,8 @@ const usageTools = {
     },
   },
 };
-const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...usageTools, ...driveTools };
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...usageTools, ...driveTools, ...agentTools };
+initAgent(tools);
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
 const visualDeclarations = [
@@ -177,8 +180,12 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
   * "الداشبورد" أو "لوحة المشاريع" بدون رقم = overview، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
 - إدارة المهام: "ذكّريني/سجّلي مهمة/عندي شغلة…" → add_task (الموعد YYYY-MM-DD محسوب من تاريخ اليوم)، "وش مهامي" → list_tasks (وقولي أهمها بالكلام، واعرضي tasks لو طلب)،
   "خلصت كذا" → update_task بالحالة منجزة. رتّبيها له حسب الأولوية والموعد لما يسأل وش أبدأ فيه.
-- Claude هو المطوّر والباك اند حقك: أي شي ما تقدرين تسوينه بأدواتك (ميزة جديدة، تكامل، ربط حساب، شي على اللابتوب، تقرير خاص) → request_dev_change بالتفاصيل كاملة،
-  وقولي له إن Claude استلمه وبيطوّره وينعكس على الواجهة.
+- Claude هو الباك اند والمطوّر حقك، وشغال دايماً بالخلفية:
+  * أي مهمة كبيرة تحتاج خطوات أو تفكير عميق (تحليل، تقرير، خطة، داشبورد معقد) → ask_claude فوراً.
+  * أي تطوير أو تعديل في كود المنصة (ميزة، شاشة، تكامل، إصلاح خلل) → request_dev_change بالتفاصيل كاملة، وقولي له إن Claude بينفّذه أول ما يفتح محادثة معه.
+  * قولي له بجملة إن Claude شغال عليها، وكمّلي معه عادي؛ لما يوصلك تنبيه إن Claude خلّص، قولي النتيجة باختصار.
+  * "وش صار على شغل Claude" → check_job. لو طلب رأي GPT بالاسم → ask_gpt.
+  * لا تجدولين شي ولا تأجّلين: كل طلب تقدرين عليه يتنفذ على طول.
   * لما يرفع ملف، النظام يبني «لوحة الملف» تلقائياً ويعرضها داخل الشاشة الرئيسية، ويوصلك تنبيه برقمها. أسئلته بعدها عن «اللوحة» أو «الأرقام» أو «الملف» = عن هذي اللوحة وملفها:
     جاوبي من الملف بـ search_documents/read_document، ولو طلب تعديل عليها (رسم إضافي، تقسيم مختلف) ابني نسخة جديدة بـ build_dashboard وتنعرض مكانها.
   * بيانات Excel/CSV محفوظة كجداول منظّمة (مذكورة تحت بأعمدتها):
@@ -283,7 +290,9 @@ app.use('/api', (req, res, next) => {
   if (!ACCESS_CODE || (req.get('x-access-code') || req.query.code) === ACCESS_CODE) return next();
   res.status(401).json({ error: 'رمز الدخول غلط' });
 });
-app.get('/api/ping', (req, res) => res.json({ ok: true }));
+app.get('/api/ping', (req, res) => res.json({ ok: true, boot: BOOT_ID, agent: agentStatus() }));
+sseRoute(app);
+app.get('/api/agent/jobs', (req, res) => res.json({ status: agentStatus(), jobs: db.prepare('SELECT id, kind, status, request, result, created_at, updated_at FROM agent_jobs ORDER BY id DESC LIMIT 20').all() }));
 
 // 1) توكن مؤقت: مفتاح API الحقيقي ما يطلع من السيرفر أبداً
 app.get('/api/session', async (req, res) => {
@@ -505,4 +514,4 @@ initHistory(ai);
 initStore()
   .then(restoreSqlite)
   .catch(e => console.error('[store] init failed:', e.message))
-  .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend}, designer: ${designerName()})`)));
+  .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend}, designer: ${designerName()}, agent: ${JSON.stringify(agentStatus())})`)));

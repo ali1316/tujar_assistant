@@ -3,15 +3,16 @@
 import { db } from './db.js';
 import { indexDocument } from './docs.js';
 import { kvGet, kvSet, backend } from './store.js';
+import { dataChanged } from './events.js';
 
-const TABLES = ['projects', 'tickets', 'dev_requests', 'documents', 'tasks'];
+const TABLES = ['projects', 'tickets', 'dev_requests', 'documents', 'tasks', 'agent_jobs'];
 let timer;
 
 export async function snapshot() {
   if (backend !== 'postgres') return;
   for (const t of TABLES) await kvSet(`sqlite:${t}`, db.prepare(`SELECT * FROM ${t}`).all());
 }
-export function snapshotSoon() { clearTimeout(timer); timer = setTimeout(() => snapshot().catch(e => console.error('[persist]', e.message)), 1500); }
+export function snapshotSoon() { dataChanged('db'); clearTimeout(timer); timer = setTimeout(() => snapshot().catch(e => console.error('[persist]', e.message)), 1500); }
 
 export async function restore() {
   if (backend !== 'postgres') return;
