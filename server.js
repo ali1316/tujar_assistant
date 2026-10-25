@@ -200,7 +200,8 @@ const promptFor = mode => mode === 'mine'
 function buildSetup(mode, voice = VOICE, sys = promptFor(mode)) {
   return {
     model: `models/${MODEL}`,
-    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+      ...(/extended-thinking/.test(MODEL) ? { thinkingConfig: { thinkingLevel: process.env.THINKING_LEVEL || 'medium' } } : {}) },
     systemInstruction: { parts: [{ text: sys }] },
     tools: [{ functionDeclarations: activeDeclarations() }],
     inputAudioTranscription: {},
