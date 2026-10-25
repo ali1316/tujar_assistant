@@ -159,6 +159,8 @@ export function createUIControl({ api, hud, onChange = () => {} }) {
         const name = Object.keys(FONTS).find(f => f.toLowerCase() === String(font).toLowerCase());
         if (!name) return { error: 'الخط غير متوفر', available: Object.keys(FONTS) };
         change.numFont = name;
+        // نشيل أي CSS قديم كان يفرض خط على الأرقام/الجداول عشان ما يتعارض
+        change.css = (state.css || []).filter(c => !(/font-family/i.test(c.css) && /\.kpi\s*b|(^|[\s,}])td\b|budget/i.test(c.css)));
       }
       if (!Object.keys(change).length) return { error: 'حددي digits أو font' };
       await commit(change);
