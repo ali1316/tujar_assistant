@@ -38,6 +38,10 @@ const CSS = `
 .hud ul.ins{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px}
 .hud ul.ins li{font-size:14px;line-height:1.7;background:#0b1d31;border:1px solid var(--ln);border-radius:8px;padding:9px 12px;opacity:0;animation:hud-cell .45s ease-out both}
 .hud ul.ins li::before{content:"✓";color:var(--c);margin-inline-end:8px;font-weight:700}
+.hud .hl{display:flex;flex-wrap:wrap;gap:10px;min-height:0;margin:-4px 0 12px}
+.hud .hl span{background:rgba(209,166,92,.14);border:1px solid var(--c);color:#fff;border-radius:99px;padding:6px 14px;font-size:15px;animation:hl-in .35s ease-out both;box-shadow:0 0 18px rgba(209,166,92,.35)}
+.hud .hl span b{color:var(--c);margin-inline-start:8px;font-family:var(--num-font,var(--font));font-variant-numeric:tabular-nums}
+@keyframes hl-in{from{opacity:0;transform:scale(.9)}}
 .hud .err{color:var(--bad);font-family:ui-monospace,monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap}
 @media (prefers-reduced-motion:reduce){.hud,.hud .cell,.hud .vl{animation:none!important;opacity:1}}
 `;
@@ -61,6 +65,18 @@ export function createHUD({ api, mount }) {
   const layer = mount?.el || document.body;
   const panels = [];
 
+  if (window.Chart && !window.__noraLabels) {
+    // الأرقام مكتوبة فوق كل عمود/نقطة (لغة الأرقام دايماً ظاهرة)
+    window.__noraLabels = true;
+    Chart.register({ id: 'noraLabels', afterDatasetsDraw(chart) {
+      const t = chart.config.type; if (t === 'radar') return;
+      const ctx = chart.ctx; ctx.save(); ctx.font = `700 12px ${brandFont()}`; ctx.fillStyle = '#e8d3a8';
+      chart.data.datasets.forEach((ds, di) => { const meta = chart.getDatasetMeta(di); if (meta.hidden) return;
+        meta.data.forEach((el, i) => { const v = ds.data[i]; if (v == null) return;
+          if (t === 'doughnut' || t === 'pie') { const p = el.tooltipPosition(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#081726'; ctx.fillText(fmt(v), p.x, p.y); ctx.fillStyle = '#e8d3a8'; }
+          else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(fmt(v), el.x, el.y - 4); } }); });
+      ctx.restore(); } });
+  }
   if (window.Chart) {
     Chart.defaults.color = '#8ea3bd';
     Chart.defaults.font.family = "'IBM Plex Sans Arabic', system-ui, sans-serif";
@@ -78,6 +94,8 @@ export function createHUD({ api, mount }) {
     el.querySelector('h3').textContent = title;
     el.querySelector('.sub').textContent = sub || '';
     el.querySelector('.x').onclick = () => closeAll();
+    el.querySelector('.body').insertAdjacentHTML('afterbegin', '<div class="hl"></div>');
+    HL = []; lastHL = '';
     layer.append(el); panels.push(el);
     mount?.show?.(title);
     return el;
@@ -91,6 +109,17 @@ export function createHUD({ api, mount }) {
   }
   function closeAll() { const had = panels.length; [...panels].forEach(p => close(p)); if (!had) mount?.home?.(); return { back_to_main_screen: true }; }
   const current = () => panels.map(p => p.querySelector('h3').textContent);
+  // ===== مزامنة الكلام مع الشاشة: أي فئة أو رقم تنطقه نورة يتظلل على الشاشة بنفس اللحظة =====
+  let HL = [], lastHL = '';
+  const norm = t => String(t).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/^ال/, '').trim();
+  function highlight(text) {
+    const el = panels.at(-1); if (!el || !HL.length || !text) return;
+    const T = ' ' + String(text).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي') + ' ';
+    const hits = HL.map(h => ({ ...h, at: T.lastIndexOf(norm(h.label)) })).filter(h => norm(h.label).length > 1 && h.at >= 0).sort((a, b) => b.at - a.at).slice(0, 3).reverse();
+    const key = hits.map(h => h.label).join('|'); if (key === lastHL) return; lastHL = key;
+    el.querySelector('.hl').innerHTML = hits.map(h => `<span>${esc(h.label)}<b>${fmt(h.value)}${h.unit ? ' ' + esc(h.unit) : ''}</b></span>`).join('');
+  }
+  const setHL = rows => { HL = rows.filter(r => r.label != null && r.value != null && isFinite(+r.value)).map(r => ({ ...r, label: String(r.label) })); };
 
   function countUp(el, to, suffix = '') {
     const t0 = performance.now(), d = 1300;
@@ -153,6 +182,7 @@ export function createHUD({ api, mount }) {
 
   function showChart({ title, chart_type = 'bar', labels = [], values = [], unit = '' }) {
     const el = panel('DATA · VISUAL', title, unit ? `الوحدة: ${unit}` : '');
+    setHL(labels.map((l, i) => ({ label: l, value: values[i], unit })));
     const body = el.querySelector('.body');
     const c = cell(body, `<div class="chart" style="height:300px"><canvas></canvas></div>`, 150);
     const round = chart_type === 'doughnut';
@@ -174,6 +204,7 @@ export function createHUD({ api, mount }) {
     const d = await api('/api/dashboard');
     const s = d.summary;
     const el = panel('PORTFOLIO · OVERVIEW', 'نظرة شاملة على المشاريع', `${d.projects.length} مشاريع · ${s.open_tickets} تذاكر مفتوحة`);
+    setHL(d.projects.map(p => ({ label: p.name, value: p.progress, unit: '٪' })));
     const g = document.createElement('div'); g.className = 'grid'; el.querySelector('.body').append(g);
     const used = Math.round((s.total_spent / s.total_budget) * 100);
     cell(g, `<div class="lbl">إجمالي الميزانية</div><div class="big" data-count="${s.total_budget}" data-suffix=" <small>ر.س</small>">0</div>
@@ -242,6 +273,11 @@ export function createHUD({ api, mount }) {
 
     const el = panel('LIVE · RENDER', title, subtitle);
     const body = el.querySelector('.body');
+    { // بيانات الشارت للمزامنة مع الكلام (نجمع حسب الفئة)
+      const vals = spec.data?.values || spec.layer?.find(l => l.data?.values)?.data.values || [];
+      const agg = {}; vals.forEach(d => { const k = d.k ?? d.label ?? d.name ?? d.category; const v = +(d.v ?? d.value); if (k != null && isFinite(v)) agg[k] = (agg[k] || 0) + v; });
+      setHL(Object.entries(agg).map(([label, value]) => ({ label, value })));
+    }
     if (kpis.length) {
       const k = document.createElement('div'); k.className = 'kpis'; body.append(k);
       kpis.slice(0, 4).forEach((x, i) => cell(k, `<div class="lbl">${esc(x.label)}</div><div class="big" data-count="${+x.value || 0}" data-suffix=" <small>${esc(x.unit || '')}</small>">0</div>`, 150 + i * 120));
@@ -301,7 +337,7 @@ export function createHUD({ api, mount }) {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && panels.length) closeAll(); });
 
   return {
-    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, showNote, closeAll, current,
+    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, showNote, closeAll, current, highlight,
     // جاهزة كـ clientTools للوكيل
     tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll, back_to_main: closeAll },
   };

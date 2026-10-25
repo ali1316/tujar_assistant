@@ -174,10 +174,20 @@ export function toVegaLite(res, type = 'bar') {
   if (type === 'pie' || type === 'donut') return { data: { values }, mark: { type: 'arc', innerRadius: type === 'donut' ? 60 : 0 }, encoding: { theta: { field: 'v', type: 'quantitative', title: res.measure }, color: { field: 'k', type: 'nominal', title: res.group_by, sort: order } } };
   const mark = type === 'line' || type === 'area' ? { type: type === 'area' ? 'area' : 'line', point: true, opacity: type === 'area' ? .5 : 1 } : { type: 'bar' };
   const hz = type === 'hbar';
-  const k = { field: 'k', type: 'nominal', title: res.group_by, sort: order }, v = { field: 'v', type: 'quantitative', title: `${AGG_AR[res.agg] || ''} ${res.measure}`.trim() };
+  const k = { field: 'k', type: 'nominal', title: res.group_by, sort: order }, v = { field: 'v', type: 'quantitative', title: res.agg === 'count' ? 'العدد' : `${AGG_AR[res.agg] || ''} ${res.measure}`.trim() };
   const enc = hz ? { y: k, x: v } : { x: k, y: v };
   if (multi) { enc.color = { field: 's', type: 'nominal', title: '' }; if (type !== 'stacked' && mark.type === 'bar') enc[hz ? 'yOffset' : 'xOffset'] = { field: 's' }; }
   enc.tooltip = [{ field: 'k', title: res.group_by || '' }, ...(multi ? [{ field: 's', title: '' }] : []), { field: 'v', title: res.measure, format: ',' }];
+  // الأرقام مكتوبة على الشارت نفسه (لغة الأرقام دايماً ظاهرة)
+  const fmt = res.agg === 'avg' ? ',.1f' : ',.2~f';
+  if (!multi) {
+    const lbl = hz ? { type: 'text', align: 'left', baseline: 'middle', dx: 6, fontWeight: 700 } : { type: 'text', align: 'center', baseline: 'bottom', dy: -6, fontWeight: 700 };
+    return { data: { values }, layer: [{ mark, encoding: enc }, { mark: lbl, encoding: { ...(hz ? { y: k, x: v } : { x: k, y: v }), text: { field: 'v', type: 'quantitative', format: fmt } } }] };
+  }
+  if (type === 'stacked') {
+    const totals = res.rows.map(r => ({ k: r.key, t: r.total }));
+    return { layer: [{ data: { values }, mark, encoding: enc }, { data: { values: totals }, mark: hz ? { type: 'text', align: 'left', dx: 6, fontWeight: 700 } : { type: 'text', baseline: 'bottom', dy: -6, fontWeight: 700 }, encoding: { ...(hz ? { y: k, x: { field: 't', type: 'quantitative' } } : { x: k, y: { field: 't', type: 'quantitative' } }), text: { field: 't', type: 'quantitative', format: fmt } } }] };
+  }
   return { data: { values }, mark, encoding: enc };
 }
 
@@ -216,8 +226,17 @@ export const datasetTools = {
     run: async ({ title, chart_type = 'bar', ...args }) => {
       const ds = await resolveDs(args); const r = runQuery(ds, args);
       const total = r.rows.reduce((a, x) => a + x.total, 0);
-      return { title, subtitle: `من «${ds.doc_name}» · ${ds.sheet} · ${r.matched_rows} صف`, vega_lite: toVegaLite(r, chart_type),
-        kpis: [{ label: r.measure === 'العدد' ? 'عدد السجلات' : `${AGG_AR[r.agg] || ''} ${r.measure}`.trim(), value: r.agg === 'avg' ? +(total / Math.max(1, r.rows.length)).toFixed(1) : total }, { label: 'عدد الفئات', value: r.rows.length }],
+      const sorted = [...r.rows].sort((a, b) => b.total - a.total), top1 = sorted[0], low = sorted.at(-1);
+      const n = x => new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(x);
+      const share = top1 && total ? Math.round(top1.total / total * 100) : 0;
+      // نقاط مكتوبة على الشاشة بالأرقام (تتطابق مع كلام نورة)
+      const insights = top1 ? [
+        `الأعلى: ${top1.key} بـ ${n(top1.total)}${r.agg === 'sum' || r.agg === 'count' ? ` (${share}٪ من الإجمالي)` : ''}`,
+        ...(sorted.length > 1 ? [`الأقل: ${low.key} بـ ${n(low.total)}`] : []),
+        ...(sorted.length > 2 && r.agg !== 'avg' ? [`أعلى ${Math.min(3, sorted.length)} فئات = ${Math.round(sorted.slice(0, 3).reduce((a, x) => a + x.total, 0) / total * 100)}٪ من الإجمالي`] : []),
+      ] : [];
+      return { title, subtitle: `من «${ds.doc_name}» · ${ds.sheet} · ${r.matched_rows} صف`, vega_lite: toVegaLite(r, chart_type), insights,
+        kpis: [{ label: r.measure === 'العدد' ? 'عدد السجلات' : `${AGG_AR[r.agg] || ''} ${r.measure}`.trim(), value: r.agg === 'avg' ? +(total / Math.max(1, r.rows.length)).toFixed(1) : total }, ...(top1 ? [{ label: `الأعلى · ${top1.key}`, value: +(+top1.total).toFixed(1) }] : []), { label: 'عدد الفئات', value: r.rows.length }],
         top: r.rows.slice(0, 5).map(x => ({ [r.group_by || '']: x.key, [r.measure]: x.total })) };
     },
   },

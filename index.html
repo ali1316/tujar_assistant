@@ -348,7 +348,7 @@ const screenToolsExtra = {
   async data_chart(args) {
     const r = await apiJson('/api/tools/data_chart', args);
     if (r.error) return r;
-    const shown = await hud.showVisual({ title: r.title, subtitle: r.subtitle, vega_lite: r.vega_lite, kpis: r.kpis });
+    const shown = await hud.showVisual({ title: r.title, subtitle: r.subtitle, vega_lite: r.vega_lite, kpis: r.kpis, insights: r.insights });
     return { ...shown, subtitle: r.subtitle, top: r.top, kpis: r.kpis };
   },
 };
@@ -378,7 +378,7 @@ const agentOpts = {
     status: t => { $('#status').textContent = t; setTimeout(() => $('#chip').classList.toggle('on', !!agent.connected), 0); },
     closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); $('#chip').classList.remove('on'); },
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
-    modelText: t => { pend.a += t; bubble('a', t); cur.u = null; },
+    modelText: t => { pend.a += t; bubble('a', t); cur.u = null; hud.highlight(pend.a.slice(-220)); },
     turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ عرض: ${fc.args?.title || VIEW_LABEL[fc.args?.view] || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
