@@ -121,7 +121,7 @@ const agent = new GeminiLiveAgent({
     userText: (t, typed) => { if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { bubble('a', t); cur.u = null; },
     turnComplete: () => { cur = { u: null, a: null }; },
-    toolCall: fc => note(fc.name.startsWith('show_') ? `✦ نورة تعرض: ${fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
+    toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
