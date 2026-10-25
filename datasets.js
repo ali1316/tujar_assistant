@@ -1,7 +1,7 @@
 // محرك البيانات: يحوّل ملفات Excel/CSV لجداول منظّمة، يحلل كل عمود، ويجاوب أي استعلام أو شارت فوراً بأرقام محسوبة (مو تقديرات)
 import * as XLSX from 'xlsx';
 import path from 'node:path';
-import { datasetAdd, datasetGet, datasetsForDoc, datasetsLatest } from './store.js';
+import { datasetAdd, datasetGet, datasetsForDoc, datasetsLatest, datasetsRecent } from './store.js';
 
 const MAX_ROWS = 20000;
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -27,7 +27,10 @@ export const dateStr = v => v instanceof Date ? toDate(v) : v;
 export function isTabular(name) { return ['.xlsx', '.xls', '.csv'].includes(path.extname(name).toLowerCase()); }
 
 export function parseWorkbook(buffer, name) {
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
+  // CSV: نقرأه UTF-8 صريح (وإلا العربي يطلع رموز غريبة)
+  const wb = path.extname(name || '').toLowerCase() === '.csv'
+    ? XLSX.read(Buffer.from(buffer).toString('utf8').replace(/^\uFEFF/, ''), { type: 'string', cellDates: true, raw: false })
+    : XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
   const out = [];
   for (const sheet of wb.SheetNames) {
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, raw: true, defval: null, blankrows: false });
@@ -199,11 +202,18 @@ export function catalogText(list) {
 }
 export async function latestCatalog() { return catalogText(await datasetsLatest().catch(() => [])); }
 
-async function resolveDs({ dataset_id, sheet } = {}) {
-  if (dataset_id) { const d = await datasetGet(dataset_id); if (d) return d; }
+async function resolveDs({ dataset_id, sheet, group_by, measure, series_by, filters } = {}) {
+  // الأعمدة المطلوبة: لو الجدول المختار ما فيه أعمدة السؤال، ندوّر تلقائياً على الملف اللي فيه (أحدث أولاً)
+  const need = [group_by, measure, series_by, ...(filters || []).map(f => f?.column)].filter(Boolean);
+  const fits = d => d && need.every(c => colIdx(d, c) >= 0);
+  if (dataset_id) { const d = await datasetGet(dataset_id); if (d && fits(d)) return d; }
   const list = await datasetsLatest();
+  const pick = (sheet && list.find(d => d.sheet === sheet || d.sheet.includes(sheet))) || list.find(fits);
+  if (pick && fits(pick)) return pick;
+  if (need.length) { const any = (await datasetsRecent(40)).find(fits); if (any) return any; }
+  if (dataset_id) { const d = await datasetGet(dataset_id); if (d) return d; }
   if (!list.length) throw new Error('ما فيه ملف بيانات (Excel/CSV) مرفوع للحين');
-  return (sheet && list.find(d => d.sheet === sheet || d.sheet.includes(sheet))) || list[0];
+  return pick || list[0];
 }
 
 // ===== 6) أدوات نورة =====

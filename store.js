@@ -128,4 +128,5 @@ export async function datasetAdd({ doc_id, doc_name, sheet, columns, rows, profi
 }
 export const datasetGet = id => q('SELECT * FROM datasets WHERE id=$1', 'SELECT * FROM datasets WHERE id=?', [id]).then(r => dsRow(r[0]));
 export const datasetsForDoc = docId => q('SELECT * FROM datasets WHERE doc_id=$1 ORDER BY id', 'SELECT * FROM datasets WHERE doc_id=? ORDER BY id', [docId]).then(r => r.map(dsRow));
+export const datasetsRecent = (n = 30) => q('SELECT * FROM datasets ORDER BY id DESC LIMIT $1', 'SELECT * FROM datasets ORDER BY id DESC LIMIT ?', [n]).then(r => r.map(dsRow));
 export const datasetsLatest = () => q('SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id', 'SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id').then(r => r.map(dsRow));
