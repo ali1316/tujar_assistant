@@ -203,11 +203,15 @@ function bubble(kind, text, append = true) {
   if (!append || !cur[kind]) { cur[kind] = Object.assign(document.createElement('div'), { className: 'm ' + kind }); $('#log').append(cur[kind]); }
   cur[kind].textContent = (cur[kind].textContent + text).replace(TAGS, ''); $('#log').scrollTop = 1e9;
   caption(kind, cur[kind].textContent);
+  trimLog();
 }
 // الشريط يعرض آخر سطر فقط (سؤالك + رد نورة)، والسجل الكامل ينفتح بزر «السجل»
 let capTimer;
+// النص ما يطلع على الشاشة (طلب فواز): الكلام صوت بس، والسجل موجود لو فتحه من زر «السجل»
+const SHOW_CAPTION = false;
+function trimLog() { const l = $('#log'); while (l.children.length > 60) l.firstChild.remove(); }
 function caption(kind, text) {
-  if (!$('#drawer').hidden) return;
+  if (!SHOW_CAPTION || !$('#drawer').hidden) return;
   const c = $('#caption'); clearTimeout(capTimer);
   if (kind === 'u' && c.dataset.done) { c.querySelector('.ca').textContent = ''; delete c.dataset.done; }
   c.querySelector(kind === 'u' ? '.cu' : '.ca').textContent = text; c.hidden = false; c.scrollTop = 1e9;
@@ -218,7 +222,7 @@ $('#logBtn').onclick = () => openLog($('#drawer').hidden);
 $('#drClose').onclick = () => openLog(false);
 $('#caption').onclick = () => openLog(true);
 $('#txt').addEventListener('input', () => { $('#send').hidden = !$('#txt').value.trim(); });
-function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; }
+function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; trimLog(); }
 
 // HUD: النوافذ المنبثقة (نورة تفتحها بأدوات show_*)
 // ===== الشاشة تبدأ فاضية؛ المساعد يعرض الأقسام لما تطلبها (show_screen) =====
