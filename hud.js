@@ -6,7 +6,7 @@ const CSS = `
 .hud-dim{position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(4,18,40,.55),rgba(2,6,14,.82));opacity:0;transition:opacity .4s;pointer-events:none;z-index:49}
 .hud-dim.on{opacity:1}
 .hud{--c:#3ee6ff;--c2:#7a8cff;--warn:#ffb547;--bad:#ff5d73;--ok:#3dffa8;--glass:rgba(8,24,48,.78);
-  position:absolute;pointer-events:auto;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 60px);overflow:auto;
+  position:absolute;pointer-events:auto;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 60px);overflow-y:auto;overflow-x:hidden;
   background:linear-gradient(160deg,rgba(20,60,110,.35),transparent 40%),var(--glass);
   border:1px solid rgba(62,230,255,.45);border-radius:6px;padding:20px 22px 18px;color:#dff8ff;
   box-shadow:0 0 0 1px rgba(62,230,255,.08),0 0 40px rgba(62,230,255,.25),inset 0 0 60px rgba(62,230,255,.08);
