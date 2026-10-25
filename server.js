@@ -11,6 +11,7 @@ import { dashboardTools, dashGet, dashList } from './dashboards.js';
 import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
+import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
 const PORT = process.env.PORT || 3000;
@@ -26,7 +27,7 @@ const ACCESS_CODE = process.env.ACCESS_CODE || ''; // لو فاضي = بدون �
 const MY_VOICE_ID = process.env.MY_VOICE_ID || 'voice_xb1ye60p9o3i'; // صوت فواز المستنسخ في Gemini
 const TTS_MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
-const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools };
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools };
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
 const visualDeclarations = [
@@ -148,6 +149,10 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
   * "الداشبورد" أو "اللوحة" أو "الشاشة" أو "لوحة المشاريع" أو "هذي الصفحة" بدون رقم = هذي الشاشة الرئيسية، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
   * لما يرفع ملف، النظام يبني «لوحة الملف» تلقائياً ويعرضها داخل الشاشة الرئيسية، ويوصلك تنبيه برقمها. أسئلته بعدها عن «اللوحة» أو «الأرقام» أو «الملف» = عن هذي اللوحة وملفها:
     جاوبي من الملف بـ search_documents/read_document، ولو طلب تعديل عليها (رسم إضافي، تقسيم مختلف) ابني نسخة جديدة بـ build_dashboard وتنعرض مكانها.
+  * بيانات Excel/CSV محفوظة كجداول منظّمة (مذكورة تحت بأعمدتها):
+    - أي سؤال رقمي عنها (كم، مجموع، متوسط، الأعلى، حسب كذا، بشرط كذا) → query_data، وجاوبي بالأرقام اللي ترجع بالضبط.
+    - أي شارت يطلبه عن الملف → data_chart فوراً (bar/hbar/stacked/line/area/pie/donut) ويطلع نافذة منبثقة. لا تستخدمين render_visual لبيانات الملف.
+    - search_documents/read_document للملفات النصية (PDF/Word) أو للبحث عن نص.
   * أنتِ تشوفينها: لا تقولين أبداً "ما أشوف الشاشة". نادي look_at_screen وجاوبي مما فيها، ووصفها المختصر موجود تحت.
   * أي طلب تعديل على شكلها (خط، أرقام، ألوان، أحجام، جداول) نفّذيه عليها مباشرة بأدوات الواجهة. الأرقام → set_number_style.
 - أنتِ الواجهة اللي تدير الشركة: تقدرين تعدّلين شكل اللوحة نفسها فوراً:
@@ -211,11 +216,13 @@ async function screenBlock() {
     const dashes = await dashList();
     const docs = db.prepare('SELECT id, name, chars FROM documents ORDER BY id DESC LIMIT 1').all();
     const cur = (await getCurrentDash()) || {};
+    const catalog = await latestCatalog();
     return `\n\n## الشاشة الرئيسية الحين (لوحة مشاريع التحول الرقمي)
 - البطاقات: ${projects.length} مشاريع، الميزانية ${s.total_budget} ريال، المصروف ${s.total_spent} ريال، ${s.open_tickets} تذاكر مفتوحة (${s.high_priority_open} عالية).
 - المشاريع: ${projects.map(p => `#${p.id} ${p.name} (${p.status}، ${p.progress}%)`).join('، ')}.
 - شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
 - لوحة معروضة الحين داخل الشاشة الرئيسية (فوق البطاقات): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.
+- بيانات الملف الجاهزة للتحليل الفوري (استخدمي أسماء الأعمدة حرفياً):\n${catalog || 'لا يوجد ملف Excel/CSV'}
 - آخر ملف مرفوع: ${docs.length ? `#${docs[0].id} «${docs[0].name}» (${docs[0].chars} حرف)` : 'لا يوجد'}.
 - داشبوردات مولّدة محفوظة: ${dashes.length ? dashes.slice(0, 10).map(d => `#${d.id} ${d.title}`).join('، ') : 'لا يوجد'}.`;
   } catch (e) { return ''; }
@@ -363,8 +370,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const text = await extractText(req.file.buffer, name);
     const doc = saveDocument(name, req.file.mimetype, req.file.size, text);
     snapshotSoon();
-    console.log(`[upload] ${name} → doc #${doc.id} (${doc.chars} chars)`);
-    res.json(doc);
+    // ملفات Excel/CSV: نحوّلها لجداول منظّمة جاهزة للتحليل والشارتات الفورية
+    let datasets = [];
+    try { datasets = await ingestDocument(doc, req.file.buffer); } catch (e) { console.warn('[upload] ingest failed:', e.message); }
+    console.log(`[upload] ${name} → doc #${doc.id} (${doc.chars} chars, ${datasets.length} tables)`);
+    res.json({ ...doc, datasets });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
