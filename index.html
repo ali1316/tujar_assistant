@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>لوحة المشاريع + مساعد صوتي</title>
+<title>لوحة المشاريع · نورة</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#0f1420;--card:#171e2e;--line:#253049;--ink:#e8edf7;--mute:#8a96b0;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d}
@@ -35,13 +36,15 @@
   .drop{outline:2px dashed var(--acc);outline-offset:-6px}
   #gate{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:9}
   #gate form{flex-direction:column;width:300px} #gate input{padding:12px} #gate button{padding:10px}
-  .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;align-self:center}
-  .seg button{background:none;border:none;color:var(--mute);padding:6px 12px;border-radius:7px;cursor:pointer;font:inherit;font-size:13px}
-  .seg button.on{background:var(--acc);color:#fff}
+  .nora{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap}
+  .nora b{font-size:18px;letter-spacing:.02em} .nora span{color:var(--mute);font-size:12px}
+  .vsel{display:flex;gap:6px;align-items:center;justify-content:center}
+  .vsel select{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
+  .vsel button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit;font-size:13px}
 </style>
 </head>
 <body>
-<header><h1>📊 لوحة مشاريع التحول الرقمي</h1><span style="color:var(--mute);font-size:13px">Gemini Live · تجربة</span></header>
+<header><h1>📊 لوحة مشاريع التحول الرقمي</h1><span style="color:var(--mute);font-size:13px">نورة · Gemini Live · تجربة</span></header>
 <div id="gate"><form id="gf"><h2 style="text-align:center">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
 <main>
   <section>
@@ -51,16 +54,18 @@
     <div class="card docs"><h2>📁 الملفات المرفوعة (اسحب ملف هنا أو اضغط 📎)</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
   </section>
   <aside class="card agent">
-    <div class="seg" id="seg"><button data-m="live">⚡ صوت Live</button><button data-m="mine">🗣️ صوتي</button></div>
+    <div class="nora"><b>✦ نورة</b><span>المساعدة الذكية</span></div>
+    <div class="vsel"><label for="voice" style="font-size:12px;color:var(--mute)">صوتها</label><select id="voice"></select><button id="preview" type="button">▶ اسمعها</button></div>
     <button class="mic" id="mic" title="ابدأ المحادثة">🎙️</button>
-    <div id="status">اضغط المايك وتكلّم — مثلاً: «وش وضع المشاريع المتأخرة؟»</div>
+    <div id="status">اضغط المايك وكلّم نورة — جرّب: «عطيني تفاصيل مشروع بوابة الخدمات»</div>
     <div id="log"></div>
-    <form id="f"><button type="button" class="attach" id="attach" title="إرفاق ملف">📎</button><input id="txt" placeholder="أو اكتب سؤالك…"><button>إرسال</button></form>
+    <form id="f"><button type="button" class="attach" id="attach" title="إرفاق ملف">📎</button><input id="txt" placeholder="اسأل نورة… مثلاً: عطيني تفاصيل بوابة الخدمات"><button>إرسال</button></form>
     <input type="file" id="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
   </aside>
 </main>
 <script type="module">
 import { GeminiLiveAgent } from './gemini-live-agent.js';
+import { createHUD } from './hud.js';
 const $ = s => document.querySelector(s);
 const sar = n => new Intl.NumberFormat('ar-SA').format(n);
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
@@ -104,14 +109,19 @@ function bubble(kind, text, append = true) {
 }
 function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; }
 
+// HUD: النوافذ المنبثقة (نورة تفتحها بأدوات show_*)
+const hud = createHUD({ api: async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json() });
+window.hud = hud;
+
 const agent = new GeminiLiveAgent({
   headers: H,
+  clientTools: hud.tools,
   on: {
     status: t => $('#status').textContent = t,
     userText: (t, typed) => { if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { bubble('a', t); cur.u = null; },
     turnComplete: () => { cur = { u: null, a: null }; },
-    toolCall: fc => note(`🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
+    toolCall: fc => note(fc.name.startsWith('show_') ? `✦ نورة تعرض: ${fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
@@ -119,23 +129,43 @@ const agent = new GeminiLiveAgent({
 });
 
 let running = false;
-let MODE = 'live'; try { MODE = localStorage.getItem('voiceMode') || 'live'; } catch {}
-const paintSeg = () => document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.m === MODE));
-paintSeg();
-document.querySelectorAll('#seg button').forEach(b => b.onclick = async () => {
-  if (b.dataset.m === MODE) return;
-  MODE = b.dataset.m; try { localStorage.setItem('voiceMode', MODE); } catch {} paintSeg();
-  note(MODE === 'mine' ? '🗣️ صار يرد بصوتك (أبطأ شوي)' : '⚡ رجع لصوت Live السريع');
-  if (running) { agent.stop(); try { await agent.start({ mode: MODE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
-});
+const MODE = 'live';
+// أصوات نورة (نسائية) — الاختيار ينحفظ في المتصفح
+const VOICE_DESC = { Sulafat: 'دافئ', Despina: 'ناعم', Aoede: 'منساب', Leda: 'شبابي', Kore: 'حازم', Zephyr: 'مشرق', Achernar: 'هادئ', Callirrhoe: 'مريح', Autonoe: 'مشرق', Erinome: 'واضح', Laomedeia: 'مرح', Gacrux: 'ناضج', Pulcherrima: 'جريء', Vindemiatrix: 'لطيف' };
+let VOICE = 'Sulafat'; try { VOICE = localStorage.getItem('noraVoice') || 'Sulafat'; } catch {}
+const VOICES = Object.keys(VOICE_DESC);
+if (!VOICES.includes(VOICE)) VOICE = 'Sulafat';
+$('#voice').innerHTML = VOICES.map(n => `<option value="${n}">${n} · ${VOICE_DESC[n]}</option>`).join('');
+$('#voice').value = VOICE;
+$('#voice').onchange = async () => {
+  VOICE = $('#voice').value; try { localStorage.setItem('noraVoice', VOICE); } catch {}
+  note(`🎙️ صوت نورة صار: ${VOICE}`);
+  if (running) { agent.stop(); try { await agent.start({ voice: VOICE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
+};
+// معاينة الصوت: جملة قصيرة عبر Gemini TTS بنفس الصوت
+$('#preview').onclick = async () => {
+  $('#preview').disabled = true;
+  try {
+    const r = await api('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice: VOICE, text: 'هلا والله! أنا نورة، مساعدتك الذكية. اسألني عن أي مشروع، وأطلّع لك كل شي على الشاشة.' }) });
+    if (!r.ok) throw new Error(await r.text());
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const ctx = new AudioContext({ sampleRate: 24000 });
+    const pcm = new Int16Array(buf.buffer, 0, buf.length >> 1);
+    const ab = ctx.createBuffer(1, pcm.length, 24000); const ch = ab.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+    const src = ctx.createBufferSource(); src.buffer = ab; src.connect(ctx.destination); src.start();
+    src.onended = () => ctx.close();
+  } catch (e) { note('❌ المعاينة: ' + e.message); }
+  $('#preview').disabled = false;
+};
 $('#mic').onclick = async () => {
   if (running) { agent.stop(); running = false; $('#mic').classList.remove('on'); return; }
-  try { await agent.start({ mode: MODE }); running = true; $('#mic').classList.add('on'); }
+  try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); }
   catch (e) { $('#status').textContent = '❌ ' + e.message; }
 };
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
-  if (!running) { try { await agent.start({ mic: false, mode: MODE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
+  if (!running) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
   agent.sendText(t); $('#txt').value = '';
 };
 
