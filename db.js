@@ -47,6 +47,14 @@ if (db.prepare('SELECT COUNT(*) c FROM projects').get().c === 0) {
   ].forEach(r => t.run(...r));
 }
 
+// إعدادات الواجهة + طلبات التطوير الكبيرة
+db.exec(`
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS dev_requests (
+  id INTEGER PRIMARY KEY, title TEXT NOT NULL, details TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'جديد', created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`);
+
 // ترقية: تاريخ بداية لكل مشروع (للجانت) — آمنة لو انعادت
 if (!db.prepare('PRAGMA table_info(projects)').all().some(c => c.name === 'start_date')) {
   db.exec('ALTER TABLE projects ADD COLUMN start_date TEXT');
@@ -172,6 +180,32 @@ export const tools = {
         .run(project_id, title, priority);
       return { ok: true, ticket_id: r.lastInsertRowid };
     },
+  },
+
+  request_dev_change: {
+    declaration: {
+      name: 'request_dev_change',
+      description: 'يسجّل طلب تطوير كبير ما تقدرين تنفذينه بأدوات الواجهة (ميزة جديدة، صفحة، تكامل، تقرير، تعديل بالباك اند). فريق التطوير (Claude) يستلمه وينفذه. اكتبي التفاصيل كاملة كما قالها المستخدم.',
+      parameters: {
+        type: 'OBJECT',
+        properties: { title: { type: 'STRING' }, details: { type: 'STRING' } },
+        required: ['title', 'details'],
+      },
+    },
+    write: true,
+    run: ({ title, details }) => {
+      const r = db.prepare('INSERT INTO dev_requests (title, details) VALUES (?,?)').run(title, details);
+      return { ok: true, request_id: r.lastInsertRowid, status: 'جديد' };
+    },
+  },
+
+  list_dev_requests: {
+    declaration: {
+      name: 'list_dev_requests',
+      description: 'يعرض طلبات التطوير المسجّلة وحالتها.',
+      parameters: { type: 'OBJECT', properties: {} },
+    },
+    run: () => ({ requests: db.prepare('SELECT * FROM dev_requests ORDER BY id DESC LIMIT 20').all() }),
   },
 
   update_ticket_status: {
