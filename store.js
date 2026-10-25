@@ -18,7 +18,8 @@ export async function initStore() {
       CREATE TABLE IF NOT EXISTS chat_sessions (id SERIAL PRIMARY KEY, started_at TIMESTAMPTZ DEFAULT now(), last_at TIMESTAMPTZ DEFAULT now(),
         summary TEXT, embedding JSONB, turns INT NOT NULL DEFAULT 0, digested_turns INT NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS chat_turns (id SERIAL PRIMARY KEY, session_id INT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now());
-      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);`);
+      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);
+      CREATE TABLE IF NOT EXISTS datasets (id SERIAL PRIMARY KEY, doc_id INT, doc_name TEXT, sheet TEXT NOT NULL, columns JSONB NOT NULL, rows JSONB NOT NULL, profile JSONB, created_at TIMESTAMPTZ DEFAULT now());`);
   } catch (e) {
     console.error('[store] postgres failed, falling back to sqlite:', e.message);
     pool = null; backend = 'sqlite';
@@ -32,7 +33,8 @@ export async function initStore() {
       CREATE TABLE IF NOT EXISTS chat_sessions (id INTEGER PRIMARY KEY, started_at TEXT DEFAULT (datetime('now')), last_at TEXT DEFAULT (datetime('now')),
         summary TEXT, embedding TEXT, turns INTEGER NOT NULL DEFAULT 0, digested_turns INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS chat_turns (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
-      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);`);
+      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);
+      CREATE TABLE IF NOT EXISTS datasets (id INTEGER PRIMARY KEY, doc_id INTEGER, doc_name TEXT, sheet TEXT NOT NULL, columns TEXT NOT NULL, rows TEXT NOT NULL, profile TEXT, created_at TEXT DEFAULT (datetime('now')));`);
   }
   console.log(`[store] ${backend}`);
 }
@@ -116,3 +118,14 @@ export async function chatSetDigest(id, { summary, embedding, digested }) {
 export const chatGet = id => q('SELECT * FROM chat_sessions WHERE id=$1', 'SELECT * FROM chat_sessions WHERE id=?', [id]).then(r => r[0] || null);
 export const chatSearchText = (word, limit = 8) =>
   q('SELECT session_id, role, text, created_at FROM chat_turns WHERE text ILIKE $1 ORDER BY id DESC LIMIT $2', 'SELECT session_id, role, text, created_at FROM chat_turns WHERE text LIKE ? ORDER BY id DESC LIMIT ?', [`%${word}%`, limit]);
+
+// ===== البيانات المنظّمة من ملفات Excel/CSV (جاهزة للشارتات الفورية) =====
+const dsRow = r => r && ({ ...r, columns: parse(r.columns), rows: parse(r.rows), profile: r.profile ? parse(r.profile) : null });
+export async function datasetAdd({ doc_id, doc_name, sheet, columns, rows, profile }) {
+  const a = [doc_id, doc_name, sheet, JSON.stringify(columns), JSON.stringify(rows), JSON.stringify(profile)];
+  if (pool) return (await pool.query('INSERT INTO datasets (doc_id, doc_name, sheet, columns, rows, profile) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', a)).rows[0].id;
+  return db.prepare('INSERT INTO datasets (doc_id, doc_name, sheet, columns, rows, profile) VALUES (?,?,?,?,?,?)').run(...a).lastInsertRowid;
+}
+export const datasetGet = id => q('SELECT * FROM datasets WHERE id=$1', 'SELECT * FROM datasets WHERE id=?', [id]).then(r => dsRow(r[0]));
+export const datasetsForDoc = docId => q('SELECT * FROM datasets WHERE doc_id=$1 ORDER BY id', 'SELECT * FROM datasets WHERE doc_id=? ORDER BY id', [docId]).then(r => r.map(dsRow));
+export const datasetsLatest = () => q('SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id', 'SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id').then(r => r.map(dsRow));
