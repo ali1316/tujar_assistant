@@ -88,6 +88,39 @@ export const tools = {
     },
   },
 
+  get_project_details: {
+    declaration: {
+      name: 'get_project_details',
+      description: 'كل تفاصيل مشروع واحد: الميزانية والمصروف والإنجاز والموعد والتذاكر. ابحث برقم المشروع أو جزء من اسمه.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          project_id: { type: 'INTEGER' },
+          name: { type: 'STRING', description: 'جزء من اسم المشروع' },
+        },
+      },
+    },
+    run: ({ project_id, name } = {}) => {
+      const p = project_id
+        ? db.prepare('SELECT * FROM projects WHERE id=?').get(project_id)
+        : db.prepare('SELECT * FROM projects WHERE name LIKE ? ORDER BY length(name) LIMIT 1').get(`%${(name || '').replace(/^ال/, '')}%`);
+      if (!p) return { error: 'ما لقيت المشروع' };
+      const tickets = db.prepare('SELECT id, title, priority, status FROM tickets WHERE project_id=? ORDER BY id DESC').all(p.id);
+      const days_left = Math.round((new Date(p.due_date) - new Date()) / 864e5);
+      return {
+        project: p,
+        tickets,
+        stats: {
+          budget_used_pct: Math.round((p.spent / p.budget) * 100),
+          remaining: p.budget - p.spent,
+          days_left,
+          open_tickets: tickets.filter(t => t.status !== 'مغلقة').length,
+          high_open: tickets.filter(t => t.status !== 'مغلقة' && t.priority === 'عالية').length,
+        },
+      };
+    },
+  },
+
   list_tickets: {
     declaration: {
       name: 'list_tickets',
