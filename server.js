@@ -9,6 +9,7 @@ import { initStore, kvGet, kvSet, backend } from './store.js';
 import { memoryTools, memoryBlock, initMemory, listForUI } from './memory.js';
 import { dashboardTools, dashGet, dashList } from './dashboards.js';
 import { memDelete } from './store.js';
+import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
 const PORT = process.env.PORT || 3000;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-live';
@@ -23,7 +24,7 @@ const ACCESS_CODE = process.env.ACCESS_CODE || ''; // لو فاضي = بدون �
 const MY_VOICE_ID = process.env.MY_VOICE_ID || 'voice_xb1ye60p9o3i'; // صوت فواز المستنسخ في Gemini
 const TTS_MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
-const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools };
+const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools };
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
 const visualDeclarations = [
@@ -150,7 +151,10 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
 - أنتِ تتعلمين وتتذكرين:
   * لما فواز يقول "تذكّري"، أو يصحّحك، أو يذكر تفضيل أو أسلوب أو مصطلح خاص ومعناه، أو شخص ودوره → remember فوراً، وقولي "حفظتها" بكلمة.
   * لو احتجتِ معلومة شخصية مو موجودة في ملخص الذاكرة تحت → recall. "انسي كذا" → forget. "وش تتذكرين عني" → list_memories.
+  * أي ملاحظة على الشكل أو اللغة أو طريقة العرض (مثل "خلي الخط عربي في الميزانية"، "لا تحولين للإنجليزي") = تفضيل دائم → remember فوراً قبل ما تنفذين.
   * طبّقي الذاكرة بهدوء في كل رد (أسلوبه، مصطلحاته)، بدون ما تقولين "حسب ذاكرتي".
+  * عندك تحت ملخص جلساتك السابقة وآخر كلام دار بينكم: أنتِ تتذكرين المحادثة حتى لو انقطعت أو تحدّثت الصفحة، فكمّلي من وين وقفتوا.
+  * كل النصوص اللي تكتبينها في الرسوم والداشبوردات (عناوين، محاور، تسميات، ملاحظات) تكون عربي دائماً إلا لو طلب غير كذا.
 - أي رقم أو اسم أو حالة لازم تجيبه من الأدوات؛ لا تخمّن ولا تألّف بيانات.
 - المبالغ بالريال، اقرأها بشكل طبيعي (مثلاً "مليون ومية ألف").
 - قبل أي إضافة أو تعديل في البيانات، أكّد مع المستخدم بجملة وحدة وانتظر موافقته.
@@ -189,7 +193,7 @@ app.get('/d/:id', (req, res) => res.sendFile('dash.html', { root: '.' }));
 
 // رمز الدخول لكل /api
 app.use('/api', (req, res, next) => {
-  if (!ACCESS_CODE || req.get('x-access-code') === ACCESS_CODE) return next();
+  if (!ACCESS_CODE || (req.get('x-access-code') || req.query.code) === ACCESS_CODE) return next();
   res.status(401).json({ error: 'رمز الدخول غلط' });
 });
 app.get('/api/ping', (req, res) => res.json({ ok: true }));
@@ -200,7 +204,9 @@ app.get('/api/session', async (req, res) => {
   const apiVersion = req.query.v || API_VERSION;
   const mode = req.query.mode === 'mine' ? 'mine' : 'live';
   try {
-    const sys = promptFor(mode) + await memoryBlock(); // ذاكرة نورة تنحقن مع كل جلسة
+    const [mem, hist, chatId] = await Promise.all([memoryBlock(), historyBlock(), chatStart()]);
+    const sys = promptFor(mode) + mem + hist; // ذاكرة نورة + سجل المحادثات تنحقن مع كل جلسة
+    digestPending(chatId); // نراجع الجلسات السابقة اللي ما تراجعت (بالخلفية)
     const now = Date.now();
     const config = {
       uses: 1,
@@ -219,12 +225,26 @@ app.get('/api/session', async (req, res) => {
       };
     }
     const token = await ai.authTokens.create({ config });
-    res.json({ token: token.name, apiVersion, mode, voice: pickVoice(req.query.voice), setup: buildSetup(mode, pickVoice(req.query.voice), sys) });
+    res.json({ token: token.name, chatId, apiVersion, mode, voice: pickVoice(req.query.voice), setup: buildSetup(mode, pickVoice(req.query.voice), sys) });
   } catch (e) {
     console.error('token error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
+
+// سجل المحادثة: المتصفح يرسل كل دور (فواز/نورة) بعد ما يخلص
+app.post('/api/chat/:id/turns', async (req, res) => {
+  try { res.json({ ok: true, saved: await addTurns(+req.params.id, req.body?.turns) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post('/api/chat/:id/end', express.text({ type: '*/*' }), async (req, res) => {
+  try {
+    let turns = []; try { turns = JSON.parse(req.body || '{}').turns || []; } catch {}
+    if (turns.length) await addTurns(+req.params.id, turns);
+    digestNow(+req.params.id); res.json({ ok: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.get('/api/chat/recent', async (req, res) => res.json({ turns: await recentForUI(+req.query.limit || 30) }));
 
 // 2) تنفيذ الأدوات
 app.post('/api/tools/:name', async (req, res) => {
@@ -318,6 +338,7 @@ app.get('/api/dashboard', async (req, res) => {
 });
 
 initMemory(ai);
+initHistory(ai);
 initStore()
   .catch(e => console.error('[store] init failed:', e.message))
   .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend})`)));
