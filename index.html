@@ -7,25 +7,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1420;--card:#171e2e;--line:#253049;--ink:#e8edf7;--mute:#8a96b0;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d}
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif}
+  :root{--bg:#0f1420;--card:#171e2e;--line:#253049;--ink:#e8edf7;--mute:#8a96b0;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d;--font:'IBM Plex Sans Arabic';--radius:12px;--fs-table:1;--fs-kpi:1;--fs-chat:1;--fs-header:1;--fs-titles:1}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font),'IBM Plex Sans Arabic',system-ui,sans-serif;transition:background .5s,color .5s}
+  input,select,button,textarea{font-family:inherit}
   header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-  h1{font-size:20px;margin:0} main{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px 24px}
+  h1{font-size:calc(20px*var(--fs-header));margin:0} main{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px 24px}
   @media(max-width:900px){main{grid-template-columns:1fr}}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-  .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-  .kpi b{display:block;font-size:22px;margin-top:4px} .kpi span{color:var(--mute);font-size:13px}
-  table{width:100%;border-collapse:collapse;font-size:14px} th,td{padding:8px;border-bottom:1px solid var(--line);text-align:right} th{color:var(--mute);font-weight:600}
+  .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;transition:background .5s,border-color .5s}
+  .kpi b{display:block;font-size:calc(22px*var(--fs-kpi));margin-top:4px} .kpi span{color:var(--mute);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:calc(14px*var(--fs-table))} th,td{padding:8px;border-bottom:1px solid var(--line);text-align:right} th{color:var(--mute);font-weight:600}
   .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
   .tag{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}
   .tag.متأخر,.tag.عالية{background:#4a1f22;color:#ff9a9d}.tag.مكتمل,.tag.مغلقة{background:#163d2a;color:#7be3a8}.tag.متوقف{background:#3d3416;color:#f5cf6b}
-  h2{font-size:15px;margin:0 0 10px;color:var(--mute)} .flash{animation:fl 1.2s} @keyframes fl{from{background:#2a3d66}}
+  h2{font-size:calc(15px*var(--fs-titles));margin:0 0 10px;color:var(--mute)} .flash{animation:fl 1.2s} @keyframes fl{from{background:#2a3d66}}
   /* لوحة المساعد */
   .agent{position:sticky;top:18px;display:flex;flex-direction:column;gap:10px;height:calc(100vh - 110px)}
   .mic{width:84px;height:84px;border-radius:50%;border:none;background:var(--acc);color:#fff;font-size:34px;cursor:pointer;align-self:center;transition:.2s;box-shadow:0 0 0 0 #4f8cff66}
   .mic.on{background:var(--bad)} #status{text-align:center;color:var(--mute);font-size:13px}
   #log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
-  .m{padding:8px 12px;border-radius:10px;font-size:14px;line-height:1.6;max-width:92%}
+  .m{padding:8px 12px;border-radius:10px;font-size:calc(14px*var(--fs-chat));line-height:1.6;max-width:92%}
   .m.u{background:#22304d;align-self:flex-start}.m.a{background:#1d2a22;align-self:flex-end}
   .m.t{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:12px;font-family:monospace;unicode-bidi:plaintext;text-align:start;align-self:stretch;word-break:break-word;max-width:100%}
   form{display:flex;gap:6px} input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit}
@@ -41,7 +42,17 @@
   .vsel{display:flex;gap:6px;align-items:center;justify-content:center}
   .vsel select{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
   .vsel button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit;font-size:13px}
+  /* أنماط الجداول (نورة تبدّل بينها) */
+  body.tbl-striped tbody tr:nth-child(even) td, body.tbl-striped table tr:nth-child(even) td{background:color-mix(in srgb,var(--acc) 7%,transparent)}
+  body.tbl-compact th, body.tbl-compact td{padding:4px 6px}
+  body.tbl-bordered table{border:1px solid var(--line)} body.tbl-bordered th, body.tbl-bordered td{border:1px solid var(--line)}
+  body.tbl-glass table{background:color-mix(in srgb,var(--acc) 5%,transparent);border-radius:var(--radius);overflow:hidden}
+  body.tbl-glass th{background:color-mix(in srgb,var(--acc) 18%,transparent);color:var(--ink)}
+  body.tbl-cards table{border-collapse:separate;border-spacing:0 8px} body.tbl-cards td{background:color-mix(in srgb,var(--ink) 5%,transparent);border:none}
+  body.tbl-cards td:first-child{border-radius:0 10px 10px 0} body.tbl-cards td:last-child{border-radius:10px 0 0 10px} body.tbl-cards th{border:none}
+  .ui-flash{animation:uiflash 1s ease-out} @keyframes uiflash{0%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 0 transparent}}
 </style>
+<style id="nora-css"></style>
 </head>
 <body>
 <header><h1>📊 لوحة مشاريع التحول الرقمي</h1><span style="color:var(--mute);font-size:13px">نورة · Gemini Live · تجربة</span></header>
@@ -52,6 +63,7 @@
     <div class="card" style="margin-bottom:16px"><h2>المشاريع</h2><table id="projects"></table></div>
     <div class="card" style="margin-bottom:16px"><h2>التذاكر</h2><table id="tickets"></table></div>
     <div class="card docs"><h2>📁 الملفات المرفوعة (اسحب ملف هنا أو اضغط 📎)</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
+    <div class="card docs" style="margin-top:16px"><h2>🛠️ طلبات التطوير (نورة تسجّلها لفريق التطوير)</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
   </section>
   <aside class="card agent">
     <div class="nora"><b>✦ نورة</b><span>المساعدة الذكية</span></div>
@@ -66,6 +78,7 @@
 <script type="module">
 import { GeminiLiveAgent } from './gemini-live-agent.js';
 import { createHUD } from './hud.js';
+import { createUIControl } from './ui-control.js';
 const $ = s => document.querySelector(s);
 const sar = n => new Intl.NumberFormat('ar-SA').format(n);
 let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
@@ -74,7 +87,7 @@ const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...
 
 // بوابة رمز الدخول
 async function gate() {
-  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; return loadDashboard(); }
+  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; ui.init(); return loadDashboard(); }
   $('#gate').style.display = 'flex';
 }
 $('#gf').onsubmit = async e => {
@@ -96,6 +109,8 @@ async function loadDashboard(flash) {
   $('#tickets').innerHTML = '<tr><th>#</th><th>العنوان</th><th>المشروع</th><th>الأولوية</th><th>الحالة</th></tr>' +
     d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td>${t.id}</td><td>${t.title}</td><td>${t.project_name}</td>
       <td><span class="tag ${t.priority}">${t.priority}</span></td><td><span class="tag ${t.status}">${t.status}</span></td></tr>`).join('');
+  if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
+    `<li><span>#${r.id} ${r.title}</span><small>${r.status} · ${r.created_at.slice(0, 16)}</small></li>`).join('');
   if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
     `<li><span>📄 ${x.name}</span><small>#${x.id} · ${sar(x.chars)} حرف</small></li>`).join('');
 }
@@ -112,17 +127,21 @@ function note(text) { $('#log').append(Object.assign(document.createElement('div
 // HUD: النوافذ المنبثقة (نورة تفتحها بأدوات show_*)
 const hud = createHUD({ api: async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json() });
 window.hud = hud;
+// تحكم نورة بالواجهة (خطوط/ألوان/أحجام/جداول/CSS)
+const apiJson = async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json();
+const ui = createUIControl({ api: apiJson, hud });
+window.ui = ui;
 
 const agent = new GeminiLiveAgent({
   headers: H,
-  clientTools: hud.tools,
+  clientTools: { ...hud.tools, ...ui.tools },
   on: {
     status: t => $('#status').textContent = t,
     userText: (t, typed) => { if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { bubble('a', t); cur.u = null; },
     turnComplete: () => { cur = { u: null, a: null }; },
     toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ نورة تعرض: ${fc.args?.title || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
-    toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
   },
