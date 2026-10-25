@@ -62,10 +62,11 @@ export function createAssistant({ api, hud, note = () => {} }) {
     },
     async build_dashboard(args) {
       const r = await api('/api/tools/build_dashboard', args);
-      if (r.ok) { note(`📊 داشبورد جديد #${r.id}: ${args.title}`); return { ...r, ...openUrl(r.url, `داشبورد: ${args.title}`) }; }
+      if (r.ok) { note(`📊 داشبورد جديد #${r.id}: ${args.title}`); if (window.showDash) return { ...r, ...(await window.showDash(r.id, args.title, args.subtitle || '')) }; return { ...r, ...openUrl(r.url, `داشبورد: ${args.title}`) }; }
       return r;
     },
     async open_dashboard({ id }) {
+      if (window.showDash) return window.showDash(id, `داشبورد #${id}`);
       return openUrl(`/d/${id}`, `داشبورد #${id}`);
     },
   };
