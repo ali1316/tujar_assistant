@@ -5,8 +5,13 @@
 const WS_BASE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage';
 
 export class GeminiLiveAgent {
-  constructor({ sessionUrl = '/api/session', toolUrl = n => `/api/tools/${n}`, headers = () => ({}), on = {} } = {}) {
+  constructor({ sessionUrl = '/api/session', toolUrl = n => `/api/tools/${n}`, speakUrl = '/api/speak', headers = () => ({}), on = {} } = {}) {
     this.headers = headers;
+    this.speakUrl = speakUrl;
+    this.mode = 'live';      // 'live' = صوت Live | 'mine' = صوتك المستنسخ (TTS)
+    this.textBuf = '';
+    this.speakChain = Promise.resolve();
+    this.aborts = new Set();
     this.sessionUrl = sessionUrl;
     this.toolUrl = toolUrl;
     this.on = on; // status, userText, modelText, toolCall, toolResult, turnComplete, error, level
@@ -16,7 +21,8 @@ export class GeminiLiveAgent {
 
   emit(ev, ...a) { try { this.on[ev]?.(...a); } catch (e) { console.error(e); } }
 
-  async start({ mic = true } = {}) {
+  async start({ mic = true, mode = this.mode } = {}) {
+    this.mode = mode;
     this.emit('status', 'جاري الاتصال…');
     // نجرب نسخة الـ API الافتراضية، ولو فشل الإعداد نجرب الثانية تلقائياً
     try { await this.#connect(); }
@@ -29,7 +35,8 @@ export class GeminiLiveAgent {
   }
 
   async #connect(version) {
-    const r = await fetch(this.sessionUrl + (version ? `?v=${version}` : ''), { headers: this.headers() });
+    const q = new URLSearchParams({ mode: this.mode, ...(version ? { v: version } : {}) });
+    const r = await fetch(`${this.sessionUrl}?${q}`, { headers: this.headers() });
     const s = await r.json();
     if (!r.ok) throw new Error(s.error || 'session error');
     const url = `${WS_BASE}.${s.apiVersion}.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(s.token)}`;
@@ -51,6 +58,7 @@ export class GeminiLiveAgent {
       ws.onerror = () => { if (!ready) reject(new Error('websocket error')); };
       ws.onclose = ev => {
         if (!ready) return reject(new Error(`closed before setup: ${ev.code} ${ev.reason}`));
+        if (this.ws !== ws) return; // اتصال قديم انقفل بعد ما بدينا جديد
         this.emit('status', `انقطع الاتصال (${ev.code}) ${ev.reason || ''}`);
         this.#stopMic();
       };
@@ -68,8 +76,13 @@ export class GeminiLiveAgent {
       if (sc.interrupted) this.#stopPlayback(); // المستخدم قاطع الموديل
       for (const part of sc.modelTurn?.parts || []) {
         if (part.inlineData?.data) this.#play(part.inlineData.data);
+        if (part.text && this.mode === 'mine' && !part.thought) { this.emit('modelText', part.text); this.#queueText(part.text); }
       }
-      if (sc.inputTranscription?.text) this.emit('userText', sc.inputTranscription.text, false);
+      if (sc.turnComplete && this.mode === 'mine') this.#queueText('', true);
+      if (sc.inputTranscription?.text) {
+        if (this.mode === 'mine' && this.sources.size) this.#stopPlayback(); // قاطعته وهو يتكلم بصوتك
+        this.emit('userText', sc.inputTranscription.text, false);
+      }
       if (sc.outputTranscription?.text) this.emit('modelText', sc.outputTranscription.text);
       if (sc.turnComplete) this.emit('turnComplete');
     }
@@ -93,9 +106,10 @@ export class GeminiLiveAgent {
   }
 
   // ===== تشغيل صوت الموديل (PCM 24kHz) =====
-  #play(b64) {
-    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    const pcm = new Int16Array(bytes.buffer);
+  #play(b64) { this.#playBytes(Uint8Array.from(atob(b64), c => c.charCodeAt(0))); }
+  #playBytes(bytes) {
+    if (!bytes.length) return;
+    const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.length >> 1);
     const buf = this.playCtx.createBuffer(1, pcm.length, 24000);
     const ch = buf.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
@@ -108,7 +122,44 @@ export class GeminiLiveAgent {
     this.sources.add(src);
     src.onended = () => this.sources.delete(src);
   }
+  // ===== وضع «صوتي»: نجمع النص لجمل ونحوّل كل جملة لصوتك بالترتيب =====
+  #queueText(t, flush = false) {
+    this.textBuf += t;
+    const parts = [];
+    let m;
+    const re = /^([\s\S]{25,}?[.!؟?،:\n])\s*/;      // جملة لا تقل عن 25 حرف
+    while ((m = this.textBuf.match(re))) { parts.push(m[1]); this.textBuf = this.textBuf.slice(m[0].length); }
+    if (flush && this.textBuf.trim()) { parts.push(this.textBuf); this.textBuf = ''; }
+    const gen = this.gen || 0;
+    for (const p of parts) this.speakChain = this.speakChain.then(() => gen === (this.gen || 0) && this.#speak(p.trim()));
+  }
+  async #speak(text) {
+    if (!text) return;
+    const ac = new AbortController(); this.aborts.add(ac);
+    try {
+      const r = await fetch(this.speakUrl, {
+        method: 'POST', signal: ac.signal,
+        headers: { 'Content-Type': 'application/json', ...this.headers() }, body: JSON.stringify({ text }),
+      });
+      if (!r.ok) { this.emit('error', await r.text()); return; }
+      const reader = r.body.getReader();
+      let carry = new Uint8Array(0);
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const all = new Uint8Array(carry.length + value.length); all.set(carry); all.set(value, carry.length);
+        const even = all.length & ~1;
+        this.#playBytes(all.slice(0, even));
+        carry = all.slice(even);
+      }
+    } catch (e) { if (e.name !== 'AbortError') this.emit('error', e.message); }
+    finally { this.aborts.delete(ac); }
+  }
+
   #stopPlayback() {
+    this.gen = (this.gen || 0) + 1;
+    this.aborts.forEach(a => a.abort()); this.aborts.clear();
+    this.textBuf = ''; this.speakChain = Promise.resolve();
     this.sources.forEach(s => { try { s.stop(); } catch {} });
     this.sources.clear();
     this.playQueueEnd = 0;
