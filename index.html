@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة المشاريع + مساعد صوتي</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0f1420;--card:#171e2e;--line:#253049;--ink:#e8edf7;--mute:#8a96b0;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  h1{font-size:20px;margin:0} main{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px 24px}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .kpi,.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .kpi b{display:block;font-size:22px;margin-top:4px} .kpi span{color:var(--mute);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:14px} th,td{padding:8px;border-bottom:1px solid var(--line);text-align:right} th{color:var(--mute);font-weight:600}
+  .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+  .tag{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}
+  .tag.متأخر,.tag.عالية{background:#4a1f22;color:#ff9a9d}.tag.مكتمل,.tag.مغلقة{background:#163d2a;color:#7be3a8}.tag.متوقف{background:#3d3416;color:#f5cf6b}
+  h2{font-size:15px;margin:0 0 10px;color:var(--mute)} .flash{animation:fl 1.2s} @keyframes fl{from{background:#2a3d66}}
+  /* لوحة المساعد */
+  .agent{position:sticky;top:18px;display:flex;flex-direction:column;gap:10px;height:calc(100vh - 110px)}
+  .mic{width:84px;height:84px;border-radius:50%;border:none;background:var(--acc);color:#fff;font-size:34px;cursor:pointer;align-self:center;transition:.2s;box-shadow:0 0 0 0 #4f8cff66}
+  .mic.on{background:var(--bad)} #status{text-align:center;color:var(--mute);font-size:13px}
+  #log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+  .m{padding:8px 12px;border-radius:10px;font-size:14px;line-height:1.6;max-width:92%}
+  .m.u{background:#22304d;align-self:flex-start}.m.a{background:#1d2a22;align-self:flex-end}
+  .m.t{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:12px;font-family:monospace;unicode-bidi:plaintext;text-align:start;align-self:stretch;word-break:break-word;max-width:100%}
+  form{display:flex;gap:6px} input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit}
+  form button{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:0 12px;cursor:pointer}
+  .docs li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .docs ul{list-style:none;margin:0;padding:0} .docs small{color:var(--mute)}
+  .attach{background:var(--line);color:var(--ink);border:none;border-radius:8px;padding:0 10px;cursor:pointer;font-size:18px}
+  .drop{outline:2px dashed var(--acc);outline-offset:-6px}
+  #gate{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:9}
+  #gate form{flex-direction:column;width:300px} #gate input{padding:12px} #gate button{padding:10px}
+</style>
+</head>
+<body>
+<header><h1>📊 لوحة مشاريع التحول الرقمي</h1><span style="color:var(--mute);font-size:13px">Gemini Live · تجربة</span></header>
+<div id="gate"><form id="gf"><h2 style="text-align:center">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
+<main>
+  <section>
+    <div class="kpis" id="kpis"></div>
+    <div class="card" style="margin-bottom:16px"><h2>المشاريع</h2><table id="projects"></table></div>
+    <div class="card" style="margin-bottom:16px"><h2>التذاكر</h2><table id="tickets"></table></div>
+    <div class="card docs"><h2>📁 الملفات المرفوعة (اسحب ملف هنا أو اضغط 📎)</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
+  </section>
+  <aside class="card agent">
+    <button class="mic" id="mic" title="ابدأ المحادثة">🎙️</button>
+    <div id="status">اضغط المايك وتكلّم — مثلاً: «وش وضع المشاريع المتأخرة؟»</div>
+    <div id="log"></div>
+    <form id="f"><button type="button" class="attach" id="attach" title="إرفاق ملف">📎</button><input id="txt" placeholder="أو اكتب سؤالك…"><button>إرسال</button></form>
+    <input type="file" id="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
+  </aside>
+</main>
+<script type="module">
+import { GeminiLiveAgent } from './gemini-live-agent.js';
+const $ = s => document.querySelector(s);
+const sar = n => new Intl.NumberFormat('ar-SA').format(n);
+let CODE = ''; try { CODE = localStorage.getItem('accessCode') || ''; } catch {}
+const H = () => ({ 'x-access-code': CODE });
+const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...H() } });
+
+// بوابة رمز الدخول
+async function gate() {
+  if ((await api('/api/ping')).ok) { $('#gate').style.display = 'none'; return loadDashboard(); }
+  $('#gate').style.display = 'flex';
+}
+$('#gf').onsubmit = async e => {
+  e.preventDefault(); CODE = $('#code').value.trim();
+  if ((await api('/api/ping')).ok) { try { localStorage.setItem('accessCode', CODE); } catch {} gate(); }
+  else $('#gerr').textContent = 'الرمز غلط';
+};
+
+async function loadDashboard(flash) {
+  const d = await (await api('/api/dashboard')).json();
+  const s = d.summary;
+  $('#kpis').innerHTML = [
+    ['المشاريع', d.projects.length], ['الميزانية (ر.س)', sar(s.total_budget)],
+    ['المصروف (ر.س)', sar(s.total_spent)], ['تذاكر مفتوحة', s.open_tickets],
+  ].map(([k, v]) => `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('#projects').innerHTML = '<tr><th>#</th><th>المشروع</th><th>الإدارة</th><th>الحالة</th><th>الإنجاز</th><th>المسؤول</th></tr>' +
+    d.projects.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.department}</td><td><span class="tag ${p.status}">${p.status}</span></td>
+      <td><div class="bar"><i style="width:${p.progress}%"></i></div></td><td>${p.owner}</td></tr>`).join('');
+  $('#tickets').innerHTML = '<tr><th>#</th><th>العنوان</th><th>المشروع</th><th>الأولوية</th><th>الحالة</th></tr>' +
+    d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td>${t.id}</td><td>${t.title}</td><td>${t.project_name}</td>
+      <td><span class="tag ${t.priority}">${t.priority}</span></td><td><span class="tag ${t.status}">${t.status}</span></td></tr>`).join('');
+  if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
+    `<li><span>📄 ${x.name}</span><small>#${x.id} · ${sar(x.chars)} حرف</small></li>`).join('');
+}
+gate();
+
+// فقاعات المحادثة: نجمع أجزاء الترانسكربت في نفس الفقاعة لين ينتهي الدور
+let cur = { u: null, a: null };
+function bubble(kind, text, append = true) {
+  if (!append || !cur[kind]) { cur[kind] = Object.assign(document.createElement('div'), { className: 'm ' + kind }); $('#log').append(cur[kind]); }
+  cur[kind].textContent += text; $('#log').scrollTop = 1e9;
+}
+function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; }
+
+const agent = new GeminiLiveAgent({
+  headers: H,
+  on: {
+    status: t => $('#status').textContent = t,
+    userText: (t, typed) => { if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
+    modelText: t => { bubble('a', t); cur.u = null; },
+    turnComplete: () => { cur = { u: null, a: null }; },
+    toolCall: fc => note(`🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
+    toolResult: (fc, r) => { note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    error: e => note('❌ ' + JSON.stringify(e)),
+    level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 40)}px #e5484d33`,
+  },
+});
+
+let running = false;
+$('#mic').onclick = async () => {
+  if (running) { agent.stop(); running = false; $('#mic').classList.remove('on'); return; }
+  try { await agent.start(); running = true; $('#mic').classList.add('on'); }
+  catch (e) { $('#status').textContent = '❌ ' + e.message; }
+};
+$('#f').onsubmit = async e => {
+  e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
+  if (!running) { try { await agent.start({ mic: false }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
+  agent.sendText(t); $('#txt').value = '';
+};
+
+// ===== رفع الملفات =====
+async function uploadFile(file) {
+  note(`⏫ جاري رفع ${file.name}…`);
+  const fd = new FormData(); fd.append('file', file);
+  const r = await api('/api/upload', { method: 'POST', body: fd });
+  const d = await r.json();
+  if (!r.ok) return note('❌ ' + d.error);
+  note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
+  loadDashboard();
+  // نعلم المساعد إن فيه ملف جديد عشان يقدر يسأل عنه مباشرة
+  if (agent.connected) agent.sendText(`[تنبيه النظام] رفع المستخدم ملف جديد اسمه "${d.name}" ورقمه ${d.id} وطوله ${d.chars} حرف.`, { silent: true });
+}
+$('#attach').onclick = () => $('#file').click();
+$('#file').onchange = e => { [...e.target.files].forEach(uploadFile); e.target.value = ''; };
+document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drop'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drop'); });
+document.addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('drop'); [...e.dataTransfer.files].forEach(uploadFile); });
+</script>
+</body>
+</html>
