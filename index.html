@@ -186,9 +186,11 @@ gate();
 
 // فقاعات المحادثة: نجمع أجزاء الترانسكربت في نفس الفقاعة لين ينتهي الدور
 let cur = { u: null, a: null };
+// وسوم المشاعر حق ElevenLabs مثل [happy] تنشال من النص المكتوب (الصوت يستخدمها)
+const TAGS = /\[[a-z_ ]{2,24}\]\s*/gi;
 function bubble(kind, text, append = true) {
   if (!append || !cur[kind]) { cur[kind] = Object.assign(document.createElement('div'), { className: 'm ' + kind }); $('#log').append(cur[kind]); }
-  cur[kind].textContent += text; $('#log').scrollTop = 1e9;
+  cur[kind].textContent = (cur[kind].textContent + text).replace(TAGS, ''); $('#log').scrollTop = 1e9;
   caption(kind, cur[kind].textContent);
 }
 // الشريط يعرض آخر سطر فقط (سؤالك + رد نورة)، والسجل الكامل ينفتح بزر «السجل»
@@ -244,7 +246,7 @@ function guardTurn(nora) {
 function takeTurns() {
   const t = [];
   if (pend.u.trim()) t.push({ role: 'user', text: pend.u.trim() });
-  if (pend.a.trim()) t.push({ role: 'nora', text: pend.a.trim() });
+  if (pend.a.trim()) t.push({ role: 'nora', text: pend.a.replace(TAGS, '').trim() });
   pend = { u: '', a: '' }; return t;
 }
 function saveTurns() {
