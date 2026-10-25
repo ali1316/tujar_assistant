@@ -64,6 +64,10 @@ export function createUIControl({ api, hud, onChange = () => {} }) {
     for (const [k, v] of Object.entries(s.colors || {})) if (hex(v)) root.style.setProperty(`--${k}`, v);
     for (const [k, v] of Object.entries(s.sizes || {})) if (TARGETS[k]) root.style.setProperty(TARGETS[k], v);
     root.style.setProperty('--radius', `${s.radius ?? 12}px`);
+    if (s.numFont) await loadFont(s.numFont);
+    root.style.setProperty('--num-font', s.numFont ? `'${s.numFont}'` : 'var(--font)');
+    const nums = s.numerals === 'latin' ? 'latin' : 'arabic';
+    if (window.NORA_NUMERALS !== nums) { window.NORA_NUMERALS = nums; document.dispatchEvent(new Event('nora:numerals')); }
     document.body.style.zoom = s.zoom && s.zoom !== 1 ? s.zoom : '';
     document.body.className = document.body.className.replace(/\btbl-\w+/g, '').trim();
     if (s.table && s.table !== 'default') document.body.classList.add(`tbl-${s.table}`);
@@ -148,6 +152,18 @@ export function createUIControl({ api, hud, onChange = () => {} }) {
       await commit({ font: 'IBM Plex Sans Arabic', colors: { ...THEMES['ليلي أزرق'] }, sizes: {}, zoom: 1, table: 'default', radius: 12, css: [] });
       return { ok: true, message: 'رجعت الواجهة للشكل الأصلي' };
     },
+    async set_number_style({ digits, font }) {
+      const change = {};
+      if (digits) change.numerals = digits === 'latin' ? 'latin' : 'arabic';
+      if (font) {
+        const name = Object.keys(FONTS).find(f => f.toLowerCase() === String(font).toLowerCase());
+        if (!name) return { error: 'الخط غير متوفر', available: Object.keys(FONTS) };
+        change.numFont = name;
+      }
+      if (!Object.keys(change).length) return { error: 'حددي digits أو font' };
+      await commit(change);
+      return { ok: true, digits: state.numerals || 'arabic', numbers_font: state.numFont || state.font };
+    },
     async get_ui_state() { return describe(); },
   };
 
@@ -156,6 +172,7 @@ export function createUIControl({ api, hud, onChange = () => {} }) {
       font: state.font, table: TABLE_STYLES[state.table], zoom: state.zoom, radius: state.radius,
       colors: state.colors, sizes: Object.fromEntries(Object.entries(state.sizes || {}).map(([k, v]) => [TARGET_AR[k], v])),
       custom_css: (state.css || []).map(c => c.description),
+      numbers: { digits: state.numerals || 'arabic', font: state.numFont || state.font },
     };
   }
 
