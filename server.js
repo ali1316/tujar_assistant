@@ -10,6 +10,7 @@ import { memoryTools, memoryBlock, initMemory, listForUI } from './memory.js';
 import { dashboardTools, dashGet, dashList } from './dashboards.js';
 import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
+import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
 const PORT = process.env.PORT || 3000;
@@ -145,6 +146,8 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
 - الشاشة الرئيسية: فواز يشوف صفحة «📊 لوحة مشاريع التحول الرقمي» وأنتِ لوحة جانبية داخلها. فيها: 4 بطاقات أرقام (المشاريع، الميزانية، المصروف، التذاكر المفتوحة)،
   جدول المشاريع، جدول التذاكر، الملفات المرفوعة، داشبوردات نورة، ذاكرة نورة، طلبات التطوير.
   * "الداشبورد" أو "اللوحة" أو "الشاشة" أو "لوحة المشاريع" أو "هذي الصفحة" بدون رقم = هذي الشاشة الرئيسية، مو الداشبوردات المولّدة (list_dashboards للمولّدة فقط).
+  * لما يرفع ملف، النظام يبني «لوحة الملف» تلقائياً ويعرضها داخل الشاشة الرئيسية، ويوصلك تنبيه برقمها. أسئلته بعدها عن «اللوحة» أو «الأرقام» أو «الملف» = عن هذي اللوحة وملفها:
+    جاوبي من الملف بـ search_documents/read_document، ولو طلب تعديل عليها (رسم إضافي، تقسيم مختلف) ابني نسخة جديدة بـ build_dashboard وتنعرض مكانها.
   * أنتِ تشوفينها: لا تقولين أبداً "ما أشوف الشاشة". نادي look_at_screen وجاوبي مما فيها، ووصفها المختصر موجود تحت.
   * أي طلب تعديل على شكلها (خط، أرقام، ألوان، أحجام، جداول) نفّذيه عليها مباشرة بأدوات الواجهة. الأرقام → set_number_style.
 - أنتِ الواجهة اللي تدير الشركة: تقدرين تعدّلين شكل اللوحة نفسها فوراً:
@@ -207,10 +210,12 @@ async function screenBlock() {
     const ui = (await kvGet('ui')) || {};
     const dashes = await dashList();
     const docs = db.prepare('SELECT id, name, chars FROM documents ORDER BY id DESC LIMIT 1').all();
+    const cur = (await getCurrentDash()) || {};
     return `\n\n## الشاشة الرئيسية الحين (لوحة مشاريع التحول الرقمي)
 - البطاقات: ${projects.length} مشاريع، الميزانية ${s.total_budget} ريال، المصروف ${s.total_spent} ريال، ${s.open_tickets} تذاكر مفتوحة (${s.high_priority_open} عالية).
 - المشاريع: ${projects.map(p => `#${p.id} ${p.name} (${p.status}، ${p.progress}%)`).join('، ')}.
 - شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
+- لوحة معروضة الحين داخل الشاشة الرئيسية (فوق البطاقات): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.
 - آخر ملف مرفوع: ${docs.length ? `#${docs[0].id} «${docs[0].name}» (${docs[0].chars} حرف)` : 'لا يوجد'}.
 - داشبوردات مولّدة محفوظة: ${dashes.length ? dashes.slice(0, 10).map(d => `#${d.id} ${d.title}`).join('، ') : 'لا يوجد'}.`;
   } catch (e) { return ''; }
@@ -359,6 +364,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
+
+// لوحة الملف: تتولد تلقائياً بعد الرفع وتظهر داخل الشاشة الرئيسية
+app.post('/api/docs/:id/dashboard', async (req, res) => {
+  try { const r = await dashboardFromDocument(+req.params.id); res.status(r.ok ? 200 : 400).json(r); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/current-dash', async (req, res) => res.json((await getCurrentDash()) || {}));
+app.post('/api/current-dash', async (req, res) => { await setCurrentDash(req.body?.id ? req.body : {}); res.json({ ok: true }); });
 
 // 4) بيانات اللوحة
 app.get('/api/dashboard', async (req, res) => {
