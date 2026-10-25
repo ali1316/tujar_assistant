@@ -307,10 +307,22 @@ export function createHUD({ api }) {
   }
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+  // زر فتح كبير (لما المتصفح يمنع فتح النافذة تلقائياً)
+  function showLink(url, label = '') {
+    const el = panel('LAUNCH · READY', 'جاهز للفتح', label);
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = '🚀 افتح الحين';
+    a.style.cssText = 'display:block;text-align:center;padding:18px;margin-top:6px;border:1px solid var(--c);border-radius:6px;color:#fff;font-size:20px;font-weight:700;text-decoration:none;background:rgba(62,230,255,.12);box-shadow:0 0 24px rgba(62,230,255,.3)';
+    a.onclick = () => setTimeout(() => close(el), 300);
+    el.querySelector('.body').append(a);
+    return { shown: true };
+  }
+
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 
   return {
-    showProject, showChart, showOverview, showVisual, showFontGallery, closeAll,
+    showProject, showChart, showOverview, showVisual, showFontGallery, showLink, closeAll,
     // جاهزة كـ clientTools للوكيل
     tools: { show_project_visual: showProject, show_chart: showChart, show_overview: showOverview, render_visual: showVisual, close_visuals: closeAll },
   };
