@@ -50,14 +50,18 @@ export function saveDocument(name, type, size, text) {
   if (!text) throw new Error('ما لقيت نص داخل الملف (لو PDF مصوّر يحتاج OCR)');
   const id = db.prepare('INSERT INTO documents (name, type, size, chars, content) VALUES (?,?,?,?,?)')
     .run(name, type, size, text.length, text).lastInsertRowid;
+  indexDocument(id, text);
+  return { id, name, chars: text.length };
+}
+export function indexDocument(id, text) {
   const ins = db.prepare('INSERT INTO doc_chunks (norm, doc_id, idx, content) VALUES (?,?,?,?)');
   db.transaction(() => {
+    db.prepare('DELETE FROM doc_chunks WHERE doc_id=?').run(id);
     for (let i = 0, k = 0; i < text.length; i += CHUNK - 200, k++) {
       const c = text.slice(i, i + CHUNK);
       ins.run(normalize(c), id, k, c);
     }
   })();
-  return { id, name, chars: text.length };
 }
 
 // ===== أدوات الملفات للموديل =====
