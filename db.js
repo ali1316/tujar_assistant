@@ -47,6 +47,13 @@ if (db.prepare('SELECT COUNT(*) c FROM projects').get().c === 0) {
   ].forEach(r => t.run(...r));
 }
 
+// ترقية: تاريخ بداية لكل مشروع (للجانت) — آمنة لو انعادت
+if (!db.prepare('PRAGMA table_info(projects)').all().some(c => c.name === 'start_date')) {
+  db.exec('ALTER TABLE projects ADD COLUMN start_date TEXT');
+  const upd = db.prepare('UPDATE projects SET start_date=? WHERE id=?');
+  [['2026-03-01', 1], ['2026-02-15', 2], ['2026-01-10', 3], ['2026-06-01', 4], ['2026-05-15', 5]].forEach(([d, id]) => upd.run(d, id));
+}
+
 // ===== الأدوات اللي يقدر الموديل يناديها (Function Calling) =====
 // كل أداة: تعريف (يروح لجيميناي) + تنفيذ (يصير في السيرفر فقط، المتصفح ما يلمس الداتابيس)
 export const tools = {
