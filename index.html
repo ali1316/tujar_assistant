@@ -290,7 +290,7 @@ function guardTurn(nora) {
   }
   // قالت أرقام أو بيانات والشاشة ما تعرض شي عنها → تعرضها الحين (الشاشة لازم تطابق الكلام)
   const NUM = /[0-9٠-٩]|واحد|اثنين|ثلاث|أربع|خمس|ست|سبع|ثمان|تسع|عشر|عش\b|مية|مئة|ألف|بالمية/;
-  const VISUAL = ['data_chart', 'query_data', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard'];
+  const VISUAL = ['data_chart', 'query_data', 'find_knowledge', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard'];
   if (NUM.test(nora) && !turnTools.some(t => VISUAL.includes(t)) && !nudged && agent.connected) {
     nudged = true;
     agent.sendText('[تنبيه النظام] قلتي أرقام والشاشة ما تعرضها. اجلبي الأرقام من الأدوات (مو من الذاكرة) واعرضيها على الشاشة الحين بالأداة المناسبة (data_chart لبيانات الملف، show_chart/show_overview للمشاريع، show_screen للأقسام)، وبعدها أكّدي الرقم بجملة قصيرة.', { silent: true });
@@ -365,6 +365,17 @@ const screenToolsExtra = {
     const [r, c] = await Promise.all([q, apiJson('/api/tools/data_chart', { ...args, title })]);
     if (!c.error) await hud.showVisual({ title: c.title, subtitle: c.subtitle, vega_lite: c.vega_lite, kpis: c.kpis, insights: c.insights });
     return { ...r, shown_on_screen: !c.error };
+  },
+  // مكتبة المعرفة: نعرض ملخص الملف (بأرقامه) على الشاشة مع الجواب — الكلام يطابق الشاشة
+  async find_knowledge(args) {
+    const r = await apiJson('/api/tools/find_knowledge', args);
+    const e = r.results?.[0];
+    if (!e) return r;
+    const lines = String(e.summary || e.purpose || '').split(/؛|\.\s+|\n+/).map(t => t.trim()).filter(t => t.length > 3);
+    const secs = (e.sections || []).map(x => typeof x === 'string' ? x : x.section);
+    if (e.status && !/كاملة/.test(e.status)) lines.push('⚠️ ' + e.status);
+    hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
+    return { ...r, on_screen: lines };
   },
 };
 const screenTools = {
