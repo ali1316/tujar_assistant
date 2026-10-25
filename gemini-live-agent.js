@@ -42,6 +42,7 @@ export class GeminiLiveAgent {
     const r = await fetch(`${this.sessionUrl}?${q}`, { headers: this.headers() });
     const s = await r.json();
     if (!r.ok) throw new Error(s.error || 'session error');
+    this.chatId = s.chatId; // رقم المحادثة في السجل
     const url = `${WS_BASE}.${s.apiVersion}.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(s.token)}`;
 
     this.playCtx ??= new AudioContext({ sampleRate: 24000 });
