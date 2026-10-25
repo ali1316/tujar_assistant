@@ -228,6 +228,11 @@ app.use(express.json({ limit: '1mb' }));
 for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js', 'assistant.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.', headers: { 'Cache-Control': 'no-cache' } })); // دايماً أحدث نسخة بعد كل تحديث
 app.get('/health', (req, res) => res.send('ok'));
+// هوية اتحاد الغرف (الشعار)
+app.get('/brand/:f', (req, res) => {
+  if (!['fsc-logo.svg', 'fsc-logo-dark.svg'].includes(req.params.f)) return res.status(404).end();
+  res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').sendFile(req.params.f, { root: 'brand' });
+});
 app.get('/d/:id', (req, res) => res.sendFile('dash.html', { root: '.', headers: { 'Cache-Control': 'no-cache' } }));
 
 // رمز الدخول لكل /api
