@@ -63,7 +63,7 @@ export async function qualityNote(datasetId) {
 export async function knowledgeCatalog() {
   const list = await kList();
   if (!list.length) return '';
-  return list.map(e => `• ${e.id} «${e.title}» (${e.kind === 'document' ? `مستند، ${e.sections.length} قسم` : `جداول: ${e.dataset_ids.map(i => '#' + i).join('، ')}`})${e.quality_pending.length ? ' ⚠️ فيه حالات معلّقة' : ''}${e.status && !/كاملة/.test(e.status) ? ` — ${e.status}` : ''}`).join('\n');
+  return list.map(e => `• ${e.id} «${e.title}» (${e.kind === 'document' ? `مستند، ${e.sections.length} قسم` : `جداول ${e.dataset_ids.map(i => '#' + i).join('، ')} — الأعمدة: ${e.columns.join('، ')}`})${e.quality_pending.length ? ' ⚠️ فيه حالات معلّقة' : ''}${e.status && !/كاملة/.test(e.status) ? ` — ${e.status}` : ''}`).join('\n');
 }
 
 export const knowledgeTools = {
