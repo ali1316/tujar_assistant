@@ -148,6 +148,7 @@
 import { GeminiLiveAgent } from './gemini-live-agent.js';
 import { ElevenRealtimeAgent } from './eleven-agent.js';
 import { createHUD } from './hud.js';
+import { sayScript } from './speech.js';
 import { createUIControl } from './ui-control.js';
 import { createAssistant } from './assistant.js';
 const $ = s => document.querySelector(s);
@@ -348,6 +349,8 @@ async function loadCurrentDash() {
   try { const c = await apiJson('/api/current-dash'); if (c?.id) showDash(c.id, c.title, c.doc_name ? 'من ملف: ' + c.doc_name : '', false, false); } catch {}
 }
 
+// نص كلام الشارت من الشاشة نفسها: العنوان، أول بطاقة (الإجمالي)، ثم الملاحظات المكتوبة
+const chartScript = c => sayScript(c.title, [c.kpis?.[0] ? `${c.kpis[0].label}: ${c.kpis[0].value}` : '', ...(c.insights || [])], 4);
 // نورة «تشوف» الشاشة: تقرأ اللي قدام فواز الحين من الصفحة نفسها
 // شارت فوري من بيانات الملف: السيرفر يحسب الأرقام، والنافذة تعرضها
 const screenToolsExtra = {
@@ -355,7 +358,7 @@ const screenToolsExtra = {
     const r = await apiJson('/api/tools/data_chart', args);
     if (r.error) return r;
     const shown = await hud.showVisual({ title: r.title, subtitle: r.subtitle, vega_lite: r.vega_lite, kpis: r.kpis, insights: r.insights });
-    return { ...shown, subtitle: r.subtitle, top: r.top, kpis: r.kpis };
+    return { ...shown, subtitle: r.subtitle, top: r.top, kpis: r.kpis, say_script: chartScript(r) };
   },
   // أي حساب مجمّع (حسب عمود) ينعرض على الشاشة تلقائياً — عشان الشاشة تطابق كلامها دايماً
   async query_data(args) {
@@ -365,7 +368,7 @@ const screenToolsExtra = {
     const title = `${AGG[args.agg || (args.measure ? 'sum' : 'count')] || ''} ${args.measure || args.about || 'السجلات'} حسب ${args.group_by}`.trim();
     const [r, c] = await Promise.all([q, apiJson('/api/tools/data_chart', { ...args, title })]);
     if (!c.error) await hud.showVisual({ title: c.title, subtitle: c.subtitle, vega_lite: c.vega_lite, kpis: c.kpis, insights: c.insights });
-    return { ...r, shown_on_screen: !c.error };
+    return { ...r, shown_on_screen: !c.error, ...(c.error ? {} : { say_script: chartScript(c) }) };
   },
   // مكتبة المعرفة: نعرض ملخص الملف (بأرقامه) على الشاشة مع الجواب — الكلام يطابق الشاشة
   async find_knowledge(args) {
@@ -400,7 +403,7 @@ const screenToolsExtra = {
     if (merged.length >= 1) lines.splice(0, lines.length, ...merged);
     if (e.status && !/كاملة/.test(e.status)) lines.push('تنبيه: ' + e.status.replace(/\s+—\s+/g, '، '));
     hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: top?.cite ? 'المصدر ' + top.cite.replace(`${e.title} · `, '') : secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
-    return { ...r, on_screen: lines, on_screen_source: e.title };
+    return { ...r, on_screen: lines, on_screen_source: e.title, say_script: sayScript('', lines.filter(l => !/^تنبيه/.test(l)), 4) + (lines.some(l => /^تنبيه/.test(l)) ? ' والمصدر نسخة جزئية.' : '') };
   },
 };
 const screenTools = {
@@ -597,7 +600,7 @@ const FIXTURES = {
   note2: () => screenToolsExtra.find_knowledge({ question: 'كيف ينبّه الموظف لما يجيه طلب مستعجل؟' }),
 };
 const FIX = new URLSearchParams(location.search).get('fixture');
-if (FIX && FIXTURES[FIX]) Promise.resolve().then(FIXTURES[FIX]).catch(e => console.error('fixture', e)).finally(() => { document.documentElement.dataset.fixture = 'ready'; });
+if (FIX && FIXTURES[FIX]) Promise.resolve().then(FIXTURES[FIX]).then(r => { window.__fxResult = r; }).catch(e => console.error('fixture', e)).finally(() => { document.documentElement.dataset.fixture = 'ready'; });
 </script>
 </body>
 </html>
