@@ -35,6 +35,9 @@ export function unstackRepeated(t) {
   return { ...t, columns };
 }
 
+// صف إجمالي: الكلمة في أول خلية نصية متبوعة بفراغ أو نهاية (\b في JS لا يعرف الحروف العربية)
+export const TOTAL_RE = /^(ال)?(إجمالي|اجمالي|المجموع|مجموع|الكلي|total)(?![\p{L}\p{N}])/iu;
+
 // أرقام طبقة النص لكل صفحة (للتحقق: هل الرقم مطبوع حرفياً في الصفحة؟)
 function textLayerKeys(analysis) {
   const m = new Map();
@@ -84,7 +87,7 @@ export function organize({ vid, analysis, pages }) {
     t.pages = [...new Set(t.parts.map(p => p.page))];
     t.ragged_rows = t.rows.filter(r => r.length !== t.columns.length).length;
     // صفوف الإجمالي: علامة المحرك + كلمة صريحة في أول خلية نصية
-    t.row_kinds = t.rows.map((r, i) => (/^(ال)?(إجمالي|اجمالي|المجموع|مجموع|الكلي|total)\b/i.test(String(r.find(c => /\p{L}/u.test(c)) || '').trim()) ? 'total' : t.row_kinds[i] || 'detail'));
+    t.row_kinds = t.rows.map((r, i) => (TOTAL_RE.test(String(r.find(c => /\p{L}/u.test(c)) || '').trim()) ? 'total' : t.row_kinds[i] || 'detail'));
     t.numeric = t.columns.map((_, j) => isNumericCol(t.rows.filter((_, i) => t.row_kinds[i] === 'detail'), j));
   }
 
