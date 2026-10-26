@@ -9,6 +9,7 @@ const isNumericCol = (rows, j) => {
   const nums = vals.filter(v => { const p = parseValue(v); return ['number', 'percent', 'zero'].includes(p.kind) || ['dash', 'missing', 'not_applicable'].includes(p.kind); });
   return nums.length / vals.length >= 0.8 && vals.some(v => ['number', 'percent', 'zero'].includes(parseValue(v).kind));
 };
+const baseTitle = x => normCol(x).replace(/[(（\[]?\s*(تتمة|تابع|تكملة|continued|cont\.?)\s*[)）\]]?/gi, '').replace(/[:：\-–—]+$/, '').trim();
 const sameCols = (a, b) => a.columns.length === b.columns.length && (a.columns.every((c, i) => c.name.trim() === b.columns[i].name.trim()) || b.continues_from_previous);
 
 // جدول بلوحتين (أو أكثر) جنباً إلى جنب بنفس الأعمدة: نفكّه إلى صفوف بدل أن تطغى أعمدة على أخرى بنفس الاسم
@@ -67,7 +68,10 @@ export function organize({ vid, analysis, pages }) {
       const prev = logical.at(-1);
       const firstOnPage = idx === 0;
       const lastPart = prev?.parts.at(-1);
-      const join = prev && firstOnPage && lastPart.page === pg.page - 1 && (lastPart.continues_on_next || t.continues_from_previous) && sameCols(prev, t);
+      // ضم عبر صفحتين متتاليتين، أو داخل نفس الصفحة لو المحرك قسم الجدول نفسه (لوحتين/«تتمة») — حصل فعلاً في تقرير تجار ص6
+      const crossPage = firstOnPage && lastPart?.page === pg.page - 1 && (lastPart.continues_on_next || t.continues_from_previous);
+      const samePage = lastPart?.page === pg.page && (t.continues_from_previous || lastPart.continues_on_next || (baseTitle(t.title) && baseTitle(t.title) === baseTitle(prev.title)));
+      const join = prev && (crossPage || samePage) && sameCols(prev, t);
       const part = { page: pg.page, printed_page: pg.printed_page_number || null, row_from: join ? prev.rows.length : 0, row_count: t.rows.length, bbox: t.bbox, continues_on_next: t.continues_on_next, title_on_page: t.title };
       if (join) {
         // صف العناوين المكرر في الجزء الثاني لا يُضاف كبيانات
@@ -75,7 +79,7 @@ export function organize({ vid, analysis, pages }) {
         part.row_count = rows.length;
         prev.rows.push(...rows); prev.row_kinds.push(...(t.row_kinds.length === t.rows.length ? t.row_kinds.slice(t.rows.length - rows.length) : rows.map(() => 'detail')));
         prev.notes.push(...t.notes); prev.parts.push(part);
-        lineage.push({ id: `${prev.id}:stitch:${pg.page}`, kind: 'stitch', output: prev.id, inputs: prev.parts.map(p => `p${p.page}`), method: 'ضم جزء جدول ممتد عبر الصفحات (نفس الأعمدة + علامة الاستمرار)' });
+        lineage.push({ id: `${prev.id}:stitch:${pg.page}`, kind: 'stitch', output: prev.id, inputs: prev.parts.map(p => `p${p.page}`), method: samePage ? 'ضم جزأين من نفس الجدول في نفس الصفحة (نفس الأعمدة + «تتمة»/علامة استمرار/نفس العنوان)' : 'ضم جزء جدول ممتد عبر الصفحات (نفس الأعمدة + علامة الاستمرار)' });
       } else {
         const id = tableId(vid, logical.length + 1);
         logical.push({ id, title: t.title, caption: t.caption, units: t.units, notes: [...t.notes], header_rows: t.header_rows, columns: t.columns, rows: [...t.rows],
