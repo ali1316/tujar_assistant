@@ -69,7 +69,7 @@
   .tabulator .tabulator-footer .tabulator-page{background:#0b1d31;color:var(--ink);border-color:var(--line)}
   .num{font-family:var(--num),var(--font),sans-serif;font-variant-numeric:tabular-nums}
   /* التذييل */
-  .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--dim);font-size:12px;padding:14px 0 0;margin-top:18px;border-top:1px solid var(--line)}
+  .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--mute);font-size:12px;padding:14px 0 0;margin-top:18px;border-top:1px solid var(--line)}
   .embed .top .back{display:none}
   .embed body{min-height:0} .embed .top{display:none}
   @media (prefers-reduced-motion:reduce){.panel{animation:none}}
@@ -268,6 +268,7 @@ function countUp(el, to, unit) {
     const p = panel(used === 0 ? 'full' : used === 1 ? 'span2' : '', 'ملخص نورة');
     p.classList.add('summary');
     p.insertAdjacentHTML('beforeend', `<ul>${spec.insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`);
+    p.dataset.say = 'ملخص نورة: ' + spec.insights.slice(0, 2).join(' ');
   }
 
   // وش نسوي بعدها: إجراءات مرتبة من الأكبر أثراً
