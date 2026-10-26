@@ -164,13 +164,14 @@ export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true 
 }
 // ثقة الاسترجاع: لو أقرب مقطع ما يغطي كلمات السؤال ومعناه بعيد، نقول «مو موجود في الملفات» بدل التخمين
 // العتبات تُعايَر بأسئلة الفخ في eval/retrieval-cases.ar.json (trap: true) — ويمكن تغييرها من البيئة
-export const MIN_COV = +(process.env.RAG_MIN_COV ?? 0.5), MIN_COS = +(process.env.RAG_MIN_COS ?? 0.7);
+// مُعايرة على الإنتاج (26 أكتوبر 2026، 36 سؤال حقيقي + 8 فخ): 0.65/0.65 يمتنع في 8 من 8 فخاخ ويخطئ في 1 من 36 سؤال حقيقي
+export const MIN_COV = +(process.env.RAG_MIN_COV ?? 0.65), MIN_COS = +(process.env.RAG_MIN_COS ?? 0.65);
 export function confidence(hits) {
   const t = hits?.[0];
   if (!t) return { level: 'none', cos: 0, cov: 0 };
   // بدون متجهات (تعطل الـ embeddings) نحكم بالكلمات بس وبحذر: ما نمتنع إلا لو التغطية ضعيفة جداً
   if (!t.cos) return { level: t.cov >= 0.3 ? 'high' : 'low', cos: 0, cov: t.cov, score: t.score, mode: 'keyword' };
-  const ok = t.cos >= MIN_COS || (t.cov >= MIN_COV && t.cos >= MIN_COS - 0.08);
+  const ok = t.cos >= MIN_COS || t.cov >= MIN_COV;
   return { level: ok ? 'high' : 'low', cos: t.cos, cov: t.cov, score: t.score };
 }
 export const cite = h => `${h.title}${h.section && h.section !== 'دليل الملف' ? ` · ${h.section}` : ''}${h.page ? ` · ص${h.page}` : ''}`;
