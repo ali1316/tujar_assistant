@@ -45,7 +45,7 @@
   .panel.span2{grid-column:span 2} .panel.full{grid-column:1/-1}
   .panel h3{margin:0 0 10px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center}
   .panel h3 .tag{color:var(--gold);font-weight:700}
-  .panel h3 .count{margin-inline-start:auto;color:var(--dim);font-size:12px;font-weight:500}
+  .panel h3 .count{margin-inline-start:auto;color:var(--mute);font-size:12px;font-weight:500}
   .chart{height:300px} .chart.s{height:210px} .chart.l{height:420px}
   @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:720px){.grid{grid-template-columns:1fr}.panel.span2{grid-column:auto}.top{flex-wrap:wrap;padding:12px 16px}.wrap{padding:0 16px 16px}.kpi .v{font-size:28px}}
@@ -73,6 +73,38 @@
   .embed .top .back{display:none}
   .embed body{min-height:0} .embed .top{display:none}
   @media (prefers-reduced-motion:reduce){.panel{animation:none}}
+  /* v26: السطر الأهم، الأحمر للمشاكل، وش نسوي بعدها، العرض التلقائي، أبيض وأسود */
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .tbtn{min-height:44px;min-width:44px;padding:8px 14px;border-radius:10px;border:1px solid #2b4a6c;background:#0b1d31;color:var(--sand);font:inherit;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+  .tbtn:hover{border-color:var(--gold)} .tbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .tbtn[aria-pressed="true"]{background:#1b3553;border-color:var(--gold);color:var(--gold)}
+  .headline{margin-top:14px;padding:12px 16px;border-radius:10px;background:#0b1d31;border:1px solid var(--line);border-inline-start:4px solid var(--gold);font-size:16px;font-weight:600;line-height:1.7}
+  .headline.flag{border-inline-start-color:var(--bad);background:#2a1a20}
+  .headline .lbl{display:block;font-size:12px;font-weight:600;color:var(--mute);margin-bottom:2px}
+  .headline.flag .lbl{color:var(--bad)}
+  .kpi.bad .v .cnt{color:var(--bad)} .kpi.good .v .cnt{color:var(--ok)}
+  .kpi.bad .l::after{content:" · يحتاج انتباه";color:var(--bad)}
+  .insight{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line);color:#c9d6e6;font-size:14px;line-height:1.7}
+  .insight b{color:var(--gold);font-weight:600;margin-inline-end:6px}
+  .panel.hasflag h3::after{content:"فيه مشكلة";margin-inline-start:auto;font-size:12px;font-weight:600;color:var(--bad);background:#3d2226;border-radius:99px;padding:2px 10px}
+  .actions{border-inline-start:3px solid var(--bad)}
+  .actions ol{list-style:none;margin:0;padding:0;display:grid;gap:10px;counter-reset:a}
+  .actions li{counter-increment:a;display:grid;grid-template-columns:34px 1fr;gap:4px 12px;background:#0b1d31;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .actions li::before{content:counter(a);grid-row:span 3;width:30px;height:30px;border-radius:50%;background:#1b3553;color:var(--gold);display:grid;place-items:center;font-weight:700}
+  .actions .act{font-weight:600;font-size:15px;line-height:1.6}
+  .actions .imp{justify-self:start;font-size:12px;font-weight:600;color:var(--ok);background:#16392e;border-radius:99px;padding:2px 10px}
+  .actions .why{color:var(--mute);font-size:13px;line-height:1.6}
+  body.mono .kpi:first-child .v{color:var(--ink)} body.mono .pill.up{background:#1b3553;color:var(--sand)} body.mono .kpi.good .v .cnt{color:var(--ink)}
+  body.mono .headline:not(.flag){border-inline-start-color:var(--mute)} body.mono .panel h3 .tag,body.mono .insight b,body.mono .actions li::before{color:var(--ink)}
+  body.mono .actions .imp{color:var(--ink);background:#1b3553} body.mono .summary{border-inline-start-color:var(--mute)} body.mono .summary li::before{color:var(--mute)}
+  body.presenting .panel,body.presenting .hero{transition:opacity .4s,box-shadow .4s}
+  body.presenting .grid .panel:not(.focus){opacity:.28}
+  body.presenting .panel.focus{box-shadow:0 0 0 2px var(--gold),0 18px 40px #0008}
+  #cap{position:fixed;inset-inline:0;bottom:18px;margin:auto;width:min(760px,calc(100% - 32px));background:#0e2238f2;border:1px solid var(--gold);border-radius:12px;padding:12px 18px;font-size:17px;line-height:1.7;box-shadow:0 12px 40px #000a;z-index:9;display:flex;gap:12px;align-items:center}
+  #cap[hidden]{display:none}
+  #cap .step{color:var(--gold);font-weight:700;white-space:nowrap}
+  #cap button{margin-inline-start:auto}
+  @media(max-width:720px){#cap{font-size:15px}}
 </style>
 </head>
 <body>
@@ -84,8 +116,14 @@
   <div class="meta"><span id="by">✦ أعدّتها نورة</span><a class="back" href="/">← لوحة نورة</a></div>
 </header>
 <main class="wrap">
-  <section class="hero"><h1 id="title">جاري التحميل…</h1><div class="sub" id="subtitle"></div><div class="kpis" id="kpis"></div></section>
+  <section class="hero"><h1 id="title">جاري التحميل…</h1><div class="sub" id="subtitle"></div><div class="headline" id="headline" hidden></div>
+    <div class="tools" id="tools" hidden>
+      <button type="button" class="tbtn" id="play" aria-pressed="false"><span aria-hidden="true">▶</span><span class="t">عرض تلقائي</span></button>
+      <button type="button" class="tbtn" id="mono" aria-pressed="false">أبيض وأسود</button>
+    </div>
+    <div class="kpis" id="kpis"></div></section>
   <section class="grid" id="grid"></section>
+  <div id="cap" role="status" aria-live="polite" hidden><span class="step" id="capStep"></span><span id="capText"></span><button type="button" class="tbtn" id="capStop">إيقاف</button></div>
   <footer class="foot"><span id="source"></span><span>اتحاد الغرف التجارية السعودية · وثيقة للاستخدام الداخلي</span></footer>
 </main>
 <script>
@@ -135,6 +173,7 @@ function countUp(el, to, unit) {
   document.title = `${spec.title} · اتحاد الغرف`;
   $('#title').textContent = spec.title;
   $('#subtitle').textContent = spec.subtitle || '';
+  if (spec.headline) { const h = $('#headline'); h.hidden = false; h.classList.toggle('flag', !!spec.headline_flag); h.innerHTML = `<span class="lbl">${spec.headline_flag ? 'أهم مشكلة' : 'أهم نتيجة'}</span>${esc(spec.headline)}`; }
   $('#when').textContent = when.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
   $('#kicker').textContent = '— ' + (spec.kicker || 'لوحة تحليلية');
   if (spec.designed_by && spec.designed_by !== 'قواعد') $('#by').textContent = `✦ أعدّتها نورة · تصميم ${spec.designed_by}`;
@@ -142,7 +181,7 @@ function countUp(el, to, unit) {
 
   // الأرقام الكبيرة
   spec.kpis.forEach(k => {
-    const d = document.createElement('div'); d.className = 'kpi';
+    const d = document.createElement('div'); d.className = 'kpi' + (k.flag ? ' ' + k.flag : '');
     const up = /^\+/.test(k.delta || ''), down = /^-/.test(k.delta || '');
     d.innerHTML = `<div class="v"><span class="cnt"></span>${k.delta ? `<span class="pill ${up ? 'up' : down ? 'down' : ''}">${esc(k.delta)}</span>` : ''}</div><div class="l">${esc(k.label)}</div>`;
     $('#kpis').append(d); countUp(d.querySelector('.cnt'), +k.value || 0, k.unit || '');
@@ -155,46 +194,69 @@ function countUp(el, to, unit) {
     $('#grid').append(p); return p;
   };
 
-  // الرسوم (ECharts) بهوية الاتحاد
+  // الرسوم (ECharts) بهوية الاتحاد — والفئات اللي فيها مشكلة بالأحمر (حتى في وضع الأبيض والأسود)
   const charts = [];
+  const BAD = '#e0705f', MONO = ['#c9d6e6', '#8fa7c4', '#5d7591', '#a9b8c9', '#46607c', '#e6edf5', '#7489a3', '#3a5470'];
+  const norm = t => String(t ?? '').replace(/\s+/g, ' ').trim();
+  function makeOpt(c, mono) {
+    const opt = JSON.parse(JSON.stringify(c.option));
+    delete opt.title; delete opt.backgroundColor; delete opt.color; // العنوان والألوان من الهوية
+    opt.backgroundColor = 'transparent'; opt.color = mono ? MONO : PALETTE; opt.animationDuration = 1300; opt.animationEasing = 'cubicOut';
+    opt.textStyle = { color: '#c9d6e6', fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` };
+    opt.tooltip = { trigger: (opt.xAxis ? 'axis' : 'item'), backgroundColor: '#0e2238', borderColor: '#2b4a6c', textStyle: { color: '#eef2f7', fontFamily: `'${FONT}', sans-serif` }, ...(opt.tooltip || {}),
+      ...(LOCALE === 'ar-SA' ? { valueFormatter: v => typeof v === 'number' ? fmt(v) : v } : {}) };
+    const axisStyle = ax => ({ ...ax, axisLine: { lineStyle: { color: '#2b4a6c' } }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#16304d' } },
+      axisLabel: { color: '#8ea3bd', ...(ax.axisLabel || {}) }, nameTextStyle: { color: '#8ea3bd' } });
+    if (opt.xAxis) opt.xAxis = Array.isArray(opt.xAxis) ? opt.xAxis.map(axisStyle) : axisStyle(opt.xAxis);
+    if (opt.yAxis) opt.yAxis = Array.isArray(opt.yAxis) ? opt.yAxis.map(axisStyle) : axisStyle(opt.yAxis);
+    // تخطيط ثابت: وسيلة الإيضاح تحت، ومساحة كافية للتسميات
+    if (opt.legend) opt.legend = [].concat(opt.legend).map(l => ({ ...l, textStyle: { color: '#c9d6e6' }, itemGap: 22, icon: 'roundRect' }));
+    if (opt.xAxis || opt.yAxis) {
+      if (opt.legend) opt.legend = opt.legend.map(l => ({ ...l, top: undefined, left: 'center', right: undefined, bottom: 0, orient: 'horizontal' }));
+      const g = Array.isArray(opt.grid) ? opt.grid[0] : (opt.grid || {});
+      opt.grid = { ...g, containLabel: true, top: 24, left: 8, right: 12, bottom: opt.legend ? 40 : 8 };
+      [].concat(opt.xAxis || []).forEach(ax => { if (ax && ax.type !== 'value' && ax.type !== 'time') { const k = (ax.data || []).length; ax.axisLabel = { ...ax.axisLabel, interval: 0, rotate: k > 5 ? 25 : 0 }; } });
+      if (LOCALE === 'ar-SA') [].concat(opt.xAxis || [], opt.yAxis || []).forEach(ax => { if (ax && (ax.type === 'value' || (ax.type === undefined && !ax.data))) ax.axisLabel = { ...ax.axisLabel, formatter: v => fmt(v) }; });
+    }
+    // الدوائر: حلقة أنيقة بحد بلون الخلفية
+    [].concat(opt.series || []).forEach(s => {
+      if (s.type === 'pie') { s.itemStyle = { borderColor: '#0e2238', borderWidth: 3, borderRadius: 4, ...(s.itemStyle || {}) }; s.label = { color: '#c9d6e6', ...(s.label || {}) }; }
+      if (s.type === 'bar') {
+        const hz = [].concat(opt.yAxis || []).some(a => a && Array.isArray(a.data));
+        s.itemStyle = { borderRadius: hz ? [0, 4, 4, 0] : [4, 4, 0, 0], ...(s.itemStyle || {}) }; s.barMaxWidth ??= 46;
+        // قيم على الأعمدة لما الرسم بسيط (سلسلة وحدة وفئات قليلة) — يغني عن قراءة المحور
+        const n = (s.data || []).length, single = [].concat(opt.series).length === 1;
+        if (single && n && n <= 12 && !s.stack) s.label = { show: true, position: hz ? 'right' : 'top', color: '#e8d3a8', fontSize: 12, ...(LOCALE === 'ar-SA' ? { formatter: p => fmt(p.value) } : {}), ...(s.label || {}) };
+      }
+      if (s.type === 'line') { s.lineStyle = { width: 3, ...(s.lineStyle || {}) }; s.symbolSize ??= 7; }
+      delete s.itemStyle?.color;
+    });
+    // الأحمر: نلوّن نقاط الفئات المعلّمة فقط
+    const flags = new Set((c.flag || []).map(norm));
+    if (flags.size) {
+      const catAx = [].concat(opt.xAxis || [], opt.yAxis || []).find(a => a && Array.isArray(a.data));
+      const cats = catAx ? catAx.data.map(d => norm(d && typeof d === 'object' ? d.value : d)) : null;
+      [].concat(opt.series || []).forEach(s => {
+        s.data = (s.data || []).map((d, i) => {
+          const name = s.type === 'pie' || s.type === 'funnel' ? norm(d && d.name) : cats ? cats[i] : null;
+          if (!name || !flags.has(name)) return d;
+          const o = d && typeof d === 'object' && !Array.isArray(d) ? d : { value: d };
+          return { ...o, itemStyle: { ...(o.itemStyle || {}), color: BAD }, label: { ...(o.label || {}), color: BAD } };
+        });
+      });
+    }
+    return opt;
+  }
+  let MONO_ON = false;
   spec.charts.forEach(c => {
     const p = panel(c.span === 2 ? 'span2' : '', c.title);
+    if (c.flag?.length) p.classList.add('hasflag');
     const box = document.createElement('div'); box.className = 'chart' + (c.size ? ' ' + c.size : ''); p.append(box);
+    if (c.insight) p.insertAdjacentHTML('beforeend', `<p class="insight"><b>الجواب:</b>${esc(c.insight)}</p>`);
+    p.dataset.say = c.insight || c.title;
     try {
       const ch = echarts.init(box, null, { renderer: 'canvas' });
-      const opt = { ...c.option };
-      delete opt.title; delete opt.backgroundColor; delete opt.color; // العنوان والألوان من الهوية
-      opt.backgroundColor = 'transparent'; opt.color = PALETTE; opt.animationDuration = 1300; opt.animationEasing = 'cubicOut';
-      opt.textStyle = { color: '#c9d6e6', fontFamily: `'${FONT}', 'IBM Plex Sans Arabic', sans-serif` };
-      opt.tooltip = { trigger: (opt.xAxis ? 'axis' : 'item'), backgroundColor: '#0e2238', borderColor: '#2b4a6c', textStyle: { color: '#eef2f7', fontFamily: `'${FONT}', sans-serif` }, ...(opt.tooltip || {}),
-        ...(LOCALE === 'ar-SA' ? { valueFormatter: v => typeof v === 'number' ? fmt(v) : v } : {}) };
-      const axisStyle = ax => ({ ...ax, axisLine: { lineStyle: { color: '#2b4a6c' } }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#16304d' } },
-        axisLabel: { color: '#8ea3bd', ...(ax.axisLabel || {}) }, nameTextStyle: { color: '#8ea3bd' } });
-      if (opt.xAxis) opt.xAxis = Array.isArray(opt.xAxis) ? opt.xAxis.map(axisStyle) : axisStyle(opt.xAxis);
-      if (opt.yAxis) opt.yAxis = Array.isArray(opt.yAxis) ? opt.yAxis.map(axisStyle) : axisStyle(opt.yAxis);
-      // تخطيط ثابت: وسيلة الإيضاح تحت، ومساحة كافية للتسميات
-      if (opt.legend) opt.legend = [].concat(opt.legend).map(l => ({ ...l, textStyle: { color: '#c9d6e6' }, itemGap: 22, icon: 'roundRect' }));
-      if (opt.xAxis || opt.yAxis) {
-        if (opt.legend) opt.legend = opt.legend.map(l => ({ ...l, top: undefined, left: 'center', right: undefined, bottom: 0, orient: 'horizontal' }));
-        const g = Array.isArray(opt.grid) ? opt.grid[0] : (opt.grid || {});
-        opt.grid = { ...g, containLabel: true, top: 24, left: 8, right: 12, bottom: opt.legend ? 40 : 8 };
-        [].concat(opt.xAxis || []).forEach(ax => { if (ax && ax.type !== 'value' && ax.type !== 'time') { const k = (ax.data || []).length; ax.axisLabel = { ...ax.axisLabel, interval: 0, rotate: k > 5 ? 25 : 0 }; } });
-        if (LOCALE === 'ar-SA') [].concat(opt.xAxis || [], opt.yAxis || []).forEach(ax => { if (ax && (ax.type === 'value' || (ax.type === undefined && !ax.data))) ax.axisLabel = { ...ax.axisLabel, formatter: v => fmt(v) }; });
-      }
-      // الدوائر: حلقة أنيقة بحد بلون الخلفية
-      [].concat(opt.series || []).forEach(s => {
-        if (s.type === 'pie') { s.itemStyle = { borderColor: '#0e2238', borderWidth: 3, borderRadius: 4, ...(s.itemStyle || {}) }; s.label = { color: '#c9d6e6', ...(s.label || {}) }; }
-        if (s.type === 'bar') {
-          const hz = [].concat(opt.yAxis || []).some(a => a && Array.isArray(a.data));
-          s.itemStyle = { borderRadius: hz ? [0, 4, 4, 0] : [4, 4, 0, 0], ...(s.itemStyle || {}) }; s.barMaxWidth ??= 46;
-          // قيم على الأعمدة لما الرسم بسيط (سلسلة وحدة وفئات قليلة) — يغني عن قراءة المحور
-          const n = (s.data || []).length, single = [].concat(opt.series).length === 1;
-          if (single && n && n <= 12 && !s.stack) s.label = { show: true, position: hz ? 'right' : 'top', color: '#e8d3a8', fontSize: 12, ...(LOCALE === 'ar-SA' ? { formatter: p => fmt(p.value) } : {}), ...(s.label || {}) };
-        }
-        if (s.type === 'line') { s.lineStyle = { width: 3, ...(s.lineStyle || {}) }; s.symbolSize ??= 7; }
-        delete s.itemStyle?.color;
-      });
-      ch.setOption(opt); charts.push(ch);
+      ch.setOption(makeOpt(c, false)); charts.push(ch); ch.__spec = c;
     } catch (e) { box.innerHTML = `<div style="color:var(--bad)">تعذّر الرسم: ${esc(e.message)}</div>`; }
   });
   addEventListener('resize', () => charts.forEach(c => c.resize()));
@@ -206,6 +268,14 @@ function countUp(el, to, unit) {
     const p = panel(used === 0 ? 'full' : used === 1 ? 'span2' : '', 'ملخص نورة');
     p.classList.add('summary');
     p.insertAdjacentHTML('beforeend', `<ul>${spec.insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`);
+  }
+
+  // وش نسوي بعدها: إجراءات مرتبة من الأكبر أثراً
+  if (spec.actions?.length) {
+    const p = panel('full', 'وش نسوي بعدها', `<span class="count">مرتبة من الأكبر أثراً</span>`);
+    p.classList.add('actions');
+    p.insertAdjacentHTML('beforeend', `<ol>${spec.actions.map(a => `<li><span class="act">${esc(a.action)}</span>${a.impact ? `<span class="imp">${esc(a.impact)}</span>` : ''}${a.why ? `<span class="why">${esc(a.why)}</span>` : ''}</li>`).join('')}</ol>`);
+    p.dataset.say = 'وش نسوي بعدها: ' + spec.actions.slice(0, 3).map((a, i) => `${i + 1}) ${a.action}`).join('  ');
   }
 
   // الجداول (Tabulator: فرز، بحث، صفحات)
@@ -224,6 +294,36 @@ function countUp(el, to, unit) {
       }),
     });
   });
+
+  // أبيض وأسود: كل شي رمادي إلا المشاكل تبقى حمراء
+  $('#tools').hidden = false;
+  $('#mono').onclick = () => {
+    MONO_ON = !MONO_ON; $('#mono').setAttribute('aria-pressed', String(MONO_ON)); document.body.classList.toggle('mono', MONO_ON);
+    charts.forEach(ch => ch.setOption(makeOpt(ch.__spec, MONO_ON), true));
+  };
+  // العرض التلقائي للشاشات الكبيرة: يمر على السطر الأهم ثم كل رسم وجوابه ثم الإجراءات
+  if (EMBED) { $('#play').outerHTML = `<a class="tbtn" href="/d/${id}?autoplay=1" target="_blank" rel="noopener"><span aria-hidden="true">▶</span>عرض تلقائي</a>`; }
+  else {
+    let timer = null, idx = 0;
+    const steps = () => [...(spec.headline ? [{ el: $('.hero'), say: spec.headline }] : []), ...[...document.querySelectorAll('#grid .panel')].filter(p => p.dataset.say).map(p => ({ el: p, say: p.dataset.say }))];
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const show = () => {
+      const st = steps(); if (!st.length) return stop();
+      const s2 = st[idx % st.length];
+      document.querySelectorAll('.panel.focus').forEach(x => x.classList.remove('focus'));
+      if (s2.el.classList.contains('panel')) s2.el.classList.add('focus');
+      s2.el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      $('#capStep').textContent = `${(idx % st.length) + 1}/${st.length}`; $('#capText').textContent = s2.say;
+      idx++; timer = setTimeout(show, Math.min(14000, 5000 + s2.say.length * 60));
+    };
+    const start = () => { idx = 0; document.body.classList.add('presenting'); $('#cap').hidden = false; $('#play').setAttribute('aria-pressed', 'true'); $('#play .t').textContent = 'إيقاف العرض'; show(); };
+    function stop() { clearTimeout(timer); timer = null; document.body.classList.remove('presenting'); document.querySelectorAll('.panel.focus').forEach(x => x.classList.remove('focus')); $('#cap').hidden = true; $('#play').setAttribute('aria-pressed', 'false'); $('#play .t').textContent = 'عرض تلقائي'; }
+    $('#play').onclick = () => timer ? stop() : start();
+    $('#capStop').onclick = () => { stop(); $('#play').focus(); };
+    addEventListener('keydown', e => { if (e.key === 'Escape' && timer) stop(); });
+    window.__dashPlay = { start, stop, steps };
+    if (new URLSearchParams(location.search).has('autoplay')) setTimeout(start, 1600);
+  }
 })();
 </script>
 </body>

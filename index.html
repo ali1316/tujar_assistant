@@ -351,7 +351,7 @@ const short = (x, n = 60) => { x = String(x ?? '').trim(); x = x.length > n ? x.
 const TOOL_AR = {
   show_screen: [a => `أعرض ${VIEW_LABEL[a.view] || 'القسم'}`, (a, r) => r.error ? null : `عرضت ${VIEW_LABEL[a.view] || r.shown_on_screen || 'القسم'}`],
   close_visuals: ['أرجع للشاشة الأساسية', 'رجعت للشاشة الأساسية'],
-  find_knowledge: ['أدوّر في مكتبة المعرفة', (a, r) => `جبت ملف: ${short(r.on_screen_source || r.results?.[0]?.title || a.question)}`],
+  find_knowledge: ['أدوّر في مكتبة المعرفة', (a, r) => r.confidence === 'low' ? 'ما لقيت الجواب في الملفات' : `جبت ملف: ${short(r.on_screen_source || r.results?.[0]?.title || a.question)}`],
   search_documents: ['أبحث في الملفات', (a, r) => `بحثت في الملفات${a.query || a.question ? `: ${short(a.query || a.question, 40)}` : ''}`],
   read_document: ['أقرأ الملف', (a, r) => `قرأت ملف: ${short(r.name || r.title || a.name || a.id, 50)}`],
   list_documents: ['أجيب قائمة الملفات', 'جبت قائمة الملفات'], find_files: ['أدوّر على الملف', 'جبت الملفات المطابقة'],
@@ -596,6 +596,13 @@ const screenToolsExtra = {
   async find_knowledge(args) {
     const r = await apiJson('/api/tools/find_knowledge', args);
     if (!r.results?.length) return r;
+    // ثقة منخفضة: نقول بوضوح إن الجواب مو في الملفات (نفس اختبار «سؤال الفخ») بدل ما نعرض ملف بعيد كأنه الجواب
+    if (r.confidence === 'low') {
+      const near = r.results[0]?.title || '';
+      const lines = ['ما لقيت جواب لهذا السؤال في ملفاتك.', ...(near ? [`أقرب ملف: ${near}`] : []), 'لو الجواب في ملف ما رفعته، ارفعه وأدوّر فيه.'];
+      hud.showNote({ eyebrow: 'مكتبة المعرفة', title: 'الجواب مو موجود في الملفات', subtitle: args.question || '', text: lines.join('\n') });
+      return { ...r, on_screen: lines, on_screen_source: 'لا يوجد', say_script: sayScript('', lines.slice(0, 2), 2) };
+    }
     // البطاقة تعرض المصدر الأقرب للسؤال بعنوانه وملخصه (مو بس الأول): ملف PDF مكسور عن موضوع ثاني ما يغطي على التقرير المقصود
     const nq = x => String(x).replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
     const qw = nq(args.question || '').split(/[^\p{L}\p{N}]+/u).map(w => (w.length > 4 && w.startsWith('ال') ? w.slice(2) : w)).filter(w => w.length > 2);

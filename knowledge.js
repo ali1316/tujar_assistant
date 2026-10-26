@@ -5,7 +5,7 @@ import { kvGet, kvSet, datasetAdd, datasetsRecent } from './store.js';
 import { parseWorkbook, profile } from './datasets.js';
 import { snapshotSoon } from './persist.js';
 import { db } from './db.js';
-import { ensureIndex, hybridSearch, cite, invalidateIndex } from './retrieval.js';
+import { ensureIndex, hybridSearch, cite, invalidateIndex, confidence } from './retrieval.js';
 
 const KEY = 'knowledge';
 let cache = null;
@@ -94,7 +94,9 @@ export const knowledgeTools = {
               quality_pending: e?.quality_pending || [], source_file: e?.source_file || doc?.name || '',
             };
           });
-          return { results, citations: hits.map(h => ({ n: h.n, source: cite(h) })) };
+          const cf = confidence(hits);
+          const low = cf.level !== 'high' ? { confidence: 'low', answer_found: false, note: 'أقرب المقاطع ما تطابق السؤال بثقة كافية. قولي لفواز بوضوح إن الجواب مو موجود في ملفاته (واذكري أقرب ملف لو يفيد)، ولا تخمّنين ولا تجيبين رقم من برّا الملفات.' } : { confidence: 'high' };
+          return { ...low, results, citations: hits.map(h => ({ n: h.n, source: cite(h) })) };
         }
       } catch (err) { console.warn('[rag] hybrid failed, legacy fallback:', err.message); }
       return legacyFind({ question, id });

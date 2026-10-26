@@ -13,8 +13,11 @@ const TEXT_PROMPT = (name, text) => `أنت مصمم داشبوردات تنفي
  "kpis": [{"label": "...", "value": رقم, "unit": "...", "delta": "اختياري"}],
  "charts": [{"title": "...", "span": 1 أو 2, "echarts_option": {كائن ECharts: series + xAxis/yAxis أو pie}}],
  "tables": [{"title": "...", "columns": ["..."], "rows_json": "[[...]]"}],
- "insights": ["..."]}
-3-6 مؤشرات، 2-4 رسوم، 1-2 جدول، 3-4 ملاحظات. كل النصوص عربي. لا دوال JavaScript ولا ألوان.
+ "insights": ["..."],
+ "headline": "سطر واحد: أهم نتيجة أو أكبر مشكلة برقمها", "headline_flag": true أو false,
+ "actions": [{"action": "إجراء يبدأ بفعل", "impact": "الأثر المتوقع", "why": "الدليل من الملف"}]}
+3-6 مؤشرات، 2-4 رسوم، 1-2 جدول، 3-4 ملاحظات، 2-4 إجراءات مرتبة من الأكبر أثراً. عنوان كل رسم سؤال إدارة يجاوبه الرسم، وأضف للرسم "insight" (جوابه بجملة ورقم) و"flag" (أسماء الفئات اللي فيها مشكلة فقط، أو بدونه).
+كل النصوص عربي. لا دوال JavaScript ولا ألوان.
 
 محتوى الملف:
 ${text}`;
@@ -38,9 +41,16 @@ const PLAN_PROMPT = (name, catalog) => `أنت محلل بيانات خبير. �
 
 ${catalog}`;
 
-const INSIGHT_PROMPT = (title, facts) => `أنت محلل بيانات. هذي نتائج محسوبة بدقة من ملف بعنوان «${title}».
-اكتب 3-4 ملاحظات تنفيذية قصيرة بالعربي (كل وحدة جملة أو جملتين): أبرز الأرقام، التركّز، الشواذ، المخاطر، وتوصية عملية.
-استخدم الأرقام كما هي بالضبط. رجّع JSON: {"insights": ["..."]}
+const INSIGHT_PROMPT = (title, facts) => `أنت محلل بيانات تنفيذي. هذي نتائج محسوبة بدقة من ملف بعنوان «${title}».
+رجّع JSON فقط بهذا الشكل:
+{"headline": "سطر واحد: أهم نتيجة أو أكبر مشكلة برقمها", "headline_flag": true لو مشكلة,
+ "insights": ["3-4 ملاحظات قصيرة: أبرز الأرقام، التركّز، الشواذ، المخاطر"],
+ "chart_insights": {"عنوان الرسم كما هو": "جواب سؤال الرسم بجملة ورقم"},
+ "flags": {"عنوان الرسم كما هو": ["أسماء الفئات اللي فيها مشكلة واضحة فقط"]},
+ "kpi_flags": {"اسم المؤشر كما هو": "bad أو good"},
+ "actions": [{"action": "إجراء واضح يبدأ بفعل", "impact": "الأثر المتوقع", "why": "الدليل من الأرقام"}]}
+القواعد: استخدم الأرقام كما هي بالضبط ولا تخترع رقم. الأحمر (flags/bad) فقط لما الأرقام تثبت مشكلة (أقل بوضوح من البقية، متأخر، متجاوز).
+الإجراءات 2-4 مرتبة من الأكبر أثراً للأقل. لو ما فيه مشكلة واضحة خل flags فاضي.
 
 ${facts}`;
 
@@ -103,6 +113,21 @@ function lintOption(c) {
   if (n <= 3 && series.length === 1 && first.type === 'bar') { span = 1; size = 's'; }
   return { title: c.title, span, size, echarts_option: JSON.stringify(o) };
 }
+// نربط ملاحظات المحلل بالرسوم والمؤشرات — والأحمر بس لفئات موجودة فعلاً في الرسم (ما نقبل أسماء مخترعة)
+export function enrich(ins, kpis, charts) {
+  const norm = t => String(t ?? '').replace(/\s+/g, ' ').trim();
+  const lookup = (map, key) => { if (!map || typeof map !== 'object') return undefined; const k = Object.keys(map).find(m => norm(m) === norm(key)); return k ? map[k] : undefined; };
+  return {
+    kpis: kpis.map(k => { const f = lookup(ins?.kpi_flags, k.label); return ['bad', 'good'].includes(f) ? { ...k, flag: f } : k; }),
+    charts: charts.map(c => {
+      const want = lookup(ins?.flags, c.title), cats = new Set((c.cats || []).map(norm));
+      const flag = Array.isArray(want) ? want.map(norm).filter(v => cats.has(v)) : [];
+      const insight = lookup(ins?.chart_insights, c.title);
+      const { cats: _, ...rest } = c;
+      return { ...rest, ...(flag.length ? { flag } : {}), ...(typeof insight === 'string' && insight.trim() ? { insight } : {}) };
+    }),
+  };
+}
 // ترتيب اللوحة: الاتجاه الزمني والرسم العريض أول، والصغيرة جنب بعض
 function arrange(charts) {
   return [...charts].sort((a, b) => (b.t ? 1 : 0) - (a.t ? 1 : 0) || (b.span || 1) - (a.span || 1) || (a.size === 's') - (b.size === 's'));
@@ -134,7 +159,7 @@ async function dashboardFromData(d, sets) {
       const r = runQuery(ds, { group_by: c.group_by, measure: c.measure || undefined, agg: c.agg || (c.measure ? 'sum' : 'count'), series_by: c.series_by || undefined, top: c.top || 12, date_unit: c.date_unit, filters: c.filters });
       const d2 = designRule(c, r, ds);
       if (!d2) continue;
-      charts.push({ title: c.title, span: d2.span, size: d2.size, t: d2.time, echarts_option: JSON.stringify(toECharts(r, d2.type)) });
+      charts.push({ title: c.title, span: d2.span, size: d2.size, t: d2.time, cats: r.rows.map(x => String(x.key)), echarts_option: JSON.stringify(toECharts(r, d2.type)) });
       facts.push(`- ${c.title}: ${r.rows.slice(0, 8).map(x => `${x.key}=${fmt(x.total)}`).join('، ')}${r.rows.length > 8 ? '…' : ''}`);
     } catch (e) { console.warn('[file-dash] chart skipped:', e.message); }
   }
@@ -151,7 +176,8 @@ async function dashboardFromData(d, sets) {
   }
 
   const { out: ins } = await designJSON(INSIGHT_PROMPT(plan.title, facts.join('\n')));
-  return dashboardTools.build_dashboard.run({ title: plan.title, subtitle: plan.subtitle || `من ملف: ${d.name}`, kicker: plan.kicker, designed_by: by, kpis, charts: arrange(charts), tables, insights: ins?.insights || [] })
+  const x = enrich(ins, kpis, charts);
+  return dashboardTools.build_dashboard.run({ title: plan.title, subtitle: plan.subtitle || `من ملف: ${d.name}`, kicker: plan.kicker, designed_by: by, kpis: x.kpis, charts: arrange(x.charts), tables, insights: ins?.insights || [], headline: ins?.headline, headline_flag: ins?.headline_flag, actions: ins?.actions || [] })
     .then(r => ({ ...r, title: plan.title, mode: 'data' }));
 }
 
@@ -160,7 +186,7 @@ async function dashboardFromText(d) {
   if (!out || !out.title) return { error: 'ما قدرت أولّد الداشبورد من الملف' };
   const args = {
     ...out, designed_by: by,
-    charts: arrange((out.charts || []).map(c => lintOption(c)).filter(Boolean)),
+    charts: arrange((out.charts || []).map(c => { const l = lintOption(c); return l && { ...l, ...(c.insight ? { insight: c.insight } : {}), ...(Array.isArray(c.flag) && c.flag.length ? { flag: c.flag } : {}) }; }).filter(Boolean)),
     tables: (out.tables || []).map(t => ({ ...t, rows_json: typeof t.rows_json === 'string' ? t.rows_json : JSON.stringify(t.rows_json || t.rows || []) })),
   };
   return dashboardTools.build_dashboard.run(args).then(r => ({ ...r, title: out.title, mode: 'text' }));

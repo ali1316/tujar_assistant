@@ -162,11 +162,23 @@ export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true 
   }).sort((a, b) => b.score - a.score).slice(0, k).map((h, i) => ({ n: i + 1, ...h }));
   return { hits, ms: performance.now() - t0, mode: qv ? 'hybrid' : 'keyword' };
 }
+// ثقة الاسترجاع: لو أقرب مقطع ما يغطي كلمات السؤال ومعناه بعيد، نقول «مو موجود في الملفات» بدل التخمين
+// العتبات تُعايَر بأسئلة الفخ في eval/retrieval-cases.ar.json (trap: true) — ويمكن تغييرها من البيئة
+export const MIN_COV = +(process.env.RAG_MIN_COV ?? 0.5), MIN_COS = +(process.env.RAG_MIN_COS ?? 0.7);
+export function confidence(hits) {
+  const t = hits?.[0];
+  if (!t) return { level: 'none', cos: 0, cov: 0 };
+  // بدون متجهات (تعطل الـ embeddings) نحكم بالكلمات بس وبحذر: ما نمتنع إلا لو التغطية ضعيفة جداً
+  if (!t.cos) return { level: t.cov >= 0.3 ? 'high' : 'low', cos: 0, cov: t.cov, score: t.score, mode: 'keyword' };
+  const ok = t.cos >= MIN_COS || (t.cov >= MIN_COV && t.cos >= MIN_COS - 0.08);
+  return { level: ok ? 'high' : 'low', cos: t.cos, cov: t.cov, score: t.score };
+}
 export const cite = h => `${h.title}${h.section && h.section !== 'دليل الملف' ? ` · ${h.section}` : ''}${h.page ? ` · ص${h.page}` : ''}`;
 
 // ===== 4) تقييم الاسترجاع (أسئلة عربية مع نص متوقع، مثل retrieval_eval في SurfSense) =====
-export async function evaluate(cases, runners) {
+export async function evaluate(allCases, runners) {
   const report = {};
+  const cases = allCases.filter(c => !c.trap);
   for (const [mode, run] of Object.entries(runners)) {
     let h1 = 0, h3 = 0, h5 = 0, rr = 0, ms = 0; const misses = [];
     for (const c of cases) {
@@ -177,6 +189,15 @@ export async function evaluate(cases, runners) {
     }
     const n = cases.length || 1;
     report[mode] = { hit1: +(h1 / n).toFixed(3), hit3: +(h3 / n).toFixed(3), hit5: +(h5 / n).toFixed(3), mrr: +(rr / n).toFixed(3), avg_ms: Math.round(ms / n), misses };
+  }
+  // أسئلة الفخ: جوابها مو موجود في الملفات. النجاح = الامتناع (ثقة منخفضة). ونقيس كمان الامتناع الخاطئ على الأسئلة العادية
+  const traps = allCases.filter(c => c.trap);
+  if (traps.length) {
+    const rows = [];
+    for (const c of allCases) { const { hits } = await hybridSearch(c.q, { k: 3 }); const cf = confidence(hits); rows.push({ q: c.q, trap: !!c.trap, level: cf.level, cos: +(+cf.cos || 0).toFixed(3), cov: +(+cf.cov || 0).toFixed(3) }); }
+    const t = rows.filter(r => r.trap), a = rows.filter(r => !r.trap);
+    report.abstain = { thresholds: { cov: MIN_COV, cos: MIN_COS }, traps: t.length, trap_abstained: +(t.filter(r => r.level !== 'high').length / (t.length || 1)).toFixed(3),
+      false_abstain: +(a.filter(r => r.level !== 'high').length / (a.length || 1)).toFixed(3), rows };
   }
   return report;
 }
