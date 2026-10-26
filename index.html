@@ -376,11 +376,20 @@ const screenToolsExtra = {
     const secs = (e.sections || []).map(x => typeof x === 'string' ? x : x.section);
     // لو فيه قسم مطابق للسؤال نعرض بنوده هو (هي اللي بتتكلم عنها نورة)، وإلا الملخص
     const top = (e.sections || []).find(x => typeof x !== 'string' && x.text);
-    const items = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l).slice(0, 7) : [];
+    const all = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l) : [];
+    // البنود الأقرب لسؤال فواز أولاً (عشان الشاشة تعرض نفس اللي نورة بتقوله)، بترتيبها في الملف
+    const nz = x => String(x).replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+    const qt = nz(args.question || '').split(/[^\p{L}\p{N}]+/u).map(w => (w.length > 4 && w.startsWith('ال') ? w.slice(2) : w)).filter(w => w.length > 2);
+    const has = (l, w) => nz(l).includes(w) || (w.length > 4 && nz(l).includes(w.slice(0, -1)));
+    const idf = Object.fromEntries(qt.map(w => [w, Math.log((all.length + 1) / (all.filter(l => has(l, w)).length + 0.5))])); // الكلمة النادرة أهم من «طلب»
+    const scored = all.map((l, i) => ({ l, i, s: qt.reduce((a, w) => a + (has(l, w) ? idf[w] : 0), 0) }));
+    const mx = Math.max(0, ...scored.map(x => x.s));
+    const best = scored.filter(x => x.s > 0 && x.s >= mx * 0.5).sort((a, b) => b.s - a.s).slice(0, 5).sort((a, b) => a.i - b.i).map(x => x.l);
+    const items = best.length ? best : all.slice(0, 7);
     // سطر عنوان بدون رقم + سطر قيمة يبدأ برقم = بند واحد «العنوان: القيمة»؛ ونشيل تكرار العنوان والقسم
     const heads = [e.title, top?.section || ''].map(x => x.replace(/^\d+\.\s*/, ''));
     const merged = items.filter(l => !heads.some(h => h && (h.includes(l) || l.includes(h)))).reduce((a, l) => { const p = a.at(-1); if (p && !/\d/.test(p) && /^[\d٠-٩]/.test(l) && p.length < 60) a[a.length - 1] = `${p}: ${l}`; else a.push(l); return a; }, []).slice(0, 6);
-    if (merged.length >= 2) lines.splice(0, lines.length, ...merged);
+    if (merged.length >= 1) lines.splice(0, lines.length, ...merged);
     if (e.status && !/كاملة/.test(e.status)) lines.push('تنبيه: ' + e.status);
     hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: top?.cite ? 'المصدر ' + top.cite.replace(`${e.title} · `, '') : secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
     return { ...r, on_screen: lines };
@@ -577,6 +586,7 @@ const FIXTURES = {
   stacked: () => screenToolsExtra.data_chart({ title: 'الطلبات حسب المنطقة والحالة', chart_type: 'stacked', group_by: 'المنطقة', series_by: 'الحالة', about: 'الطلبات' }),
   line: () => screenToolsExtra.data_chart({ title: 'الطلبات شهرياً', chart_type: 'line', group_by: 'تاريخ الطلب', date_unit: 'month', about: 'الطلبات' }),
   note: () => screenToolsExtra.find_knowledge({ question: 'وش النطاق السعري المقترح للمسار السريع' }),
+  note2: () => screenToolsExtra.find_knowledge({ question: 'كيف ينبّه الموظف لما يجيه طلب مستعجل؟' }),
 };
 const FIX = new URLSearchParams(location.search).get('fixture');
 if (FIX && FIXTURES[FIX]) Promise.resolve().then(FIXTURES[FIX]).catch(e => console.error('fixture', e)).finally(() => { document.documentElement.dataset.fixture = 'ready'; });
