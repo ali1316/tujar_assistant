@@ -94,7 +94,12 @@ export const tools = {
       // السؤال حدد المكان فقط (مثل «وش الرقم في الحاشية؟»): نرجع قيم ذلك المكان ونوضح أن المطابقة بالمكان لا بالمعنى
       let byLocation = false;
       if (where && !all.length) { byLocation = true; for (const data of await sources(document_id)) for (const v of data.values) if (v.source.type === where) all.push({ s: 0, v, data }); }
-      all.sort((a, b) => b.s - a.s || (a.v.row_kind === 'total') - (b.v.row_kind === 'total'));
+      // سؤال عن «الإجمالي» بدون ذكر كيان (غرفة…) ⇒ صف الإجمالي والفقرات أولاً؛ غير كذا التفاصيل أولاً
+      const qn = nz(query);
+      const namesEntity = all.some(x => Object.values(x.v.dims || {}).some(d => d && d.length > 2 && qn.includes(nz(d))));
+      const wantsTotal = /اجمالي|مجموع|الكلي|كامل/.test(qn) && !namesEntity;
+      const rank = x => (wantsTotal ? (x.v.row_kind === 'total' || x.v.source.type === 'paragraph' ? 0 : 1) : (x.v.row_kind === 'total' ? 1 : 0));
+      all.sort((a, b) => rank(a) - rank(b) || b.s - a.s);
       if (!all.length) return { found: false, ...(where ? { searched_in: where } : {}), message: 'لم أجد هذه القيمة في مصادر PDF المحفوظة — غير متاحة في المصدر.' };
       return { found: true, ...(byLocation ? { matched_by: 'location_only', searched_in: where } : {}), matches: all.slice(0, 8).map(x => pub(x.v, x.data)), note: 'القيم بحالة «تقدير بصري» أو «متعارض» لا تُستخدم كأرقام مؤكدة.' };
     },
