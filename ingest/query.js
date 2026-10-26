@@ -19,6 +19,15 @@ const stems = h => new Set(nz(h).split(' ').filter(Boolean).map(stem));
 const usable = v => v.value != null && v.verification.some(x => USABLE_FOR_METRICS.has(x)) && !v.verification.includes(VERIFY.ESTIMATED) && !v.verification.includes(VERIFY.CONFLICT);
 const VER_AR = { matched_text_layer: 'مطابق لنص الصفحة', total_reconciled: 'مطابق للمجموع', vision_only: 'مقروء من الصورة فقط', visual_estimate: 'تقدير بصري (غير مؤكد)', conflict: 'متعارض', cross_referenced: 'متطابق مع موضع آخر' };
 
+// المعرّف الكامل أولاً، ثم المختصر («ds02» من pdf_sources) — ولو المختصر في أكثر من ملف نرفض بدل التخمين، ثم العنوان
+export function matchDatasets(list, dataset) {
+  const q = String(dataset ?? ''), short = q.replace(/^#/, '');
+  const exact = list.find(x => x.ds.id === q); if (exact) return { hit: exact };
+  const byShort = list.filter(x => x.ds.id.endsWith('#' + short));
+  if (byShort.length > 1) return { hit: null, ambiguous: byShort.map(x => x.ds.id) };
+  if (byShort.length === 1) return { hit: byShort[0] };
+  return { hit: list.find(x => nz(x.ds.title).includes(nz(q)) || nz(q).includes(nz(x.ds.title))) || null };
+}
 async function sources(document_id) {
   const docs = await currentVersions();
   const out = [];
@@ -128,10 +137,9 @@ export const tools = {
       agg: { type: 'STRING', enum: ['sum', 'avg', 'count', 'max', 'min'] }, group_by: { type: 'STRING', description: 'بُعد للتجميع (اختياري)' },
       filters: { type: 'ARRAY', items: { type: 'OBJECT', properties: { column: { type: 'STRING' }, value: { type: 'STRING' } } } } }, required: ['dataset'] } },
     run: async ({ dataset, measure, agg = 'sum', group_by, filters = [] } = {}) => {
-      let hit = null;
-      for (const data of await sources()) for (const ds of data.datasets) {
-        if (ds.id === dataset || nz(ds.title).includes(nz(dataset)) || nz(dataset).includes(nz(ds.title))) { hit = { ds, data }; break; }
-      }
+      const list = []; for (const data of await sources()) for (const ds of data.datasets) list.push({ ds, data });
+      const { hit, ambiguous } = matchDatasets(list, dataset);
+      if (ambiguous) return { available: false, message: `«${dataset}» موجود في أكثر من ملف — حدّد المعرّف الكامل: ${ambiguous.join('، ')}` };
       if (!hit) return { available: false, message: `لا يوجد جدول «${dataset}» في المصادر المحفوظة.` };
       const { ds, data } = hit;
       const rd = data.readiness.find(r => r.dataset === ds.id);
