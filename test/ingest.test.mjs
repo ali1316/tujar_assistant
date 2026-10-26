@@ -155,6 +155,34 @@ let tErr = null; const t0 = Date.now();
 try { await withTimeout(() => new Promise(() => {}), 200, 'interactions'); } catch (e) { tErr = e.message; }
 ok('استدعاء معلّق ينتهي بمهلة بدل التعليق', !!tErr && Date.now() - t0 < 2000, tErr);
 
+// ===== تدقيق الأخطاء (2026-10-26) =====
+{ // صياغة عامة ما تسبب رفضاً كاذباً
+  const r1 = await Q.tools.pdf_find_value.run({ query: 'ابي اعرف الإجمالي الكلي للخدمات المنفذة بالكامل لعام 2026' });
+  ok('صياغة «ابي اعرف/الكلي/بالكامل/لعام» لا تُرفض', r1.found !== false, JSON.stringify(r1.missing_terms || r1.results?.[0]?.value));
+  const r2 = await Q.tools.pdf_find_value.run({ query: 'كم عدد الموظفين بالكامل؟' });
+  ok('ما زال يرفض الكلمة الجوهرية الغائبة', r2.found === false && r2.missing_terms.some(t => t.includes('موظف')));
+}
+{ // أعمدة السنوات المتجاورة ليست لوحات
+  const mk = (names, hr) => ({ columns: names.map(name => ({ name })), rows: [[1, 2, 3, 4]], row_kinds: ['detail'], header_rows: hr });
+  ok('«المشتركون 2023 | النمو 2023 | المشتركون 2024 | النمو 2024» لا تُفك', !unstackRepeated(mk(['المشتركون 2023', 'النمو 2023', 'المشتركون 2024', 'النمو 2024'])).unstacked);
+  ok('سنة في صف عناوين ثانٍ تمنع الفك', !unstackRepeated(mk(['أ', 'ب', 'أ', 'ب'], [['أ', 'ب', 'أ', 'ب'], ['2023', '2023', '2024', '2024']])).unstacked);
+  ok('لوحات «(1)/(2)» ما زالت تُفك', !!unstackRepeated(mk(['الغرفة (1)', 'القيمة (1)', 'الغرفة (2)', 'القيمة (2)'])).unstacked);
+}
+{ // مسار Excel القديم
+  const XLSX = (await import('xlsx')).default;
+  const D = await import('../datasets.js');
+  const ws = XLSX.utils.aoa_to_sheet([['م', 'المنطقة', 'القيمة', 'النسبة'], [1, 'الرياض', 10, 0.25], [2, 'جدة', '—', 0.5], [3, 'مكة', 30, 0.25], [4, 'الدمام', 5, 0], [null, 'الاجمالي العام', 45, 1], ['', 'المتوسط', 15, null], ['* المصدر: بيانات تجريبية', null, null, null]]);
+  for (const a of ['D2', 'D3', 'D4', 'D5']) ws[a].z = '0%';
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'بيانات'); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['شرح', 'x'], ['a', 'b']]), 'اقرأني');
+  const out = D.parseWorkbook(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }), 't.xlsx');
+  ok('Excel: ورقة «اقرأني» لا تُقرأ كبيانات', out.length === 1);
+  ok('Excel: الإجمالي (بدون همزة، في العمود الثاني) والمتوسط وسطر المصدر تُحذف', out[0].rows.length === 4, JSON.stringify(out[0].rows.map(r => r[1])));
+  ok('Excel: النسبة المنسقة تُحفظ كما تظهر (25 لا 0.25)', out[0].rows[0][3] === 25);
+  const prof = D.profile(out[0].columns, out[0].rows).columns;
+  ok('Excel: «—» لا يحوّل العمود الرقمي إلى نص', prof.find(c => c.name === 'القيمة').type === 'number');
+  ok('Excel: «الكلية/متوسط الدخل» ليست صفوف إجمالي', !D.isSummaryRow(['الكلية', 1]) && !D.isSummaryRow(['متوسط الدخل', 1]));
+}
+
 const failed = results.filter(r => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} passed · storage: ${dir}`);
 fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify(results, null, 1));
