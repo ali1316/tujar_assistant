@@ -155,7 +155,7 @@ export class GeminiLiveAgent {
     try {
       const r = await fetch(this.speakUrl, {
         method: 'POST', signal: ac.signal,
-        headers: { 'Content-Type': 'application/json', ...this.headers() }, body: JSON.stringify({ text }),
+        headers: { 'Content-Type': 'application/json', ...this.headers() }, body: JSON.stringify({ text, ...(this.persona ? { persona: this.persona } : {}) }),
       });
       if (!r.ok) { this.emit('error', await r.text()); return; }
       const reader = r.body.getReader();

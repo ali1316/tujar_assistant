@@ -14,3 +14,10 @@ export const claimsScreen = s => String(s ?? '').split(/(?<=[.!؟?\n،,])/).some
 
 // أدوات تغيّر الشاشة فعلاً
 export const SCREEN_TOOL = /^(show_|render_|data_chart|build_dashboard|pdf_dashboard|open_dashboard)/;
+
+// تصنيف الأدوات لحراس الشاشة في الواجهة (أدوات pdf_* لها نفس مكانة الأدوات القديمة — كانت تنرفض وتنحوّل لـ data_chart)
+const DATA_TOOLS = /^(data_chart|query|list_|get_|search|find_|dashboard|portfolio|stats|project|ticket|task|usage|check_job|pdf_)/;
+const VISUAL_TOOLS = new Set(['data_chart', 'query_data', 'find_knowledge', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard', 'pdf_dashboard']);
+export const isDataTool = n => DATA_TOOLS.test(n);
+export const isVisualTool = n => VISUAL_TOOLS.has(n);
+export const isDashboardTool = n => n === 'build_dashboard' || n === 'pdf_dashboard';

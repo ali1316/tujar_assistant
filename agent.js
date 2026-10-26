@@ -87,7 +87,7 @@ async function runGpt(job) {
   step(job, 'GPT بدأ');
   const r = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-5', instructions: 'جاوب بالعربي باختصار وبلهجة سعودية بيضاء، بدون رموز أو جداول لأن الرد بيتحوّل لصوت.', input: job.request }),
+    body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-5', instructions: 'جاوب بالعربي باختصار، بدون رموز أو جداول لأن الرد بيتحوّل لصوت.', input: job.request }),
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`OpenAI ${r.status}: ${j.error?.message || ''}`);

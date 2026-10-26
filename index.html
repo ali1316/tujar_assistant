@@ -342,7 +342,7 @@ import { createHUD } from './hud.js';
 import { sayScript } from './speech.js';
 import { createUIControl } from './ui-control.js';
 import { createAssistant } from './assistant.js';
-import { stripToolTags, claimsScreen, SCREEN_TOOL } from './text-guard.js';
+import { stripToolTags, claimsScreen, SCREEN_TOOL, isDataTool, isVisualTool, isDashboardTool } from './text-guard.js';
 const $ = s => document.querySelector(s);
 const sar = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA').format(n ?? 0);
 const num = n => window.NORA_NUMERALS === 'latin' ? String(n) : sar(n);
@@ -563,8 +563,7 @@ let pend = { u: '', a: '' };
 // حارس: لو طلب داشبورد وهي قالت «تم» بدون ما تبنيه فعلاً، نطلب منها تنفذ
 let turnTools = [], lastUser = '', nudged = false;
 // الأرقام لازم تكون طازجة من الأدوات في نفس الدور — مو من ذاكرة المحادثة
-const DATA_TOOLS = /^(data_chart|query|list_|get_|search|find_|dashboard|portfolio|stats|project|ticket|task|usage|check_job)/;
-const freshOnly = fn => args => turnTools.some(t => DATA_TOOLS.test(t))
+const freshOnly = fn => args => turnTools.some(isDataTool)
   ? fn(args)
   : { error: 'مرفوض: الأرقام لازم تنجلب من الأدوات الحين (data_chart لبيانات الملف، أو أدوات المشاريع/التذاكر)، مو من ذاكرة المحادثة. اجلبيها أول، بعدين اعرضي — ولو السؤال عن ملف استخدمي data_chart مباشرة لأنه يرسم بنفسه.' };
 function guardTurn(nora) {
@@ -577,9 +576,9 @@ function guardTurn(nora) {
   }
   const wantsDash = /داش\s?بورد|dashboard|لوحة بيانات/i.test(lastUser);
   const claimed = /تم|بنيت|سويت|سوّيت|انبنى|جاهز/.test(nora);
-  if (wantsDash && claimed && !turnTools.includes('build_dashboard') && !nudged && agent.connected) {
+  if (wantsDash && claimed && !turnTools.some(isDashboardTool) && !nudged && agent.connected) {
     nudged = true;
-    agent.sendText('[تنبيه النظام] ما ناديتي build_dashboard في هذا الطلب، فما انبنى أي داشبورد. نفّذي الطلب الحين فعلياً بالأدوات (ولو فيه ملف مرفوع حديثاً اقرئيه أول).', { silent: true });
+    agent.sendText('[تنبيه النظام] ما ناديتي أداة داشبورد (build_dashboard، أو pdf_dashboard لملفات PDF) في هذا الطلب، فما انبنى أي داشبورد. نفّذي الطلب الحين فعلياً بالأدوات (ولو فيه ملف مرفوع حديثاً اقرئيه أول).', { silent: true });
     return;
   }
   // وعدت «لحظة/أشيك/أراجع» وخلّصت ردها بدون ما تنادي أي أداة → نخليها تكمّل فوراً
@@ -591,10 +590,9 @@ function guardTurn(nora) {
   }
   // قالت أرقام أو بيانات والشاشة ما تعرض شي عنها → تعرضها الحين (الشاشة لازم تطابق الكلام)
   const NUM = /[0-9٠-٩]|واحد|اثنين|ثلاث|أربع|خمس|ست|سبع|ثمان|تسع|عشر|عش\b|مية|مئة|ألف|بالمية/;
-  const VISUAL = ['data_chart', 'query_data', 'find_knowledge', 'show_chart', 'show_overview', 'show_project_visual', 'render_visual', 'show_screen', 'build_dashboard'];
-  if (NUM.test(nora) && !turnTools.some(t => VISUAL.includes(t)) && !nudged && agent.connected) {
+  if (NUM.test(nora) && !turnTools.some(isVisualTool) && !nudged && agent.connected) {
     nudged = true;
-    agent.sendText('[تنبيه النظام] قلتي أرقام والشاشة ما تعرضها. اجلبي الأرقام من الأدوات (مو من الذاكرة) واعرضيها على الشاشة الحين بالأداة المناسبة (data_chart لبيانات الملف، show_chart/show_overview للمشاريع، show_screen للأقسام)، وبعدها أكّدي الرقم بجملة قصيرة.', { silent: true });
+    agent.sendText('[تنبيه النظام] قلتي أرقام والشاشة ما تعرضها. اجلبي الأرقام من الأدوات (مو من الذاكرة) واعرضيها على الشاشة الحين بالأداة المناسبة (pdf_dashboard لملفات PDF، data_chart لبيانات Excel، show_chart/show_overview للمشاريع، show_screen للأقسام)، وبعدها أكّدي الرقم بجملة قصيرة.', { silent: true });
   }
 }
 function takeTurns() {
@@ -778,11 +776,13 @@ function trackUsage(u) {
 }
 let ENGINE = 'gemini'; try { ENGINE = localStorage.getItem('noraEngine') || 'gemini'; } catch {}
 // جداوي: نفس عقل Gemini (الأدوات والذاكرة)، والنطق بصوت ElevenLabs v4 Turbo جملة جملة (وضع mine)
-const makeAgent = e => e === 'eleven' ? new ElevenRealtimeAgent(agentOpts) : e === 'jeddawi' ? new GeminiLiveAgent({ ...agentOpts, speakUrl: '/api/speak/eleven', persona: 'jeddawi' }) : new GeminiLiveAgent(agentOpts);
+// فواز وجداوي: نفس عقل Gemini (يسمع العربي صح ويشغّل الأدوات)، والنطق بـ ElevenLabs v4 Turbo — فواز بصوته المستنسخ.
+// (Eleven Realtime كان يسمع الكلام العربي هندي/ألماني/إسباني — سجل 26 أكتوبر)
+const makeAgent = e => e === 'eleven' ? new GeminiLiveAgent({ ...agentOpts, speakUrl: '/api/speak/eleven', persona: 'fawaz' }) : e === 'jeddawi' ? new GeminiLiveAgent({ ...agentOpts, speakUrl: '/api/speak/eleven', persona: 'jeddawi' }) : new GeminiLiveAgent(agentOpts);
 let agent = makeAgent(ENGINE);
 
 let running = false;
-const modeFor = () => ENGINE === 'jeddawi' ? 'mine' : 'live';
+const modeFor = () => ENGINE === 'jeddawi' || ENGINE === 'eleven' ? 'mine' : 'live';
 // أصوات نورة (نسائية) — الاختيار ينحفظ في المتصفح
 const VOICE_DESC = { Sulafat: 'دافئ', Despina: 'ناعم', Aoede: 'منساب', Leda: 'شبابي', Kore: 'حازم', Zephyr: 'مشرق', Achernar: 'هادئ', Callirrhoe: 'مريح', Autonoe: 'مشرق', Erinome: 'واضح', Laomedeia: 'مرح', Gacrux: 'ناضج', Pulcherrima: 'جريء', Vindemiatrix: 'لطيف' };
 let GVOICE = 'Sulafat'; try { GVOICE = localStorage.getItem('noraVoice') || 'Sulafat'; } catch {}
@@ -806,6 +806,7 @@ function applyPersona() {
 applyPersona();
 async function fillVoices() {
   if (ENGINE === 'jeddawi') { $('#voice').innerHTML = '<option value="jeddawi">جداوي · Jeddawi Echo (v4 Turbo)</option>'; VOICE = ''; return; }
+  if (ENGINE === 'eleven') { $('#voice').innerHTML = '<option value="fawaz">صوت فواز المستنسخ (v4 Turbo)</option>'; VOICE = ''; return; }
   if (ENGINE === 'eleven') {
     try {
       const r = await apiJson('/api/eleven/voices');
@@ -838,11 +839,10 @@ $('#voice').onchange = async () => {
 };
 // معاينة الصوت: جملة قصيرة عبر Gemini TTS بنفس الصوت
 $('#preview').onclick = async () => {
-  if (ENGINE === 'eleven') { const v = ELEVEN_VOICES.find(x => x.id === VOICE); if (v?.preview) new Audio(v.preview).play(); return; }
-  const jed = ENGINE === 'jeddawi';
+  const jed = ENGINE === 'jeddawi' || ENGINE === 'eleven';
   $('#preview').disabled = true;
   try {
-    const r = await api(jed ? '/api/speak/eleven' : '/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(jed ? { text: 'هلا والله! أنا جداوي، مساعدك الذكي. إيش تبغى نشوف اليوم؟' } : { voice: VOICE, text: 'هلا والله! أنا نورة، مساعدتك الذكية. اسألني عن أي مشروع، وأطلّع لك كل شي على الشاشة.' }) });
+    const r = await api(jed ? '/api/speak/eleven' : '/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(jed ? { persona: ENGINE === 'eleven' ? 'fawaz' : 'jeddawi', text: ENGINE === 'eleven' ? 'هلا والله! أنا فواز، مساعدك الذكي. وش تبغى نشوف اليوم؟' : 'هلا والله! أنا جداوي، مساعدك الذكي. إيش تبغى نشوف اليوم؟' } : { voice: VOICE, text: 'هلا والله! أنا نورة، مساعدتك الذكية. اسألني عن أي مشروع، وأطلّع لك كل شي على الشاشة.' }) });
     if (!r.ok) throw new Error(await r.text());
     const buf = new Uint8Array(await r.arrayBuffer());
     const ctx = new AudioContext({ sampleRate: 24000 });

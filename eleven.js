@@ -80,6 +80,8 @@ export const JEDDAWI = {
   get voice() { return process.env.JEDDAWI_VOICE || 'yXEnnEln9armDCyhkXcA'; },
   get model() { return process.env.JEDDAWI_TTS_MODEL || 'eleven_v4_turbo'; },
 };
+// صوت كل هوية: جداوي (مكتبة ElevenLabs) وفواز (صوته المستنسخ)
+export const voiceFor = persona => persona === 'fawaz' ? (process.env.FAWAZ_VOICE || process.env.ELEVEN_VOICE || 'si9mYqRfqKHdK2kDRssy') : JEDDAWI.voice;
 export function ttsRequest({ text, voice = JEDDAWI.voice, model = JEDDAWI.model }) {
   return {
     url: `${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`,
@@ -88,10 +90,10 @@ export function ttsRequest({ text, voice = JEDDAWI.voice, model = JEDDAWI.model 
 }
 
 // يمرّر صوت ElevenLabs للمتصفح، ولو المتصفح قطع (مقاطعة) نوقف الطلب عند ElevenLabs فوراً
-export async function streamTTS(text, res, { fetchImpl = fetch } = {}) {
+export async function streamTTS(text, res, { fetchImpl = fetch, persona = 'jeddawi' } = {}) {
   const ac = new AbortController();
   res.on('close', () => ac.abort());
-  const { url, init } = ttsRequest({ text });
+  const { url, init } = ttsRequest({ text, voice: voiceFor(persona) });
   let sent = 0;
   try {
     const r = await fetchImpl(url, { ...init, signal: ac.signal });
