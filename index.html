@@ -130,21 +130,102 @@
     #tickets th.c-id,#tickets td.c-id,#tasks th.c-id,#tasks td.c-id{display:none}
   }
   #status .retry{margin-inline-start:8px;background:transparent;border:1px solid var(--acc);color:var(--acc);border-radius:99px;min-height:32px;padding:2px 12px;cursor:pointer;font-size:12px}
+
+  /* ===== v25: هوية الرأس + الشاشة الأولى حسب المعاينة ===== */
+  header.top{border-bottom:1px solid color-mix(in srgb,var(--acc) 55%,transparent);padding:14px 32px;gap:18px;z-index:10}
+  header.top .brands{display:flex;align-items:center;gap:18px;flex:none}
+  header.top .logo{display:block;width:auto;background:none;border:0;box-shadow:none}
+  header.top .logo.fsc{height:46px} header.top .logo.tj{height:42px}
+  header.top .sep{width:1px;height:36px;background:color-mix(in srgb,var(--ink) 35%,transparent)}
+  header.top h1{margin-inline-start:auto;font-weight:600;font-size:calc(20px*var(--fs-header))}
+  .nora-chip{margin-inline-start:0;font-size:14px;color:var(--ink)} .nora-chip b{font-weight:500}
+  .nora-chip i{width:9px;height:9px;background:var(--ok);box-shadow:0 0 0 3px #59c48f26} .nora-chip.on i{box-shadow:0 0 0 5px #59c48f40}
+  /* الواترمارك والخطوط الزخرفية: خلف كل شي، والبطاقات والرسوم تغطيها */
+  .bg-art{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .wm{position:absolute;top:calc(84px + 7vh);height:clamp(70px,9.5vw,130px);width:auto;opacity:.04}
+  .wm-fsc{inset-inline-start:calc(4vw + 140px)} .wm-tj{inset-inline-end:calc(4vw + 30px);height:clamp(64px,8.6vw,118px)}
+  .lines{position:absolute;bottom:0;height:calc(100vh - 90px);width:min(17vw,250px);color:var(--acc);opacity:.32}
+  .lines-r{inset-inline-start:0} .lines-l{inset-inline-end:0}
+  main{position:relative;z-index:1} .tagline{position:fixed;z-index:2}
+  body.blank.log-open #dock{top:auto;bottom:0}
+  /* الشاشة الأولى */
+  #empty{top:calc(25vh + 40px);z-index:1}
+  #empty h2{font-size:clamp(28px,3.4vw,46px);font-weight:700;margin:0 0 14px;letter-spacing:0} #empty h2 .gold{color:var(--acc)}
+  #empty p{font-size:clamp(15px,1.4vw,19px);color:color-mix(in srgb,var(--ink) 78%,transparent)}
+  .qa{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:26px}
+  .qa-btn{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 24px;border-radius:99px;border:1px solid color-mix(in srgb,var(--acc) 75%,transparent);background:color-mix(in srgb,var(--bg) 70%,transparent);color:var(--ink);font:inherit;font-size:15px;cursor:pointer;transition:background .15s,border-color .15s}
+  .qa-btn svg{width:22px;height:22px;color:var(--acc)} .qa-btn:hover{background:color-mix(in srgb,var(--acc) 12%,transparent);border-color:var(--acc)}
+  body.blank #dock{top:calc(25vh + 290px)}
+  body.blank #dock>*{width:min(1000px,100%)}
+  body.blank #dock{border-top:0;background:none}
+  /* شريط الكتابة */
+  .composer{border:1px solid color-mix(in srgb,var(--acc) 80%,transparent);background:color-mix(in srgb,var(--card) 88%,transparent);padding:8px 10px;gap:6px;border-radius:999px}
+  body.blank .composer{padding:12px 14px}
+  .composer input{font-size:17px;padding:8px 10px}
+  .vsep{width:1px;height:28px;background:color-mix(in srgb,var(--ink) 18%,transparent);flex:none}
+  .ic{color:color-mix(in srgb,var(--ink) 85%,transparent)} .ic svg{width:22px;height:22px}
+  .ic.send{display:grid} .ic.send[aria-disabled=true]{opacity:.55}
+  .ic.mic{width:56px;height:56px;box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 18%,transparent),0 0 0 7px color-mix(in srgb,var(--acc) 35%,transparent)} .ic.mic svg{width:26px;height:26px}
+  body.blank .ic.mic{width:66px;height:66px}
+  .chipbtn{display:inline-flex;align-items:center;gap:6px;color:color-mix(in srgb,var(--ink) 80%,transparent);font-size:14px} .chipbtn svg{width:19px;height:19px}
+  .chipsel.engine{border:0;color:var(--ink);font-weight:500;font-size:15px}
+  #status{font-size:13px;color:color-mix(in srgb,var(--ink) 70%,transparent)}
+  .tagline{display:none;inset-inline:0;bottom:22px;text-align:center;color:var(--acc);font-size:14px;pointer-events:none}
+  .tagline span{display:inline-flex;align-items:center;gap:22px} .tagline span::before,.tagline span::after{content:"";width:60px;height:1px;background:var(--acc);opacity:.7}
+  body.blank .tagline{display:block} body.blank.log-open .tagline{display:none}
+  /* الواترمارك والخطوط تظهر بالكامل في الشاشة الأولى، وأخف مع المحتوى */
+  body:not(.blank) .lines{opacity:.12} body:not(.blank) .wm{opacity:.03}
+  @media(max-width:1100px){.lines{display:none} header.top{padding:12px 20px}}
+  @media(max-width:900px){header.top .logo.fsc{height:38px} header.top .logo.tj{height:34px} header.top h1{font-size:16px}}
+  @media(max-width:600px){
+    header.top{padding:10px 14px;gap:10px} header.top .brands{gap:10px}
+    header.top .logo.fsc{height:30px} header.top .logo.tj{height:27px} header.top h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} .sep2{display:none} .nora-chip{margin-inline-start:auto}
+    .nora-chip span{display:none}
+    .wm{top:auto;bottom:16vh;height:44px;opacity:.035} .wm-fsc{inset-inline-start:6vw} .wm-tj{inset-inline-end:6vw;height:40px}
+    #empty{top:calc(16vh + 20px)} #empty h2{font-size:26px} #empty p{font-size:14px}
+    .qa{gap:8px;margin-top:18px} .qa-btn{padding:0 14px;font-size:14px;min-height:44px;gap:6px} .qa-btn svg{width:18px;height:18px}
+    body.blank #dock{top:calc(16vh + 270px)}
+    body.blank .composer{padding:8px} body.blank .ic.mic,.ic.mic{width:50px;height:50px}
+    .composer .vsep{display:none} #logBtn{min-width:44px;padding:0;justify-content:center} #logBtn .lbl-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)} .chipsel.engine{padding:4px 2px;font-size:14px} .composer{gap:2px}
+    .tagline{bottom:12px}
+  }
+  @media(max-height:700px) and (min-width:601px){#empty{top:calc(18vh + 30px)} body.blank #dock{top:calc(18vh + 280px)} .tagline{display:none!important}}
 </style>
 <style id="nora-css"></style>
 </head>
 <body>
 <header class="top">
-  <img class="logo" src="/brand/fsc-logo-dark.svg" alt="اتحاد الغرف التجارية السعودية">
-  <span class="sep"></span>
+  <div class="brands">
+    <img class="logo fsc" src="/brand/fsc-logo-white.svg" alt="اتحاد الغرف التجارية السعودية" width="163" height="50">
+    <span class="sep" aria-hidden="true"></span>
+    <img class="logo tj" src="/brand/tujar-logo-white.png" alt="منصة تُجّار" width="124" height="46">
+  </div>
   <h1>لوحة مشاريع التحول الرقمي</h1>
   <button type="button" id="crumb" aria-label="رجوع للشاشة الأساسية"></button>
-  <div class="nora-chip" id="chip"><i></i><b>نورة</b><span>المساعدة الذكية</span></div>
+  <span class="sep sep2" aria-hidden="true"></span>
+  <div class="nora-chip" id="chip"><i></i><b>نورة</b><span>· جاهزة للمساعدة</span></div>
 </header>
+<div class="bg-art" aria-hidden="true">
+  <img class="wm wm-fsc" src="/brand/fsc-logo-white.svg" alt="">
+  <img class="wm wm-tj" src="/brand/tujar-logo-white.png" alt="">
+  <svg class="lines lines-r" viewBox="0 0 240 800" preserveAspectRatio="xMaxYMid slice"><g fill="none" stroke="currentColor" stroke-width="1">
+    <path d="M240 60 C120 140 70 260 70 420 V800"/><path d="M240 120 C150 190 100 300 100 440 V800" opacity=".6"/><path d="M240 180 C170 240 130 330 130 460 V800" opacity=".4"/>
+    <path d="M240 520 C170 540 110 600 40 700" opacity=".7"/><path d="M240 560 C180 580 130 630 70 720" opacity=".45"/><path d="M0 240 V800" opacity=".35"/>
+  </g><g fill="currentColor"><circle cx="70" cy="420" r="3"/><circle cx="100" cy="300" r="2.5"/><circle cx="130" cy="460" r="2"/><circle cx="40" cy="700" r="3.5"/><circle cx="0" cy="240" r="3"/><circle cx="160" cy="610" r="2"/></g></svg>
+  <svg class="lines lines-l" viewBox="0 0 240 800" preserveAspectRatio="xMinYMid slice"><g fill="none" stroke="currentColor" stroke-width="1" transform="translate(240 0) scale(-1 1)">
+    <path d="M240 60 C120 140 70 260 70 420 V800"/><path d="M240 120 C150 190 100 300 100 440 V800" opacity=".6"/><path d="M240 180 C170 240 130 330 130 460 V800" opacity=".4"/>
+    <path d="M240 520 C170 540 110 600 40 700" opacity=".7"/><path d="M240 560 C180 580 130 630 70 720" opacity=".45"/><path d="M0 240 V800" opacity=".35"/>
+  </g><g fill="currentColor" transform="translate(240 0) scale(-1 1)"><circle cx="70" cy="420" r="3"/><circle cx="100" cy="300" r="2.5"/><circle cx="130" cy="460" r="2"/><circle cx="40" cy="700" r="3.5"/><circle cx="0" cy="240" r="3"/><circle cx="160" cy="610" r="2"/></g></svg>
+</div>
 <div id="gate"><form id="gf"><h2 style="text-align:center;color:var(--ink)">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
 <main>
   <section id="home">
-    <div id="empty"><h2 id="hello">هلا فواز، وش نسوي اليوم؟</h2><p>اطلب بالصوت أو بالكتابة: المشاريع، مهامك، ملف ترفعه، داشبورد، رسالة واتساب…</p></div>
+    <div id="empty"><h2 id="hello"><span class="gold">هلا فواز،</span> وش ننجز اليوم؟</h2><p>مشاريعك، ملفاتك، ومؤشراتك… في مساحة واحدة.</p>
+      <div class="qa" role="group" aria-label="اختصارات سريعة">
+        <button type="button" class="qa-btn" data-say="اعرضي لي المشاريع"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 20V12M12 20V5M18 20v-9"/></svg>اعرض المشاريع</button>
+        <button type="button" class="qa-btn" data-act="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>حلّل ملفاً</button>
+        <button type="button" class="qa-btn" data-say="اعرضي لي الداشبوردات"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>افتح لوحة</button>
+      </div></div>
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
@@ -162,6 +243,7 @@
   </section>
   <section id="view" hidden></section>
 </main>
+<div class="tagline" aria-hidden="true"><span>مساحة العمل الذكية</span></div>
 <div id="sr" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="dock" role="region" aria-label="المحادثة مع نورة">
   <div id="drawer" hidden role="dialog" aria-modal="false" aria-labelledby="drTitle">
@@ -171,14 +253,14 @@
   </div>
   <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
   <form id="f" class="composer">
-    <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button><span class="vsep" aria-hidden="true"></span>
     <input id="txt" placeholder="اسأل نورة…" autocomplete="off" aria-label="اكتب سؤالك لنورة">
-    <select id="engine" class="chipsel engine" title="المساعد" aria-label="اختيار المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option></select>
-    <button type="button" class="chipbtn" id="logBtn" aria-expanded="false" aria-controls="drawer">السجل</button>
+    <span class="vsep" aria-hidden="true"></span><select id="engine" class="chipsel engine" title="المساعد" aria-label="اختيار المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option></select>
+    <span class="vsep" aria-hidden="true"></span><button type="button" class="chipbtn" id="logBtn" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg><span class="lbl-t">السجل</span></button><span class="vsep" aria-hidden="true"></span>
+    <button class="ic send" id="send" title="إرسال" aria-label="إرسال"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L10.5 13.5"/><path d="M21 3l-6.8 18-3.7-7.5L3 9.8z"/></svg></button>
     <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة" aria-label="تكلّم مع نورة بالصوت" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
-    <button class="ic send" id="send" title="إرسال" aria-label="إرسال" hidden><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
   </form>
-  <div id="status"><span id="stTxt">اضغط زر الصوت وكلّم نورة، أو اكتب سؤالك</span><button type="button" class="retry" id="retry" hidden>إعادة المحاولة</button></div>
+  <div id="status"><span id="stTxt">اكتب طلبك أو اضغط للتحدث.</span><button type="button" class="retry" id="retry" hidden>إعادة المحاولة</button></div>
   <input type="file" id="file" hidden aria-label="اختيار ملف للرفع" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
 </div>
 <script type="module">
@@ -349,7 +431,8 @@ $('#drClose').onclick = () => openLog(false, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#drawer').hidden) { e.preventDefault(); openLog(false, true); } });
 document.addEventListener('pointerdown', e => { if (!$('#drawer').hidden && !e.target.closest('#drawer, #logBtn, #f, #status')) openLog(false); });
 $('#caption').onclick = () => openLog(true);
-$('#txt').addEventListener('input', () => { $('#send').hidden = !$('#txt').value.trim(); });
+$('#txt').addEventListener('input', () => { $('#send').setAttribute('aria-disabled', String(!$('#txt').value.trim())); });
+$('#send').setAttribute('aria-disabled', 'true');
 function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; trimLog(); }
 
 // HUD: النوافذ المنبثقة (نورة تفتحها بأدوات show_*)
@@ -664,6 +747,11 @@ $('#mic').onclick = async () => {
   try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); $('#mic').setAttribute('aria-pressed', 'true'); }
   catch (e) { setStatus('❌ ' + e.message); }
 };
+// اختصارات الشاشة الأولى: ترسل الطلب لنورة (عشان تتكلم وتعرض بنفس اللحظة)، و«حلّل ملفاً» يفتح اختيار الملف
+document.querySelectorAll('.qa-btn').forEach(b => b.onclick = () => {
+  if (b.dataset.act === 'file') return $('#file').click();
+  $('#txt').value = b.dataset.say; $('#f').requestSubmit();
+});
 $('#retry').onclick = async () => {
   setStatus('جاري الاتصال…');
   try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); }
@@ -671,7 +759,7 @@ $('#retry').onclick = async () => {
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
   if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); return; } }
-  agent.sendText(t); $('#txt').value = ''; $('#send').hidden = true;
+  agent.sendText(t); $('#txt').value = ''; $('#send').setAttribute('aria-disabled', 'true');
 };
 
 // ===== رفع الملفات =====

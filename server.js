@@ -317,8 +317,9 @@ app.get(/^\/vendor\/plex\/((?:files\/)?[\w.-]+\.(?:css|woff2?))$/, (req, res) =>
 app.get('/health', (req, res) => res.send('ok'));
 // هوية اتحاد الغرف (الشعار)
 app.get('/brand/:f', (req, res) => {
-  if (!['fsc-logo.svg', 'fsc-logo-dark.svg'].includes(req.params.f)) return res.status(404).end();
-  res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').sendFile(req.params.f, { root: 'brand' });
+  // الأصول الأصلية محفوظة كما هي، ونسخ العرض البيضاء الشفافة منفصلة (fsc-logo-white.svg, tujar-logo-white.png)
+  if (!['fsc-logo.svg', 'fsc-logo-dark.svg', 'fsc-logo-white.svg', 'tujar-logo-original.png', 'tujar-logo-white.png'].includes(req.params.f)) return res.status(404).end();
+  res.type(req.params.f.endsWith('.png') ? 'image/png' : 'image/svg+xml').set('Cache-Control', 'public, max-age=86400').sendFile(req.params.f, { root: 'brand' });
 });
 app.get('/d/:id', (req, res) => res.sendFile('dash.html', { root: '.', headers: { 'Cache-Control': 'no-cache' } }));
 
