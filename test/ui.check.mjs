@@ -54,6 +54,12 @@ try {
     for (const [eng, name, ready, say] of [['eleven', 'فواز', /جاهز(?!ة)/, 'اعرض لي المشاريع'], ['gemini', 'نورة', /جاهزة/, 'اعرضي لي المشاريع']]) {
       await p.selectOption('#engine', eng); await p.waitForTimeout(400);
       const g = await p.evaluate(() => ({ chip: document.querySelector('#chip').innerText, ph: document.querySelector('#txt').placeholder, inLbl: document.querySelector('#txt').getAttribute('aria-label'), mic: document.querySelector('#mic').getAttribute('aria-label'), micT: document.querySelector('#mic').title, opt: document.querySelector('#engine').selectedOptions[0].textContent, say: document.querySelector('.qa-btn[data-say]').dataset.say }));
+      for (const w of [1280, 390]) {
+        await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(200);
+        const fit = await p.evaluate(() => { const e = document.querySelector('#engine'); const c = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(e); c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; return { need: Math.ceil(c.measureText(e.selectedOptions[0].textContent).width) + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 18, have: e.clientWidth, cap: cs.maxWidth, sw: document.documentElement.scrollWidth, vw: innerWidth }; });
+        ok(`engine label not clipped at ${w}px (${eng})`, fit.have >= fit.need && fit.cap === 'none' && fit.sw <= fit.vw, JSON.stringify(fit));
+      }
+      await p.setViewportSize({ width: 1280, height: 800 });
       ok(`persona ${eng}`, g.chip.includes(name) && ready.test(g.chip) && g.ph === `اسأل ${name}…` && g.inLbl.includes(name) && g.mic.includes(name) && g.micT.includes(name) && g.opt === `المساعد: ${name}` && g.say === say, JSON.stringify(g));
     }
   }
