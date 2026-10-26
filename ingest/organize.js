@@ -14,9 +14,22 @@ const sameCols = (a, b) => a.columns.length === b.columns.length && (a.columns.e
 
 // جدول بلوحتين (أو أكثر) جنباً إلى جنب بنفس الأعمدة: نفكّه إلى صفوف بدل أن تطغى أعمدة على أخرى بنفس الاسم
 const normCol = x => String(x || '').replace(/\s+/g, ' ').trim();
+// رقم اللوحة الذي قد يضيفه المحرك للأسماء: «الغرفة (2)» / «الغرفة 2» / «الغرفة - 2»
+const panelBase = x => normCol(x).replace(/\s*[-–—]?\s*[(（\[]?\s*[0-9٠-٩]+\s*[)）\]]?\s*$/, '').trim();
 export function unstackRepeated(t) {
-  const names = t.columns.map(c => normCol(c.name)), n = names.length;
-  for (let g = 1; g <= n / 2; g++) {
+  const n = t.columns.length;
+  // نجرب أسماء الأعمدة بعد حذف رقم اللوحة، ثم صف العناوين المطبوع (حصل فعلاً: v5 أعاد «(1)/(2)» في الأسماء لكن العناوين مكررة حرفياً)
+  const candidates = [t.columns.map(c => panelBase(c.name)), ...(t.header_rows || []).filter(h => h.length === n).map(h => h.map(panelBase))];
+  for (const names of candidates) {
+    const r = tryUnstack(t, names);
+    if (r) return r;
+  }
+  return dedupeCols(t);
+}
+function tryUnstack(t, names) {
+  const n = names.length;
+  if (names.some(x => !x)) return null; // اسم صار فاضياً بعد حذف الرقم (مثل أعمدة سنوات 2025/2026) — ليس لوحات
+  for (let g = 2; g <= n / 2; g++) { // لوحة من عمودين على الأقل: عمود مكرر وحده ليس نمط لوحات
     if (n % g) continue;
     if (!names.every((x, i) => x === names[i % g])) continue;
     const k = n / g;
@@ -28,8 +41,11 @@ export function unstackRepeated(t) {
       // نوع الصف المطبوع يخص السطر كاملاً (قد يجمع غرفة من لوحة وإجمالي من أخرى) — بعد الفك يُحدد من نص الخلية نفسها
       rows.push(part); kinds.push(['total', 'subtotal'].includes(t.row_kinds[i]) ? 'detail' : (t.row_kinds[i] || 'detail'));
     });
-    return { ...t, columns: t.columns.slice(0, g), rows, row_kinds: kinds, header_rows: (t.header_rows || []).map(h => h.slice(0, g)), unstacked: { panels: k, group: g } };
+    return { ...t, columns: t.columns.slice(0, g).map((c, j) => ({ ...c, name: names[j] || panelBase(c.name) })), rows, row_kinds: kinds, header_rows: (t.header_rows || []).map(h => h.slice(0, g)), unstacked: { panels: k, group: g } };
   }
+  return null;
+}
+function dedupeCols(t) {
   // أسماء مكررة بلا نمط واضح: نميّزها بلاحقة حتى لا تضيع خلايا بصمت
   const seen = {};
   const columns = t.columns.map(c => { const b = normCol(c.name) || 'عمود'; seen[b] = (seen[b] || 0) + 1; return seen[b] > 1 ? { ...c, name: `${b} (${seen[b]})` } : c; });

@@ -75,6 +75,7 @@ export async function reprocess(versionIdArg) {
 
 // ===== المشغّل =====
 const running = new Map();
+export const _isRunning = att => running.has(att);
 export function kick(att) {
   if (running.has(att)) return running.get(att);
   const p = (async () => {
