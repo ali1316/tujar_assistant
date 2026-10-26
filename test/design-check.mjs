@@ -9,7 +9,7 @@ import { join } from 'node:path';
 const args = process.argv.slice(2);
 const outI = args.indexOf('--out'); const OUT = outI >= 0 ? args.splice(outI, 2)[1] : 'test/design-out';
 const BASE = (args[0] || 'http://localhost:3000').replace(/\/$/, '');
-const FIXTURES = ['bar', 'hbar', 'pie', 'stacked', 'line', 'note'];
+const FIXTURES = ['bar', 'hbar', 'pie', 'stacked', 'line', 'note', 'note2'];
 const WIDTHS = [{ w: 1440, h: 900 }, { w: 768, h: 1024 }, { w: 390, h: 844 }];
 mkdirSync(OUT, { recursive: true });
 
@@ -52,7 +52,7 @@ for (const fx of FIXTURES) for (const { w, h } of WIDTHS) {
   if (m.emoji) add('WARN', fx, w, 'emoji', `رموز تعبيرية داخل اللوحة: ${m.emoji}`);
   if (m.digitSets.length > 1) add('FAIL', fx, w, 'mixed-digits', 'أرقام عربية وإنجليزية مخلوطة في نفس اللوحة');
   if (m.lastBottom > m.dockTop + 1) add('FAIL', fx, w, 'under-dock', `آخر عنصر مختفي تحت شريط نورة (${Math.round(m.lastBottom - m.dockTop)}px)`);
-  if (fx !== 'note') {
+  if (!fx.startsWith('note')) {
     if (!m.svg || m.svg.w < 200 || m.svg.h < 150) add('FAIL', fx, w, 'chart-size', `الشارت صغير أو ما ظهر (${m.svg ? `${Math.round(m.svg.w)}×${Math.round(m.svg.h)}` : 'لا يوجد'})`);
     if (m.overlaps > 0) add(m.overlaps > 2 ? 'FAIL' : 'WARN', fx, w, 'label-overlap', `${m.overlaps} تداخل بين نصوص الشارت`);
     const nums = m.dataLabels.map(toNum).filter(v => v !== null);
