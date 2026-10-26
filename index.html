@@ -109,7 +109,7 @@
 <div id="gate"><form id="gf"><h2 style="text-align:center;color:var(--ink)">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
 <main>
   <section id="home">
-    <div id="empty"><h2 id="hello">هلا فواز، وش نسوي اليوم؟</h2><p>اطلب بالصوت أو بالكتابة — المشاريع، مهامك، ملف ترفعه، داشبورد، رسالة واتساب…</p></div>
+    <div id="empty"><h2 id="hello">هلا فواز، وش نسوي اليوم؟</h2><p>اطلب بالصوت أو بالكتابة: المشاريع، مهامك، ملف ترفعه، داشبورد، رسالة واتساب…</p></div>
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
@@ -122,8 +122,8 @@
     <div class="card sec" data-v="tasks" hidden><h2>مهامي</h2><table id="tasks"></table></div>
     <div class="card docs sec" data-v="files" hidden><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
     <div class="card docs sec" data-v="dashboards" hidden><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
-    <div class="card docs sec" data-v="memory" hidden><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
-    <div class="card docs sec" data-v="dev_requests" hidden><h2>طلبات التطوير · ينفّذها Claude</h2><ul id="devreq"><li><small>ما فيه طلبات للحين — قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
+    <div class="card docs sec" data-v="memory" hidden><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية. قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
+    <div class="card docs sec" data-v="dev_requests" hidden><h2>طلبات التطوير · ينفّذها Claude</h2><ul id="devreq"><li><small>ما فيه طلبات للحين. قل لنورة مثلاً: «أبي صفحة تقارير شهرية»</small></li></ul></div>
   </section>
   <section id="view" hidden></section>
 </main>
@@ -186,11 +186,11 @@ async function loadDashboard(flash) {
     `<li><a href="/d/${x.id}" target="_blank" style="color:var(--acc)">#${x.id} ${esc(x.title)}</a><small>${String(x.created_at).slice(0, 16).replace('T', ' ')}</small></li>`).join('');
   if (d.memories?.length) $('#mems').innerHTML = d.memories.map(m =>
     `<li><span><small>[${m.category}]</small> ${esc(m.content)}</span><button class="memdel" data-id="${m.id}" title="انسيها" style="background:none;border:none;color:var(--mute);cursor:pointer">✕</button></li>`).join('');
-  else $('#mems').innerHTML = '<li><small>فاضية — قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li>';
+  else $('#mems').innerHTML = '<li><small>فاضية. قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li>';
   const T = d.tasks || [];
   $('#tasks').innerHTML = T.length ? '<tr><th>#</th><th>المهمة</th><th>الأولوية</th><th>الموعد</th><th>الحالة</th></tr>' + T.map(t =>
     `<tr style="${t.status === 'منجزة' || t.status === 'ملغاة' ? 'opacity:.5' : ''}"><td class="num">${num(t.id)}</td><td>${esc(t.title)}${t.notes ? `<br><small style="color:var(--mute)">${esc(t.notes)}</small>` : ''}</td><td><span class="tag ${t.priority}">${t.priority}</span></td><td class="num">${t.due_date || '—'}</td><td><span class="tag ${t.status === 'منجزة' ? 'مكتمل' : ''}">${t.status}</span></td></tr>`).join('')
-    : '<tr><td><small style="color:var(--mute)">ما فيه مهام — قل: «سجّل لي مهمة…»</small></td></tr>';
+    : '<tr><td><small style="color:var(--mute)">ما فيه مهام. قل: «سجّل لي مهمة…»</small></td></tr>';
   if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
     `<li><span>#${r.id} ${esc(r.title)}${r.dev_note ? `<br><small style="color:var(--sand)">✦ Claude: ${esc(r.dev_note)}</small>` : ''}</span><small>${esc(r.status)} · ${(r.updated_at || r.created_at).slice(0, 16)}</small></li>`).join('');
   if (d.documents.length) $('#docs').innerHTML = d.documents.map(x =>
@@ -376,7 +376,11 @@ const screenToolsExtra = {
     const secs = (e.sections || []).map(x => typeof x === 'string' ? x : x.section);
     // لو فيه قسم مطابق للسؤال نعرض بنوده هو (هي اللي بتتكلم عنها نورة)، وإلا الملخص
     const top = (e.sections || []).find(x => typeof x !== 'string' && x.text);
-    const all = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l) : [];
+    // سطر مكسور من PDF (حرف مفرد في بدايته أو حرفين مفردين، أو حروف ملتصقة بأرقام طويلة) ما ينعرض
+    const SHORT_OK = new Set(['في', 'من', 'عن', 'او', 'أو', 'لا', 'ما', 'هو', 'هي', 'إن', 'أن', 'ان', 'لم', 'لن', 'قد', 'كل', 'ثم', 'بل', 'يا', 'إذ', 'به', 'له', 'لك', 'كم', 'مع', 'ذا', 'كي', 'و']);
+    const bad = t => { const w = t.replace(/[«»"'()،,:؛.؟?!·–-]/g, ''); return (/^\p{Script=Arabic}{1,2}$/u.test(w) && !SHORT_OK.has(w)) || /\p{Script=Arabic}[0-9٠-٩]|[0-9٠-٩]\p{Script=Arabic}/u.test(w); };
+    const broken = l => { const ts = l.split(/\s+/).filter(t => /\p{Script=Arabic}/u.test(t)); return bad(ts[0] || '') || ts.filter(bad).length / (ts.length || 1) >= 0.25; };
+    const all = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l) && !broken(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l) : [];
     // البنود الأقرب لسؤال فواز أولاً (عشان الشاشة تعرض نفس اللي نورة بتقوله)، بترتيبها في الملف
     const nz = x => String(x).replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
     const qt = nz(args.question || '').split(/[^\p{L}\p{N}]+/u).map(w => (w.length > 4 && w.startsWith('ال') ? w.slice(2) : w)).filter(w => w.length > 2);
@@ -390,7 +394,7 @@ const screenToolsExtra = {
     const heads = [e.title, top?.section || ''].map(x => x.replace(/^\d+\.\s*/, ''));
     const merged = items.filter(l => !heads.some(h => h && (h.includes(l) || l.includes(h)))).reduce((a, l) => { const p = a.at(-1); if (p && !/\d/.test(p) && /^[\d٠-٩]/.test(l) && p.length < 60) a[a.length - 1] = `${p}: ${l}`; else a.push(l); return a; }, []).slice(0, 6);
     if (merged.length >= 1) lines.splice(0, lines.length, ...merged);
-    if (e.status && !/كاملة/.test(e.status)) lines.push('تنبيه: ' + e.status);
+    if (e.status && !/كاملة/.test(e.status)) lines.push('تنبيه: ' + e.status.replace(/\s+—\s+/g, '، '));
     hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: top?.cite ? 'المصدر ' + top.cite.replace(`${e.title} · `, '') : secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
     return { ...r, on_screen: lines };
   },
@@ -482,7 +486,7 @@ $('#engine').onchange = async () => {
   agent = makeAgent(ENGINE);
   applyPersona();
   note(`⚙️ المساعد صار: ${ENGINE === 'eleven' ? 'فواز' : 'نورة'}`);
-  $('#status').textContent = `${ENGINE === 'eleven' ? 'فواز' : 'نورة'} جاهز${ENGINE === 'eleven' ? '' : 'ة'} — اضغط زر الصوت أو اكتب`;
+  $('#status').textContent = `${ENGINE === 'eleven' ? 'فواز' : 'نورة'} جاهز${ENGINE === 'eleven' ? '' : 'ة'}، اضغط زر الصوت أو اكتب`;
   await fillVoices();
 };
 fillVoices();
@@ -527,7 +531,7 @@ async function uploadFile(file) {
   const r = await api('/api/upload', { method: 'POST', body: fd });
   const d = await r.json();
   if (!r.ok) return note('❌ ' + d.error);
-  if (d.duplicate) { note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id}) — نفس البصمة، ما كررته`); return; }
+  if (d.duplicate) { note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id})، نفس البصمة فما كررته`); return; }
   if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»${k.dataset_ids?.length ? ` (جداول ${k.dataset_ids.map(i => '#' + i).join('، ')})` : ''}${k.sections ? ` · ${k.sections} قسم` : ''}`); return; }
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
   loadDashboard();
@@ -558,7 +562,7 @@ function connectLive() {
   const es = window.__live = new EventSource(`/api/events?code=${encodeURIComponent(CODE)}`);
   es.addEventListener('hello', e => {
     const { boot } = JSON.parse(e.data);
-    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; $('#status').textContent = 'فيه تحديث جديد — ينطبق بعد ما تخلص المحادثة'; } else location.reload(); }
+    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; $('#status').textContent = 'فيه تحديث جديد، ينطبق بعد ما تخلص المحادثة'; } else location.reload(); }
     BOOT ||= boot;
   });
   es.addEventListener('data', () => { clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });

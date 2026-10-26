@@ -122,6 +122,15 @@ function vectors() {
   return vecCache;
 }
 
+// جودة النص: نسبة الكلمات المكسورة من استخراج PDF (حرف عربي مفرد، أو حروف ملتصقة بأرقام طويلة)
+const SHORT_OK = new Set(['في', 'من', 'عن', 'او', 'أو', 'لا', 'ما', 'هو', 'هي', 'إن', 'أن', 'ان', 'لم', 'لن', 'قد', 'كل', 'ثم', 'بل', 'يا', 'إذ', 'به', 'له', 'لك', 'كم', 'مع', 'ذا', 'كي', 'و']);
+export const badToken = t => { const w = t.replace(/[«»"'()،,:؛.؟?!·–-]/g, ''); return (/^\p{Script=Arabic}{1,2}$/u.test(w) && !SHORT_OK.has(w)) || /\p{Script=Arabic}[0-9٠-٩]|[0-9٠-٩]\p{Script=Arabic}/u.test(w); };
+export function garble(text) {
+  const toks = String(text || '').split(/\s+/).filter(t => /\p{Script=Arabic}/u.test(t));
+  if (toks.length < 3) return 0;
+  return toks.filter(badToken).length / toks.length;
+}
+
 // ===== 3) البحث الهجين =====
 export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true } = {}) {
   const t0 = performance.now();
@@ -148,7 +157,8 @@ export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true 
     const hay = normalize(`${r.title} ${r.section || ''} ${r.text}`), hs = hay.replace(/\s+/g, '');
     const cov = ts.length ? ts.filter(t => hay.includes(t) || hs.includes(t)).length / ts.length : 0;
     const c = Math.max(0, cand.get(r.id)?.cos || 0);
-    return { ...r, cos: +c.toFixed(4), cov: +cov.toFixed(3), score: +(qv ? W_COS * c + W_COV * cov : cov).toFixed(4) };
+    const q = 1 - Math.min(0.4, garble(r.text) * 2); // نص PDF مكسور («غر فة تجار ية17») ينزل تحت النص السليم
+    return { ...r, cos: +c.toFixed(4), cov: +cov.toFixed(3), quality: +q.toFixed(3), score: +((qv ? W_COS * c + W_COV * cov : cov) * q).toFixed(4) };
   }).sort((a, b) => b.score - a.score).slice(0, k).map((h, i) => ({ n: i + 1, ...h }));
   return { hits, ms: performance.now() - t0, mode: qv ? 'hybrid' : 'keyword' };
 }
