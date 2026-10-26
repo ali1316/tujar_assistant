@@ -373,6 +373,10 @@ const screenToolsExtra = {
     if (!e) return r;
     const lines = String(e.summary || e.purpose || '').split(/(؛|\.\s+|\n+)/).reduce((a, t) => { const open = a.length && (a.at(-1).match(/\(/g) || []).length > (a.at(-1).match(/\)/g) || []).length; if (open) a[a.length - 1] += t; else if (!/^(؛|\.\s+|\n+)$/.test(t)) a.push(t); return a; }, []).map(t => t.trim()).filter(t => t.length > 3);
     const secs = (e.sections || []).map(x => typeof x === 'string' ? x : x.section);
+    // لو فيه قسم مطابق للسؤال نعرض بنوده هو (هي اللي بتتكلم عنها نورة)، وإلا الملخص
+    const top = (e.sections || []).find(x => typeof x !== 'string' && x.text);
+    const items = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l).slice(0, 7) : [];
+    if (items.length >= 2) lines.splice(0, lines.length, ...items);
     if (e.status && !/كاملة/.test(e.status)) lines.push('⚠️ ' + e.status);
     hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
     return { ...r, on_screen: lines };
