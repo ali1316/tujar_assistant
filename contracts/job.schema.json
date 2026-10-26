@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nora-ingest/1/job",
+  "title": "مهمة معالجة (kv: ingest:job:<attempt_id>) — قابلة للاستئناف",
+  "type": "object",
+  "required": ["attempt_id", "document_id", "version", "version_id", "stage"],
+  "properties": {
+    "attempt_id": { "type": "string", "pattern": "^att-[0-9]{14}-[0-9a-f]{6}$" },
+    "document_id": { "type": "string" },
+    "version": { "type": "integer" },
+    "version_id": { "type": "string" },
+    "file_name": { "type": "string" },
+    "stage": { "enum": ["uploaded", "queued", "extracting", "organizing", "validating", "ready", "partial", "failed"] },
+    "pages_total": { "type": ["integer", "null"] },
+    "page_results": { "type": "object", "description": "نقطة استئناف: نتيجة كل صفحة منجزة (تُختصر بعد الانتهاء)" },
+    "issues": { "type": "array", "items": { "type": "object", "properties": { "page": { "type": ["integer", "null"] }, "element": { "type": "string" }, "reason": { "type": "string" } } } },
+    "errors": { "type": "array", "items": { "type": "object", "properties": { "at": { "type": "string" }, "stage": { "type": "string" }, "message": { "type": "string" }, "retry": { "type": "integer" } } } },
+    "links": { "type": ["object", "null"] }
+  }
+}

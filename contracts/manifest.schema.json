@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nora-ingest/1/manifest",
+  "title": "manifest.json — على مستوى المستند (يُكتب آخراً بعد اكتمال ملفات الإصدار)",
+  "type": "object",
+  "required": ["schema", "document_id", "file_name", "current_version", "versions"],
+  "properties": {
+    "schema": { "const": "nora-ingest/1" },
+    "document_id": { "type": "string" },
+    "file_name": { "type": "string" },
+    "current_version": { "type": ["integer", "null"], "description": "آخر إصدار حالته ready أو partial؛ لا يتغير لو فشل إصدار أحدث" },
+    "versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["n", "version_id", "sha256", "status", "attempt_id"],
+        "properties": {
+          "n": { "type": "integer" },
+          "version_id": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "status": { "enum": ["uploaded", "queued", "extracting", "organizing", "validating", "ready", "partial", "failed"] },
+          "attempt_id": { "type": "string" },
+          "uploaded_at": { "type": "string", "format": "date-time" },
+          "folder": { "type": ["string", "null"], "description": "رابط مجلد الإصدار في Drive (خاص)" },
+          "files": { "type": "object", "additionalProperties": { "type": "object", "properties": { "id": { "type": "string" }, "url": { "type": "string" }, "bytes": { "type": "integer" } } } },
+          "datasets": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "state": { "enum": ["ready", "ready_with_notes", "blocked", "text_only"] } } } }
+        }
+      }
+    }
+  }
+}

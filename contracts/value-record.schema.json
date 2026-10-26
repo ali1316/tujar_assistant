@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nora-ingest/1/value-record",
+  "title": "سجل قيمة مستخرجة (سطر في metrics.jsonl)",
+  "type": "object",
+  "required": [
+    "id",
+    "document_id",
+    "version_id",
+    "source",
+    "raw",
+    "kind",
+    "verification",
+    "extraction"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "معرّف ثابت: <version_id>#<kind>-<hash12>"
+    },
+    "document_id": {
+      "type": "string",
+      "pattern": "^pdf-[0-9a-f]{10}$"
+    },
+    "version_id": {
+      "type": "string",
+      "pattern": "^pdf-[0-9a-f]{10}@v[0-9]+$"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type",
+        "page"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "table",
+            "paragraph",
+            "footnote",
+            "list_item",
+            "heading",
+            "caption",
+            "chart",
+            "other"
+          ]
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "رقم صفحة PDF"
+        },
+        "printed_page": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "الرقم المطبوع على الصفحة إن وُجد"
+        },
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "description": "x0,y0,x1,y1 من 0 إلى 1000"
+        },
+        "row": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "column": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "table_id": {
+          "type": "string"
+        },
+        "block_id": {
+          "type": "string"
+        },
+        "chart_id": {
+          "type": "string"
+        }
+      }
+    },
+    "context": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "العبارة المحيطة (±60 حرفاً) للأرقام داخل الفقرات والحواشي"
+    },
+    "raw": {
+      "type": "string",
+      "description": "القيمة كما طُبعت حرفياً"
+    },
+    "kind": {
+      "enum": [
+        "number",
+        "percent",
+        "zero",
+        "missing",
+        "not_applicable",
+        "dash",
+        "text",
+        "date",
+        "identifier"
+      ]
+    },
+    "value": {
+      "type": [
+        "number",
+        "string",
+        "null"
+      ],
+      "description": "القيمة المنظّمة (رقم، أو نص للمعرفات)"
+    },
+    "percent_as_written": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "unit": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "كما ذُكرت؛ لا تحويل عملات"
+    },
+    "period": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dims": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "row_kind": {
+      "enum": [
+        "detail",
+        "total",
+        "subtotal",
+        "section",
+        null
+      ]
+    },
+    "extraction": {
+      "type": "string",
+      "description": "المحرك الذي استخرج القيمة: gemini | text_layer | docling | test"
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "matched_text_layer",
+          "total_reconciled",
+          "cross_referenced",
+          "vision_only",
+          "visual_estimate",
+          "conflict"
+        ]
+      },
+      "description": "حالات وصفية؛ لا نسب ثقة غير معايرة"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "scale": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "ألف/مليون/مليار كما وردت"
+    },
+    "value_source": {
+      "enum": [
+        "written",
+        "estimated"
+      ],
+      "description": "لنقاط الرسوم فقط"
+    },
+    "usable_for_metrics": {
+      "type": "boolean",
+      "description": "true فقط للقيم المتحققة غير المقدّرة وغير المتعارضة"
+    }
+  },
+  "description": "فصل الأنواع: raw = القيمة كما طُبعت، value = المنظّفة، القيم المحسوبة في lineage.jsonl (kind=compute) ولا تُخزن هنا، ولا قيم مستنتجة."
+}
