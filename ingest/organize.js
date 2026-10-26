@@ -24,7 +24,8 @@ export function unstackRepeated(t) {
     for (let s = 0; s < k; s++) t.rows.forEach((r, i) => {
       const part = r.slice(s * g, s * g + g);
       if (part.every(c => String(c ?? '').trim() === '')) return; // لوحة أقصر من الأخرى
-      rows.push(part); kinds.push(t.row_kinds[i] || 'detail');
+      // نوع الصف المطبوع يخص السطر كاملاً (قد يجمع غرفة من لوحة وإجمالي من أخرى) — بعد الفك يُحدد من نص الخلية نفسها
+      rows.push(part); kinds.push(['total', 'subtotal'].includes(t.row_kinds[i]) ? 'detail' : (t.row_kinds[i] || 'detail'));
     });
     return { ...t, columns: t.columns.slice(0, g), rows, row_kinds: kinds, header_rows: (t.header_rows || []).map(h => h.slice(0, g)), unstacked: { panels: k, group: g } };
   }
