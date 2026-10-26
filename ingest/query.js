@@ -57,14 +57,25 @@ export const tools = {
     },
   },
   pdf_find_value: {
-    declaration: { name: 'pdf_find_value', description: 'تبحث عن رقم أو معلومة داخل ملفات PDF المحفوظة (فقرات، حواشي، جداول، رسوم) وترجع القيمة حرفياً مع الصفحة والموضع وحالة التحقق ومعرّف السجل. لا تعيد تحليل الملف. لو ما لقت، قولي بوضوح إنها غير موجودة في المصدر.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'وصف القيمة المطلوبة بكلمات السؤال' }, document_id: { type: 'STRING' } }, required: ['query'] } },
-    run: async ({ query, document_id } = {}) => {
-      const ts = toks(query); if (!ts.length) return { found: false, message: 'اكتب وصفاً للقيمة' };
+    declaration: { name: 'pdf_find_value', description: 'تبحث عن رقم أو معلومة داخل ملفات PDF المحفوظة (فقرات، حواشي، جداول، رسوم) وترجع القيمة حرفياً مع الصفحة والموضع وحالة التحقق ومعرّف السجل. لا تعيد تحليل الملف. لو ما لقت، قولي بوضوح إنها غير موجودة في المصدر.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'وصف القيمة المطلوبة بكلمات السؤال' }, document_id: { type: 'STRING' },
+      source_type: { type: 'STRING', description: 'اختياري: paragraph | footnote | table | chart — لما يحدد السؤال مكان الرقم (فقرة، حاشية، جدول، رسم)' } }, required: ['query'] } },
+    run: async ({ query, document_id, source_type } = {}) => {
+      // مكان الرقم: صريح من المعامل، أو من كلمات السؤال (حاشية/هامش، فقرة/النص، جدول، رسم)
+      const where = source_type || (/حاشي|هامش|footnote/i.test(query) ? 'footnote' : /فقر|في النص|paragraph/i.test(query) ? 'paragraph' : /رسم|شارت|chart/i.test(query) ? 'chart' : null);
+      const q = where && !source_type ? query.replace(/(في\s+)?(الحاشية|حاشية|الحواشي|الهامش|هامش|الفقرة|فقرة|في النص|الرسم|رسم|الشارت)/g, ' ') : query;
+      const ts = toks(q);
       const all = [];
-      for (const data of await sources(document_id)) for (const v of data.values) { const s = score(v, data, ts); if (s >= 0.5) all.push({ s, v, data }); }
+      for (const data of await sources(document_id)) for (const v of data.values) {
+        if (where && v.source.type !== where) continue;
+        const s = ts.length ? score(v, data, ts) : 1; if (s >= 0.5) all.push({ s, v, data });
+      }
+      if (!ts.length && !where) return { found: false, message: 'اكتب وصفاً للقيمة' };
+      // السؤال حدد المكان فقط (مثل «وش الرقم في الحاشية؟»): نرجع قيم ذلك المكان ونوضح أن المطابقة بالمكان لا بالمعنى
+      let byLocation = false;
+      if (where && !all.length) { byLocation = true; for (const data of await sources(document_id)) for (const v of data.values) if (v.source.type === where) all.push({ s: 0, v, data }); }
       all.sort((a, b) => b.s - a.s || (a.v.row_kind === 'total') - (b.v.row_kind === 'total'));
-      if (!all.length) return { found: false, message: 'لم أجد هذه القيمة في مصادر PDF المحفوظة — غير متاحة في المصدر.' };
-      return { found: true, matches: all.slice(0, 8).map(x => pub(x.v, x.data)), note: 'القيم بحالة «تقدير بصري» أو «متعارض» لا تُستخدم كأرقام مؤكدة.' };
+      if (!all.length) return { found: false, ...(where ? { searched_in: where } : {}), message: 'لم أجد هذه القيمة في مصادر PDF المحفوظة — غير متاحة في المصدر.' };
+      return { found: true, ...(byLocation ? { matched_by: 'location_only', searched_in: where } : {}), matches: all.slice(0, 8).map(x => pub(x.v, x.data)), note: 'القيم بحالة «تقدير بصري» أو «متعارض» لا تُستخدم كأرقام مؤكدة.' };
     },
   },
   pdf_get_table: {
@@ -133,7 +144,9 @@ export const tools = {
       if (!v) return { found: false, message: 'معرّف السجل غير موجود.' };
       const ix = await getIndex(); const [docId, vn] = vid.split('@v');
       const ver = ix.documents[docId]?.versions.find(x => x.n === +vn);
-      return { found: true, record_id, page: v.source.page, printed_page: v.source.printed_page, bbox: v.source.bbox?.length ? v.source.bbox : null, location: where(v, data), raw: v.raw, value: v.value, kind: v.kind, unit: v.unit,
+      return { found: true, record_id, page: v.source.page, printed_page: v.source.printed_page, bbox: v.source.bbox?.length ? v.source.bbox : null,
+        ...(!v.source.bbox?.length && v.source.table_id ? (() => { const t = data.tables.find(x => x.id === v.source.table_id); const part = t?.parts?.find(p => p.page === v.source.page); return part?.bbox?.length ? { table_bbox: part.bbox, bbox_note: 'موضع الخلية غير متاح من المحرك؛ هذا موضع الجدول في الصفحة (0–1000)' } : {}; })() : {}),
+        location: where(v, data), raw: v.raw, value: v.value, kind: v.kind, unit: v.unit,
         context: v.context || null, dims: v.dims, extraction: v.extraction, verification: v.verification.map(x => VER_AR[x] || x), usable_for_metrics: usable(v),
         document: data.meta.file_name, version_id: vid, sha256: ver?.sha256 || null,
         links: { original_pdf: ver?.original?.url || null, folder: data.meta.drive?.folder || null, lineage: data.meta.drive?.files?.['lineage.jsonl']?.url || null } };

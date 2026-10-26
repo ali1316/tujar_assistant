@@ -25,7 +25,7 @@ export const PAGE_SCHEMA = {
       level: { type: 'integer' }, text: S('النص حرفياً بترتيب القراءة العربي'), bbox: BBOX,
     }, required: ['type', 'text'] }, 'كل نصوص الصفحة بترتيب القراءة، بدون حذف أو تلخيص'),
     tables: ARR({ type: 'object', properties: {
-      title: S('عنوان الجدول كما هو'), caption: S('شرح أو مصدر تحت الجدول'), units: S('الوحدة العامة لو مذكورة'),
+      title: S('عنوان الجدول كما هو'), caption: S('شرح أو مصدر تحت الجدول'), units: S('الوحدة العامة كما هي مطبوعة حرفياً فقط (مثل «ريال» أو «بالآلاف»)، وإلا فاضي. بدون شرح أو استنتاج'),
       notes: ARR({ type: 'string' }, 'حواشي وملاحظات الجدول حرفياً'),
       continues_from_previous: { type: 'boolean' }, continues_on_next: { type: 'boolean' },
       header_rows: ARR(ARR({ type: 'string' }), 'صفوف العناوين كما هي (قد تكون أكثر من صف)'),
@@ -134,6 +134,8 @@ export async function doclingTables(pdfBuffer, name) {
   }));
 }
 
+// الوحدة تُحفظ فقط لو مطبوعة كوحدة قصيرة؛ أي شرح أو استنتاج من المحرك يُحذف (حصل فعلاً: «عدد / فرد / معاملة (غير محدد صراحة…)»)
+export const literalUnit = u => { const x = String(u ?? '').trim(); return !x || x.length > 30 || /غير محدد|صراحة|بدون|لكن|ربما|يبدو|تقدير|not specified|implied|\(|\)/i.test(x) ? '' : x; };
 function sanitize(j) {
   const arr = v => (Array.isArray(v) ? v : []);
   const str = v => (v == null ? '' : String(v));
@@ -141,14 +143,14 @@ function sanitize(j) {
     printed_page_number: str(j.printed_page_number), observed_kind: str(j.observed_kind), report_date: str(j.report_date), data_period: str(j.data_period),
     blocks: arr(j.blocks).filter(b => b && str(b.text).trim()).map(b => ({ type: str(b.type) || 'paragraph', level: b.level ?? null, text: str(b.text), bbox: arr(b.bbox).slice(0, 4).map(Number) })),
     tables: arr(j.tables).map(t => ({
-      title: str(t.title), caption: str(t.caption), units: str(t.units), notes: arr(t.notes).map(str),
+      title: str(t.title), caption: str(t.caption), units: literalUnit(t.units), notes: arr(t.notes).map(str),
       continues_from_previous: !!t.continues_from_previous, continues_on_next: !!t.continues_on_next,
       header_rows: arr(t.header_rows).map(r => arr(r).map(str)),
-      columns: arr(t.columns).map(c => ({ name: str(c?.name ?? c), unit: str(c?.unit) })),
+      columns: arr(t.columns).map(c => ({ name: str(c?.name ?? c), unit: literalUnit(c?.unit) })),
       rows: arr(t.rows).map(r => arr(r).map(str)), row_kinds: arr(t.row_kinds).map(str), bbox: arr(t.bbox).slice(0, 4).map(Number),
     })).filter(t => t.columns.length && t.rows.length),
     charts: arr(j.charts).map(c => ({
-      title: str(c.title), chart_type: str(c.chart_type), x_label: str(c.x_label), y_label: str(c.y_label), unit: str(c.unit), period: str(c.period), notes: str(c.notes), bbox: arr(c.bbox).slice(0, 4).map(Number),
+      title: str(c.title), chart_type: str(c.chart_type), x_label: str(c.x_label), y_label: str(c.y_label), unit: literalUnit(c.unit), period: str(c.period), notes: str(c.notes), bbox: arr(c.bbox).slice(0, 4).map(Number),
       points: arr(c.points).map(p => ({ series: str(p.series), category: str(p.category), value_text: str(p.value_text), value_source: p.value_source === 'written' ? 'written' : 'estimated' })),
     })),
     images: arr(j.images).map(i => ({ description: str(i.description), bbox: arr(i.bbox).slice(0, 4).map(Number) })),
