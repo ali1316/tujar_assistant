@@ -341,6 +341,9 @@ app.get('/d/:id', (req, res) => res.sendFile('dash.html', { root: '.', headers: 
 // رمز الدخول لكل /api
 app.use('/api', (req, res, next) => {
   if (!ACCESS_CODE || (req.get('x-access-code') || req.query.code) === ACCESS_CODE) return next();
+  // فتح رابط /api مباشرة من المتصفح: صفحة توضيحية بدل JSON مربك (الواجهة نفسها ترسل الرمز في الهيدر)
+  if (req.method === 'GET' && req.accepts(['json', 'html']) === 'html' && !req.get('x-access-code'))
+    return res.status(401).type('html').send('<!doctype html><meta charset="utf-8"><body dir="rtl" style="font-family:system-ui;padding:40px;background:#0f1720;color:#e8e2d6"><h2>هذا رابط داخلي للسيرفر</h2><p>روابط <code>/api</code> تستخدمها واجهة نورة من الداخل ومحمية برمز الدخول. افتح الصفحة الرئيسية:</p><p><a style="color:#d1a65c" href="/">نورة ←</a></p></body>');
   res.status(401).json({ error: 'رمز الدخول غلط' });
 });
 app.get('/api/ping', (req, res) => res.json({ ok: true, boot: BOOT_ID, agent: agentStatus() }));
@@ -533,7 +536,9 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       .catch(e => { console.warn('[drive] archive failed:', e.message); step('archived', { error: e.message.slice(0, 120) }); });
     res.json({ ...doc, datasets, stats: datasets.stats || null, ingest });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    // PDF بدون طبقة نص (ممسوح): المسار القديم يفشل، لكن مسار الاستقبال التفصيلي شغّال بالرؤية — نرجّع حالته بدل فشل كاذب
+    if (ingest && !ingest.error) { step('read', { chars: 0, note: e.message }); return res.json({ id: null, name, chars: 0, datasets: [], stats: null, ingest, legacy_error: e.message }); }
+    res.status(400).json({ error: e.message, ingest });
   }
 });
 

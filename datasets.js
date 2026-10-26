@@ -27,13 +27,25 @@ const toDate = v => {
 export const dateStr = v => v instanceof Date ? toDate(v) : v;
 export function isTabular(name) { return ['.xlsx', '.xls', '.csv'].includes(path.extname(name).toLowerCase()); }
 
+// صف إجمالي/متوسط: أول خلية نصية في الصف (بعد عمود التسلسل) — بتطبيع الهمزة
+const norm = t => String(t ?? '').trim().replace(/[أإآ]/g, 'ا').replace(/ـ/g, '');
+const SUMMARY_RE = /^(ال)?(اجمالي|مجموع|كلي|total|sum|grand total)(?![\p{L}\p{N}])|^(ال)?متوسط(\s+(العام|الكلي))?$|^average$/iu;
+export const isSummaryRow = r => { const c = r.find(v => typeof v === 'string' && v.trim() && !/^\d+$/.test(v.trim())); return c != null && SUMMARY_RE.test(norm(c)); };
+const NA_RE = /^(—|–|-|\.\.|\.\.\.|n\/?a|غير منطبق|لا ينطبق|غير متاح|لا يوجد)$/i;
+export const isNA = v => NA_RE.test(String(v ?? '').trim());
+const isNoteRow = r => { const f = r.filter(v => v != null && String(v).trim() !== ''); return f.length === 1 && typeof f[0] === 'string' && (/^[*•※]|^(المصدر|مصدر|ملاحظة|ملاحظات|source|note)/i.test(f[0].trim()) || f[0].trim().length > 40); };
+
 export function parseWorkbook(buffer, name) {
   // CSV: نقرأه UTF-8 صريح (وإلا العربي يطلع رموز غريبة)
   const wb = path.extname(name || '').toLowerCase() === '.csv'
     ? XLSX.read(Buffer.from(buffer).toString('utf8').replace(/^\uFEFF/, ''), { type: 'string', cellDates: true, raw: false })
-    : XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
+    : XLSX.read(buffer, { type: 'buffer', cellDates: true, cellNF: true, raw: false });
   const out = [];
   for (const sheet of wb.SheetNames) {
+    if (/^(اقرأني|اقرءني|readme|read me|about|تعليمات)$/i.test(sheet.trim())) continue; // ورقة شرح، مو بيانات
+    // خلايا Excel المنسقة كنسبة تنحفظ كسور (0.25): نرجعها كما تظهر (25) عشان تتطابق مع CSV «25%»
+    const ws = wb.Sheets[sheet];
+    for (const a in ws) { const c = ws[a]; if (a[0] !== '!' && c && c.t === 'n' && /%/.test(c.z || '')) c.v = +(c.v * 100).toFixed(10); }
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, raw: true, defval: null, blankrows: false });
     if (!grid.length) continue;
     // صف العناوين = أول صف أغلبه نص
@@ -44,7 +56,9 @@ export function parseWorkbook(buffer, name) {
     let rows = grid.slice(h + 1).filter(r => r.some(c => c != null && String(c).trim() !== ''))
       .map(r => columns.map((_, i) => r[i] instanceof Date ? toDate(r[i]) : (r[i] ?? null)));
     // نتجاهل صفوف «الإجمالي» عشان ما تتكرر الأرقام
-    rows = rows.filter(r => !/^(الإجمالي|المجموع|إجمالي|total|sum)$/i.test(String(r[0] ?? '').trim()));
+    rows = rows.filter(r => !isSummaryRow(r));
+    // سطور الملاحظات/المصدر تحت الجدول (خلية نصية وحدة) مو بيانات
+    while (columns.length >= 2 && rows.length && isNoteRow(rows.at(-1))) rows.pop();
     if (!rows.length) continue;
     out.push({ sheet, columns, rows: rows.slice(0, MAX_ROWS) });
   }
@@ -54,7 +68,7 @@ export function parseWorkbook(buffer, name) {
 // ===== 2) تحليل الأعمدة (Profiling) =====
 export function profile(columns, rows) {
   const cols = columns.map((name, i) => {
-    const vals = rows.map(r => r[i]).filter(v => v != null && String(v).trim() !== '');
+    const vals = rows.map(r => r[i]).filter(v => v != null && String(v).trim() !== '' && !isNA(v)); // «—/غير منطبق» = مفقود، مو نص
     const nums = vals.map(toNum).filter(v => v != null);
     const dates = vals.map(toDate).filter(Boolean);
     const type = vals.length && nums.length / vals.length >= 0.85 ? 'number' : vals.length && dates.length / vals.length >= 0.85 ? 'date' : 'text';

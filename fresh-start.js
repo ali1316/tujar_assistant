@@ -31,9 +31,10 @@ export async function freshStart({ archiveName }) {
   // 1) النسخة الاحتياطية أولاً — بدونها ما نمسح
   if (!process.env.DRIVE_SCRIPT_URL) throw new Error('Drive غير مربوط — ما أقدر أحفظ نسخة احتياطية، فما مسحت شيئاً');
   const st = new DriveStorage(process.env.DRIVE_SCRIPT_URL, archiveName);
+  const bpath = `backup/nora-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`; // اسم فريد: لا يستبدل نسخة سابقة
   const json = JSON.stringify({ created_at: new Date().toISOString(), note: 'نسخة احتياطية قبل البداية الجديدة لنورة', counts: before, data });
-  const file = await st.putFile('backup/nora-backup.json', Buffer.from(json, 'utf8'), 'application/json');
-  const back = await st.getFile('backup/nora-backup.json');
+  const file = await st.putFile(bpath, Buffer.from(json, 'utf8'), 'application/json');
+  const back = await st.getFile(bpath);
   if (!back || back.length !== Buffer.byteLength(json)) throw new Error('تعذّر التحقق من النسخة الاحتياطية — ما مسحت شيئاً');
   // 2) المسح
   const fk = db.pragma('foreign_keys', { simple: true });
@@ -49,5 +50,5 @@ export async function freshStart({ archiveName }) {
   await snapshot(); // نسخة Postgres من جداول SQLite تصير فاضية أيضاً (وإلا ترجع بعد إعادة التشغيل)
   resetKnowledgeCache(); invalidateIndex(); ensureIndex().catch(() => {});
   const after = counts(await collect());
-  return { ok: true, before, after, backup: { name: 'backup/nora-backup.json', url: file?.url || null, bytes: Buffer.byteLength(json), archive: archiveName } };
+  return { ok: true, before, after, backup: { name: bpath, url: file?.url || null, bytes: Buffer.byteLength(json), archive: archiveName } };
 }

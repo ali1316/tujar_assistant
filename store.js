@@ -10,6 +10,7 @@ let pool;
 export async function initStore() {
   if (URL) try {
     pool = new pg.Pool({ connectionString: URL, ssl: /render\.com|sslmode=require/.test(URL) ? { rejectUnauthorized: false } : undefined, max: 5 });
+    pool.on('error', e => console.warn('[store] idle pg client error:', e.message)); // انقطاع اتصال خامل لا يطيّح السيرفر
     await pool.query(`
       CREATE TABLE IF NOT EXISTS memories (id SERIAL PRIMARY KEY, content TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'fact',
         embedding JSONB, hits INT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now());

@@ -319,7 +319,7 @@
     <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة" aria-label="تكلّم مع نورة بالصوت" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
   </form>
   <div id="status"><span id="stTxt">اكتب طلبك أو اضغط للتحدث.</span><button type="button" class="retry" id="retry" hidden>إعادة المحاولة</button></div>
-  <input type="file" id="file" hidden aria-label="اختيار ملف للرفع" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
+  <input type="file" id="file" hidden multiple aria-label="اختيار ملف للرفع" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
 </div>
 <script type="module">
 import { GeminiLiveAgent } from './gemini-live-agent.js';
@@ -872,10 +872,10 @@ function journey(file) {
     set(...a) { q.push(['set', a]); pump(); }, finish(...a) { this.ended = true; q.push(['finish', a]); pump(); }, fail(...a) { this.ended = true; q.push(['fail', a]); pump(); }, msg(t) { q.push(['msg', [t]]); pump(); },
     // تحديث خطوة: state = on | ok | skip | bad ، frac = جزء الخطوة المنجز (0..1) للخطوات القابلة للقياس
     _set(key, state, detail = '', frac) {
-      const s = steps.find(x => x.key === key); if (!s || (s.state === 'ok' && state === 'on')) return false;
+      const s = steps.find(x => x.key === key); if (!s || (['ok', 'skip', 'bad'].includes(s.state) && state === 'on')) return false; // حدث متأخر ما يرجّع خطوة منتهية
       const was = s.state;
       // كل الخطوات قبلها اكتملت فعلاً (السيرفر يرسلها بالترتيب)
-      if (state === 'ok' || state === 'on') steps.slice(0, steps.indexOf(s)).forEach(x => { if (x.state === 'wait' || x.state === 'on') { x.state = 'ok'; x.frac = 1; } });
+      if ((state === 'ok' || state === 'on') && key !== 'archived') steps.slice(0, steps.indexOf(s)).forEach(x => { if (x.state === 'wait' || x.state === 'on') { x.state = 'ok'; x.frac = 1; } });
       s.state = state; s.frac = state === 'ok' || state === 'skip' ? 1 : frac ?? s.frac; if (detail) s.detail = detail;
       this.render();
       return was !== state && (state === 'ok' || state === 'skip'); // محطة جديدة اكتملت ⇒ نعطيها لحظة عرض
@@ -908,6 +908,8 @@ function journey(file) {
       setTimeout(() => el.isConnected && el.classList.add('mini'), 6000);
     },
     _fail(key, why) {
+      key ||= (steps.find(x => x.state === 'on' && x.key !== 'archived') || steps.find(x => x.state === 'wait'))?.key || 'upload';
+      steps.forEach(x => { if (x.state === 'on' && x.key !== key) x.state = 'wait'; });
       this._set(key, 'bad'); el.classList.add('fail'); el.querySelector('.jr-msg').textContent = '❌ ' + why; this.done = true; this.render();
     },
   };
@@ -933,7 +935,7 @@ function onUploadEvent(ev) {
   if (ev.step === 'checked') { j.set('checked', 'ok', ev.duplicate ? 'مكرر' : 'جديد'); if (!ev.duplicate && j.kind !== 'pdf') { j.set('read', 'on'); j.msg('نقرأ محتوى الملف…'); } }
   if (ev.step === 'read') { j.set('read', 'ok', `${n(ev.chars)} حرف`); if (j.kind === 'tabular') { j.set('tables', 'on'); j.msg('نحوّل كل ورقة لجدول ونحلل أعمدتها…'); } }
   if (ev.step === 'tables') { j.stats = ev; j.set('tables', ev.sheets ? 'ok' : 'skip', ev.sheets ? `${ev.sheets} أوراق · ${n(ev.rows)} صف` : 'لا جداول'); }
-  if (ev.step === 'archived') j.set('archived', ev.error ? 'bad' : 'ok', ev.error ? 'تعذّر' : (ev.category || (ev.drive ? 'Drive' : 'محلي')));
+  if (ev.step === 'archived') j.set('archived', ev.error ? 'bad' : ev.drive === false ? 'skip' : 'ok', ev.error ? 'تعذّر' : ev.drive === false ? 'محلي فقط (Drive غير مربوط)' : (ev.category || 'Drive'));
 }
 // رفع بـ XHR عشان نسبة الرفع الحقيقية بالبايت
 function xhrUpload(fd, trace, onProg) {
@@ -951,7 +953,9 @@ function xhrUpload(fd, trace, onProg) {
 let INGEST_LAST = null;
 function trackIngest(ing, jr) {
   if (ing.error) { jr?.fail('original', 'مسار PDF: ' + ing.error); return note('⚠️ مسار PDF: ' + ing.error); }
-  if (ing.duplicate) {
+  const FINAL = ['ready', 'partial', 'failed'];
+  if (ing.duplicate && ing.attempt_id && !FINAL.includes(ing.status)) note(`🗂️ نفس الـ PDF قيد المعالجة الحين (${ing.version_id}) — نتابع نفس المهمة بدون تكرار`);
+  else if (ing.duplicate) {
     note(`🗂️ نفس الـ PDF معالج سابقاً (${ing.version_id} · ${ing.status}) — ما تكررت المعالجة`);
     jr?.finish('الملف معالج من قبل — جاهز للأسئلة', [`الإصدار ${ing.version_id.split('@')[1] || ing.version_id}`, { ready: 'جاهز ومتحقق', partial: 'جاهز جزئياً', failed: 'فشل', queued: 'في الانتظار', extracting: 'قيد الاستخراج', organizing: 'قيد التنظيم', validating: 'قيد التحقق' }[ing.status] || ing.status], [], { rest: 'skip' });
     return;
@@ -960,9 +964,11 @@ function trackIngest(ing, jr) {
   jr?.set('original', 'ok', ing.version_id?.split('@')[1] || ''); jr?.set('extract', 'on', '', 0); jr?.msg('نقرأ الصفحات وحدة وحدة…');
   const el = Object.assign(document.createElement('div'), { className: 'm t ingest-card' });
   $('#log').append(el); $('#log').scrollTop = 1e9;
-  let last = '', tries = 0;
+  let last = '', tries = 0, missing = 0;
   const tick = async () => {
     const j = await apiJson(`/api/ingest/jobs/${encodeURIComponent(id)}`).catch(() => null);
+    if (j?.error && ++missing >= 3) { el.textContent = '⚠️ مهمة PDF غير موجودة على السيرفر: ' + j.error; jr?.fail(null, 'المهمة ما عادت موجودة على السيرفر'); return; }
+    if (j && !j.error) missing = 0;
     if (j && !j.error) {
       INGEST_LAST = j;
       const pages = j.pages_total ? ` · الصفحات ${j.pages_done}/${j.pages_total}` : '';
@@ -979,7 +985,7 @@ function trackIngest(ing, jr) {
           const a = (u, t) => u ? ` <a href="${u}" target="_blank" rel="noopener">${t}</a>` : '';
           el.insertAdjacentHTML('beforeend', `<div class="ingest-links">${a(j.links.folder, 'المجلد')}${a(j.links.review_xlsx, 'Excel')}${a(j.links.quality_report, 'تقرير الجودة')}${a(j.links.document_md, 'النص الكامل')}</div>`);
         }
-        if (j.stage === 'failed') { note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || '')); jr?.fail('validate', 'فشلت المعالجة، والإصدار السابق باقي كما هو'); }
+        if (j.stage === 'failed') { note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || '')); jr?.fail(null, 'فشلت المعالجة، والإصدار السابق باقي كما هو'); }
         else {
           if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
           if (agent?.connected) agent.sendText(`[تنبيه النظام] انتهت معالجة PDF «${j.file_name}» بحالة ${j.stage_ar} (${j.pages_done}/${j.pages_total} صفحة، ${j.issues} مشكلة). الإصدار ${j.version_id}. استخدمي pdf_sources ثم pdf_* للأسئلة، واذكري رقم الصفحة، ولا تخترعي ما ليس في المصدر.`, { silent: true });
@@ -1001,7 +1007,7 @@ async function uploadFile(file) {
   try { r = await xhrUpload(fd, jr.trace, f => { jr.set('upload', 'on', `${Math.round(f * 100)}%`, f); jr.msg(f < 1 ? 'نرفع الملف للسيرفر…' : 'وصل الملف، السيرفر يستلمه…'); }); }
   catch (e) { jr.fail('upload', e.message); return note('❌ ' + e.message); }
   const d = r.d;
-  if (!r.ok) { jr.fail(jr.steps.find(s => s.state === 'on')?.key || 'upload', d.error || 'تعذّر الرفع'); return note('❌ ' + (d.error || 'تعذّر الرفع')); }
+  if (!r.ok) { jr.set('upload', 'ok'); jr.fail(null, d.error || 'تعذّر الرفع'); return note('❌ ' + (d.error || 'تعذّر الرفع')); }
   // الاستجابة وصلت = كل خطوات السيرفر خلصت فعلاً (لو فاتنا حدث لحظي)
   jr.set('checked', 'ok', d.duplicate ? 'مكرر' : 'جديد');
   if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»`); jr.finish('انضاف لمكتبة المعرفة', [k.title || k.id], [], { rest: 'skip' }); return; }
@@ -1034,7 +1040,7 @@ async function uploadFile(file) {
   const close = () => jr.finish(g.ok ? 'الملف جاهز ولوحته معروضة' : 'الملف محفوظ — اللوحة تحتاج طلب من نورة',
     [...(st?.sheets ? [arN(st.sheets, 'ورقة', 'أوراق'), arN(st.rows, 'صف', 'صفوف'), arN(st.measures, 'مقياس', 'مقاييس')] : [`${(d.chars || 0).toLocaleString('en-US')} حرف`]), ...(archived.state === 'ok' ? [`Drive: ${archived.detail}`] : [])]);
   const wait0 = performance.now();
-  const waitArchive = () => { if (archived.state === 'ok' || archived.state === 'bad') return close(); if (performance.now() - wait0 > 60000) { jr.set('archived', 'skip', 'جارية'); return close(); } setTimeout(waitArchive, 500); };
+  const waitArchive = () => { if (['ok', 'bad', 'skip'].includes(archived.state)) return close(); if (performance.now() - wait0 > 60000) { jr.set('archived', 'skip', 'جارية'); return close(); } setTimeout(waitArchive, 500); };
   waitArchive();
 }
 $('#attach').onclick = () => $('#file').click();
