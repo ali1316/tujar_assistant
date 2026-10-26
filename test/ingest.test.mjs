@@ -97,8 +97,9 @@ ok('بعد ضياع الكاش: البيانات تُقرأ من الحزمة ب
 
 // 8) جدول بلوحتين متجاورتين بنفس الأعمدة (حالة حقيقية من تقرير تجار ص6): لا تضيع اللوحة الثانية
 const { unstackRepeated } = await import('../ingest/organize.js');
-const two = unstackRepeated({ columns: ['الغرفة', 'المستخدمون', 'الغرفة', 'المستخدمون'].map(name => ({ name })), rows: [['أ', '10', 'ج', '3'], ['ب', '7', 'الإجمالي', '20']], row_kinds: ['detail', 'detail'], header_rows: [] });
+const two = unstackRepeated({ columns: ['الغرفة', 'المستخدمون', 'الغرفة', 'المستخدمون'].map(name => ({ name })), rows: [['أ', '10', 'ج', '3'], ['ب', '7', 'الإجمالي', '20']], row_kinds: ['detail', 'total'], header_rows: [] });
 ok('جدول بلوحتين متجاورتين يُفك إلى صفوف بدون فقد', two.columns.length === 2 && two.rows.length === 4 && two.rows.map(r => r[0]).join(',') === 'أ,ب,ج,الإجمالي', JSON.stringify(two.rows));
+ok('صف يجمع غرفة وإجمالياً في لوحتين: الغرفة لا تُعلَّم إجمالياً', two.row_kinds[1] === 'detail', two.row_kinds.join(','));
 
 // 9) إعادة معالجة صريحة: إصدار جديد من نفس الأصل، والسابق يبقى
 const r4 = await P.reprocess(r1.version_id);
