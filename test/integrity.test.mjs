@@ -178,3 +178,10 @@ test('TTS upstream is aborted when the browser disconnects', async () => {
   assert.equal(signal.aborted, true);
   assert.ok(res.writes < 5, `writes=${res.writes}`);
 });
+test('فواز speaks with his cloned voice through v4 Turbo', async () => {
+  const E = await import('../eleven.js'); const { personaBlock } = await import('../personas.js');
+  assert.equal(E.voiceFor('fawaz'), 'si9mYqRfqKHdK2kDRssy');
+  assert.equal(E.voiceFor('jeddawi'), 'yXEnnEln9armDCyhkXcA');
+  assert.ok(E.ttsRequest({ text: 'هلا', voice: E.voiceFor('fawaz') }).url.includes('/si9mYqRfqKHdK2kDRssy/'));
+  assert.match(personaBlock('fawaz'), /فواز/); assert.match(personaBlock('fawaz'), /مذكر/);
+});

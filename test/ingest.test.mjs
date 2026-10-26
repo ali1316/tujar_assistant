@@ -80,6 +80,9 @@ const cell = await Q.tools.pdf_find_value.run({ query: 'غرفة جدة عدد �
 ok('قيمة داخل جدول', cell.matches?.some(m => m.value === 1137 && m.source_type === 'table'));
 const sum = await Q.tools.pdf_metric.run({ dataset: data.datasets[0].id, measure: 'عدد الخدمات', agg: 'sum' });
 ok('مجموع محسوب بالكود يطابق المصدر', sum.value === truth.total && sum.matches_printed_total === true, `${sum.value} مقابل ${truth.total}`);
+const shortId = data.datasets[0].id.split('#')[1];
+const byShort = await Q.tools.pdf_metric.run({ dataset: shortId, measure: 'عدد الخدمات', agg: 'sum' });
+ok('معرّف الجدول المختصر («ds01») يكفي للحساب والداشبورد', byShort.value === sum.value && byShort.value != null, `${shortId} → ${byShort.value ?? byShort.message}`);
 const missing = await Q.tools.pdf_metric.run({ dataset: data.datasets[0].id, measure: 'عدد الخدمات', agg: 'sum', filters: [{ column: 'الشهر', value: 'يوليو' }] });
 ok('تفصيل غير موجود: يرفض بدل الاختلاق', missing.available === false, missing.message);
 const est = await Q.tools.pdf_find_value.run({ query: 'التصاريح' });

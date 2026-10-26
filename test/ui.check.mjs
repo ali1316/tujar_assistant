@@ -72,6 +72,9 @@ try {
     const g = await p.evaluate(() => { const a = window.__nora.agent(); return { opt: document.querySelector('#engine').selectedOptions[0].textContent, chip: document.querySelector('#chip').innerText, ph: document.querySelector('#txt').placeholder, speak: a.speakUrl, persona: a.persona, gemini: a.constructor.name, mode: window.__nora.modeFor() }; });
     ok('جداوي in the selector with masculine strings', g.opt === 'المساعد: جداوي' && /جداوي/.test(g.chip) && /جاهز(?!ة)/.test(g.chip) && g.ph === 'اسأل جداوي…', JSON.stringify(g));
     ok('جداوي = Gemini brain, mine mode, eleven speak URL', g.gemini === 'GeminiLiveAgent' && g.mode === 'mine' && g.speak === '/api/speak/eleven' && g.persona === 'jeddawi', JSON.stringify(g));
+    await p.selectOption('#engine', 'eleven'); await p.waitForTimeout(300);
+    const fz = await p.evaluate(() => { const a = window.__nora.agent(); return { gemini: a.constructor.name, speak: a.speakUrl, persona: a.persona, mode: window.__nora.modeFor() }; });
+    ok('فواز = Gemini brain + his voice (mine mode)', fz.gemini === 'GeminiLiveAgent' && fz.speak === '/api/speak/eleven' && fz.persona === 'fawaz' && fz.mode === 'mine', JSON.stringify(fz));
     await p.selectOption('#engine', 'gemini'); await p.waitForTimeout(300);
     const n = await p.evaluate(() => { const a = window.__nora.agent(); return { speak: a.speakUrl, persona: a.persona || '', mode: window.__nora.modeFor() }; });
     ok('switching back restores Nora live mode', n.speak === '/api/speak' && n.persona === '' && n.mode === 'live', JSON.stringify(n));
