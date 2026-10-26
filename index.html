@@ -191,51 +191,62 @@
   }
   @media(max-height:700px) and (min-width:601px){#empty{top:calc(18vh + 30px)} body.blank #dock{top:calc(18vh + 280px)} .tagline{display:none!important}}
 
-  /* ===== رحلة الرفع: محطات حقيقية (تتحرك فقط عند اكتمال خطوة فعلية في السيرفر) ===== */
-  #journeys{display:flex;flex-direction:column;gap:8px;width:min(760px,100%);pointer-events:auto}
-  .jr{position:relative;background:linear-gradient(180deg,#10273f,#0b1d31);border:1px solid color-mix(in srgb,var(--acc) 45%,#1d3a5a);border-radius:16px;padding:12px 14px 10px;box-shadow:0 12px 34px #0007;overflow:hidden;animation:jrIn .35s ease-out}
-  @keyframes jrIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .jr-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-  .jr-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#14304f;font-size:18px;flex:none}
-  .jr-tt{flex:1;min-width:0}
-  .jr-tt b{display:block;color:var(--ink);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .jr-tt small{color:var(--mute);font-size:12px}
-  .jr-pct{font-weight:700;color:var(--acc);font-size:20px;font-variant-numeric:tabular-nums;min-width:56px;text-align:end}
-  .jr-x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:16px;padding:4px}
-  .jr-bar{height:10px;border-radius:99px;background:#0a1a2c;border:1px solid #1d3a5a;overflow:hidden}
-  .jr-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#b8893f,var(--acc),#f1d79c);transition:width .55s cubic-bezier(.2,.8,.2,1);position:relative}
-  .jr-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#fff5,transparent);animation:jrShine 1.6s linear infinite}
-  .jr.done .jr-fill::after,.jr.fail .jr-fill::after{display:none}
-  @keyframes jrShine{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
-  .jr-steps{display:flex;gap:4px;margin-top:10px;align-items:flex-start}
-  .jr-st{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;position:relative}
-  .jr-st:not(:last-child)::after{content:"";position:absolute;top:13px;inset-inline-start:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:#1d3a5a}
+  /* ===== رحلة الرفع: شريط علوي مضغوط تحت الهيدر (المحطات ثم شريط التقدم تحتها مباشرة) — يدفع المحتوى للأسفل بدل ما يغطيه ===== */
+  #journeys{position:sticky;top:var(--hdr-h,72px);z-index:4;display:flex;flex-direction:column;gap:6px;max-width:1180px;margin:0 auto;padding:0 28px}
+  #journeys:empty{display:none}
+  #journeys:not(:empty){padding-top:8px;padding-bottom:4px;background:linear-gradient(var(--bg) 70%,transparent)}
+  .jr{position:relative;background:linear-gradient(180deg,#10273f,#0c1f33);border:1px solid color-mix(in srgb,var(--acc) 45%,#1d3a5a);border-radius:12px;padding:8px 14px 9px;box-shadow:0 8px 22px #0006;overflow:hidden;animation:jrIn .3s ease-out}
+  @keyframes jrIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .jr-top{display:flex;align-items:center;gap:10px;min-height:26px}
+  .jr-ic{font-size:16px;flex:none}
+  .jr-tt{display:flex;align-items:baseline;gap:8px;min-width:0;flex:0 1 auto}
+  .jr-tt b{color:var(--ink);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+  .jr-tt small{color:var(--mute);font-size:12px;white-space:nowrap}
+  .jr-msg{flex:1;min-width:0;font-size:12px;color:var(--sand);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jr-pct{font-weight:700;color:var(--acc);font-size:16px;font-variant-numeric:tabular-nums;min-width:44px;text-align:end}
+  .jr-x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:14px;padding:2px 4px}
+  .jr-steps{display:flex;gap:2px;margin-top:6px;align-items:flex-start}
+  .jr-st{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;position:relative}
+  .jr-st:not(:last-child)::after{content:"";position:absolute;top:10px;inset-inline-start:calc(50% + 12px);width:calc(100% - 24px);height:2px;background:#1d3a5a}
   .jr-st.ok:not(:last-child)::after{background:var(--acc)}
-  .jr-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;background:#0a1a2c;border:2px solid #2b4a6c;color:var(--mute);z-index:1;transition:all .3s}
-  .jr-st.ok .jr-dot{background:var(--acc);border-color:var(--acc);color:#081726;animation:jrPop .4s ease-out}
-  .jr-st.on .jr-dot{border-color:var(--acc);color:var(--acc);box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 60%,transparent);animation:jrPulse 1.4s ease-out infinite}
+  .jr-dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:#0a1a2c;border:2px solid #2b4a6c;color:var(--mute);z-index:1;transition:all .3s}
+  .jr-st.ok .jr-dot{background:var(--acc);border-color:var(--acc);color:#081726;animation:jrPop .35s ease-out}
+  .jr-st.on .jr-dot{border-color:var(--acc);color:var(--acc);animation:jrPulse 1.4s ease-out infinite}
   .jr-st.skip .jr-dot{opacity:.45}
   .jr-st.bad .jr-dot{background:var(--bad);border-color:var(--bad);color:#fff}
   @keyframes jrPop{0%{transform:scale(.6)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
-  @keyframes jrPulse{to{box-shadow:0 0 0 8px transparent}}
-  .jr-st span{font-size:11px;color:var(--mute);line-height:1.35;max-width:100%}
+  @keyframes jrPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 60%,transparent)}100%{box-shadow:0 0 0 7px transparent}}
+  .jr-st span{font-size:10.5px;color:var(--mute);line-height:1.3;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .jr-st.ok span,.jr-st.on span{color:var(--ink)}
-  .jr-st em{font-style:normal;font-size:10.5px;color:var(--acc);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .jr-msg{margin-top:8px;font-size:12.5px;color:var(--sand);min-height:17px}
-  .jr-win{display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--acc) 14%,#0b1d31);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
-  .jr.done .jr-win{display:block;animation:jrIn .4s ease-out}
-  .jr-win b{color:var(--acc)}
-  .jr-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-  .jr-chips span{background:#0a1a2c;border:1px solid #2b4a6c;border-radius:99px;padding:3px 10px;font-size:12px;color:var(--ink)}
+  .jr-st em{font-style:normal;font-size:10px;color:var(--acc);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:13px}
+  .jr-bar{height:6px;margin-top:7px;border-radius:99px;background:#0a1a2c;border:1px solid #1d3a5a;overflow:hidden}
+  .jr-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#b8893f,var(--acc),#f1d79c);transition:width .5s cubic-bezier(.2,.8,.2,1);position:relative}
+  .jr-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#fff5,transparent);animation:jrShine 1.6s linear infinite}
+  .jr.done .jr-fill::after,.jr.fail .jr-fill::after{display:none}
+  @keyframes jrShine{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+  .jr-win{display:none;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;white-space:nowrap;margin-top:7px;font-size:12.5px}
+  .jr-win::-webkit-scrollbar{display:none}
+  .jr-win b{white-space:nowrap}
+  .jr.done .jr-win{display:flex;animation:jrIn .35s ease-out}
+  .jr-win b{color:var(--acc);font-size:13px}
+  .jr-chips{display:contents}
+  .jr-chips span{background:#0a1a2c;border:1px solid #2b4a6c;border-radius:99px;padding:2px 9px;font-size:11.5px;color:var(--ink)}
   .jr-chips a{color:var(--acc);font-size:12px}
   .jr.fail{border-color:var(--bad)} .jr.fail .jr-fill{background:var(--bad)}
-  .jr.mini .jr-steps,.jr.mini .jr-msg,.jr.mini .jr-win{display:none}
-  .jr.mini{padding:8px 12px;cursor:pointer}
+  /* بعد الانتهاء بثواني: سطر واحد فقط (الكأس + الملخص) */
+  .jr.mini{padding:6px 12px;cursor:pointer}
+  .jr.mini .jr-steps,.jr.mini .jr-bar,.jr.mini .jr-msg,.jr.mini .jr-pct,.jr.mini .jr-tt small{display:none}
+  .jr.mini .jr-win{margin-top:0}
+  .jr.mini{display:flex;align-items:center;gap:10px} .jr.mini .jr-top{flex:none}
   .jr-conf{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-  .jr-conf i{position:absolute;top:-10px;width:7px;height:11px;border-radius:2px;opacity:.9;animation:jrFall 1.6s ease-in forwards}
-  @keyframes jrFall{to{transform:translateY(190px) rotate(540deg);opacity:0}}
-  @media(max-width:600px){.jr-st span{font-size:10px}.jr-st em{display:none}.jr-dot{width:24px;height:24px}.jr-st:not(:last-child)::after{top:11px}}
+  .jr-conf i{position:absolute;top:-10px;width:6px;height:9px;border-radius:2px;opacity:.9;animation:jrFall 1.4s ease-in forwards}
+  @keyframes jrFall{to{transform:translateY(130px) rotate(540deg);opacity:0}}
+  @media(max-width:900px){#journeys{padding:0 16px}}
+  @media(max-width:700px){.jr-st span,.jr-st em{display:none}.jr-st.on span{display:block;position:absolute;top:24px;white-space:nowrap;font-size:10px}.jr-steps{padding-bottom:0}.jr-st.on{margin-bottom:12px}.jr-msg{display:none}.jr-tt b{max-width:150px}}
   @media(prefers-reduced-motion:reduce){.jr,.jr-fill,.jr-dot{animation:none!important;transition:none!important}.jr-fill::after,.jr-conf{display:none}}
+  /* الشاشة الفاضية: الترحيب وشريط الكتابة ينزلون بمقدار تداخلهم مع شريط الرحلة فقط */
+  body.blank #empty,body.blank #dock{translate:0 var(--jr-push,0px);transition:translate .3s ease}
+  @media(max-width:700px){.jr.mini .jr-tt b{display:none}}
 </style>
 <style id="nora-css"></style>
 </head>
@@ -264,6 +275,7 @@
   </g><g fill="currentColor" transform="translate(240 0) scale(-1 1)"><circle cx="70" cy="420" r="3"/><circle cx="100" cy="300" r="2.5"/><circle cx="130" cy="460" r="2"/><circle cx="40" cy="700" r="3.5"/><circle cx="0" cy="240" r="3"/><circle cx="160" cy="610" r="2"/></g></svg>
 </div>
 <div id="gate"><form id="gf"><h2 style="text-align:center;color:var(--ink)">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
+<div id="journeys" aria-live="polite"></div>
 <main>
   <section id="home">
     <div id="empty"><h2 id="hello"><span class="gold">هلا فواز،</span> وش ننجز اليوم؟</h2><p>مشاريعك، ملفاتك، ومؤشراتك… في مساحة واحدة.</p>
@@ -298,7 +310,6 @@
     <div class="dr-foot"><small id="usage"></small></div>
   </div>
   <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
-  <div id="journeys" aria-live="polite"></div>
   <form id="f" class="composer">
     <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button><span class="vsep" aria-hidden="true"></span>
     <input id="txt" placeholder="اسأل نورة…" autocomplete="off" aria-label="اكتب سؤالك لنورة">
@@ -845,10 +856,10 @@ function journey(file) {
   const trace = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const steps = JR_STEPS[kind].map(([key, label, icon, w]) => ({ key, label, icon, w, state: 'wait', frac: 0, detail: '' }));
   const el = document.createElement('div'); el.className = 'jr';
-  el.innerHTML = `<div class="jr-top"><div class="jr-ic">${kind === 'pdf' ? '📕' : kind === 'tabular' ? '📗' : '📘'}</div><div class="jr-tt"><b></b><small></small></div><div class="jr-pct">0%</div><button class="jr-x" type="button" aria-label="إخفاء">✕</button></div>
+  el.innerHTML = `<div class="jr-top"><span class="jr-ic">${kind === 'pdf' ? '📕' : kind === 'tabular' ? '📗' : '📘'}</span><div class="jr-tt"><b></b><small></small></div><div class="jr-msg"></div><div class="jr-pct">0%</div><button class="jr-x" type="button" aria-label="إخفاء">✕</button></div>
+    <div class="jr-steps">${steps.map(s => `<div class="jr-st" data-k="${s.key}" title="${s.label}"><div class="jr-dot">${s.icon}</div><span>${s.label}</span><em></em></div>`).join('')}</div>
     <div class="jr-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="jr-fill"></div></div>
-    <div class="jr-steps">${steps.map(s => `<div class="jr-st" data-k="${s.key}"><div class="jr-dot">${s.icon}</div><span>${s.label}</span><em></em></div>`).join('')}</div>
-    <div class="jr-msg"></div><div class="jr-win"></div>`;
+    <div class="jr-win"></div>`;
   el.querySelector('.jr-tt b').textContent = file.name;
   el.querySelector('.jr-x').onclick = e => { e.stopPropagation(); el.remove(); JR.delete(trace); };
   el.onclick = () => el.classList.contains('mini') && el.classList.remove('mini');
@@ -877,7 +888,7 @@ function journey(file) {
       el.querySelector('.jr-pct').textContent = pct + '%';
       el.querySelector('.jr-bar').setAttribute('aria-valuenow', pct);
       const idx = steps.findIndex(s => s.state !== 'ok' && s.state !== 'skip');
-      el.querySelector('.jr-tt small').textContent = this.done ? `اكتملت الرحلة في ${((performance.now() - t0) / 1000).toFixed(1)} ثانية` : `المرحلة ${idx < 0 ? steps.length : idx + 1} من ${steps.length}`;
+      el.querySelector('.jr-tt small').textContent = this.done ? `${((performance.now() - t0) / 1000).toFixed(1)} ثانية` : `المرحلة ${idx < 0 ? steps.length : idx + 1} من ${steps.length}${idx >= 0 ? ' · ' + steps[idx].label : ''}`;
       steps.forEach(s => { const n = el.querySelector(`[data-k="${s.key}"]`); n.className = 'jr-st ' + s.state; n.querySelector('em').textContent = s.detail; });
     },
     _finish(title, chips = [], links = [], { rest = 'ok' } = {}) {
@@ -894,7 +905,7 @@ function journey(file) {
         el.append(c); setTimeout(() => c.remove(), 2200);
       }
       sr(`اكتمل رفع ${file.name}: ${title}`);
-      setTimeout(() => el.isConnected && el.classList.add('mini'), 15000);
+      setTimeout(() => el.isConnected && el.classList.add('mini'), 6000);
     },
     _fail(key, why) {
       this._set(key, 'bad'); el.classList.add('fail'); el.querySelector('.jr-msg').textContent = '❌ ' + why; this.done = true; this.render();
@@ -903,6 +914,16 @@ function journey(file) {
   JR.set(trace, j); j.set('upload', 'on', '', 0); return j;
 }
 const arN = (n, one, few) => `${(+n).toLocaleString('en-US')} ${n >= 3 && n <= 10 ? few : one}`; // جمع عربي بسيط: 3–10 جمع
+// ارتفاع الهيدر الفعلي ⇒ شريط الرحلة يلتصق تحته مباشرة
+const hdrObs = new ResizeObserver(() => document.documentElement.style.setProperty('--hdr-h', $('header.top').getBoundingClientRect().height + 'px')); hdrObs.observe($('header.top'));
+const jrObs = new ResizeObserver(() => {
+  const j = $('#journeys'), e = $('#empty');
+  if (!j.children.length || !e) return document.documentElement.style.setProperty('--jr-push', '0px');
+  const top = parseFloat(getComputedStyle(e).top) || e.getBoundingClientRect().top;
+  document.documentElement.style.setProperty('--jr-push', Math.max(0, Math.round(j.getBoundingClientRect().bottom + 14 - top)) + 'px');
+});
+jrObs.observe($('#journeys')); new MutationObserver(() => jrObs.disconnect() || jrObs.observe($('#journeys'))).observe($('#journeys'), { childList: true });
+addEventListener('resize', () => { jrObs.disconnect(); jrObs.observe($('#journeys')); });
 function sr(t) { const n = $('#sr'); if (n) n.textContent = t; }
 // أحداث السيرفر: كل خطوة تنحسب بس لما تخلص فعلاً
 function onUploadEvent(ev) {
