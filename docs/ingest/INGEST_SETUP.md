@@ -9,7 +9,7 @@
 |---|---|---|
 | السيرفر (Render `gemini-live-dashboard`) | Node ≥ 20، `npm ci` | يثبت pdfjs-dist 6.3.289 وpdf-lib 1.17.1 تلقائياً من package-lock |
 | السيرفر — متغيرات البيئة | `GEMINI_API_KEY` (موجود)، `DRIVE_SCRIPT_URL` (موجود)، `DATABASE_URL` (موجود) | بدون مفتاح Gemini يعمل المسار بطبقة النص فقط وتُعلَّم النتيجة «جزئي» |
-| السيرفر — اختياري | `INGEST_MODEL` (افتراضي `gemini-3.8-flash`)، `INGEST_CONCURRENCY` (افتراضي 2)، `INGEST_ROOT_NAME` (افتراضي «نورة — مصادر PDF»)، `DOCLING_URL` | — |
+| السيرفر — اختياري | `INGEST_MODEL` (افتراضي `gemini-3.8-flash`)، `INGEST_PAGE_TIMEOUT_MS` (افتراضي 90000)، `INGEST_CONCURRENCY` (افتراضي 2)، `INGEST_ROOT_NAME` (افتراضي «نورة — مصادر PDF»)، `DOCLING_URL` | — |
 | Google Apps Script (جسر Drive) | لصق `drive-apps-script.gs` ثم **Deploy → Manage deployments → Edit → New version** | نفس الرابط يبقى؛ يضيف إجراءات `dir/put/get/ls/getById` تحت جذر واحد خاص |
 | جهاز تطوير محلي | Node ≥ 20، `npm ci`، `.env` محلي | `INGEST_STORAGE=local` و`INGEST_LOCAL_DIR=./ingest-data` للتجربة بدون Drive |
 | Docling (اختياري) | خادم docling-serve بذاكرة ≥ 4GB (torch) | لا يعمل على خطة 512MB؛ يُفعّل بوضع `DOCLING_URL` فقط |
