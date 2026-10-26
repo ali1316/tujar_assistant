@@ -39,8 +39,9 @@ const ok = (name, cond, detail = '') => { results.push({ name, pass: !!cond, det
 // 1) رفع + انقطاع متعمد بعد صفحة واحدة ثم استكمال
 P._interruptAfterPages(1);
 const r1 = await P.receive({ buffer: pdf, fileName: 'تقرير الخدمات الاختباري.pdf' });
-await new Promise(r => setTimeout(r, 800));
-let j = await P.getJob(r1.attempt_id);
+// ننتظر حتى تتوقف المهمة فعلاً بعد الصفحة الأولى (بدل مهلة ثابتة كانت تفشل أحياناً على جهاز أبطأ)
+let j;
+for (let t = 0; t < 100; t++) { j = await P.getJob(r1.attempt_id); if (Object.keys(j.page_results || {}).length >= 1 && !P._isRunning?.(r1.attempt_id)) break; await new Promise(r => setTimeout(r, 100)); }
 ok('انقطاع: المهمة توقفت في «استخراج» بعد صفحة', j.stage === 'extracting' && Object.keys(j.page_results).length >= 1, `${j.stage}, ${Object.keys(j.page_results).length} صفحة`);
 const donePages = Object.keys(j.page_results).length;
 P.kick(r1.attempt_id);
@@ -122,6 +123,16 @@ ok('إعادة المعالجة تنشئ إصداراً جديداً وتبقي 
   const val = validate(org);
   const totalOk = val.checks.find(c => c.type === 'total' && c.result === 'pass');
   ok('جزءا جدول في نفس الصفحة («تتمة») يُضمان ويطابق الإجمالي', org.tables.length === 1 && org.tables[0].rows.length === 4 && !!totalOk, `${org.tables.length} جدول، ${totalOk?.detail || 'لا تطابق'}`);
+}
+
+// 12) حالة v5 الحقيقية: المحرك رقّم الأعمدة «(1)/(2)» والعناوين المطبوعة مكررة
+{
+  const names = ['الغرفة', 'المشتركون الفعّالون', 'المستخدمون', 'إجمالي الخدمات'];
+  const v5 = unstackRepeated({ columns: [...names.map(x => ({ name: x + ' (1)' })), ...names.map(x => ({ name: x + ' (2)' }))], header_rows: [[...names, ...names]],
+    rows: [['حائل', '29,859', '35,729', '20,058', 'ينبع *', '12,209', '13,111', '0'], ['حفر الباطن', '19,294', '20,541', '17,673', 'الإجمالي', '474,125', '497,501', '333,265']], row_kinds: ['detail', 'total'] });
+  ok('أعمدة مرقّمة باللوحة «(1)/(2)» تُفك بأسمائها الأصلية', v5.unstacked?.panels === 2 && v5.columns.map(c => c.name).join('|') === names.join('|') && v5.rows.length === 4 && v5.row_kinds[1] === 'detail', v5.columns.map(c => c.name).join('|'));
+  const years = unstackRepeated({ columns: ['البند', '2025', '2026'].map(name => ({ name })), header_rows: [], rows: [['أ', '1', '2']], row_kinds: ['detail'] });
+  ok('أعمدة سنوات لا تُعامل كلوحات', !years.unstacked && years.columns.length === 3);
 }
 
 // 10) استدعاء رؤية معلّق لا يوقف المهمة: مهلة ثم خطأ واضح
