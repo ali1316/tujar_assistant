@@ -142,3 +142,39 @@ test('search_history never returns tool tags', async () => {
   const r = await H.historyTools.search_history.run({ query: 'قدامك' });
   assert.ok(!/⟨|استخدمت/.test(JSON.stringify(r)), JSON.stringify(r).slice(0, 300));
 });
+
+// ===== جداوي: صوت ElevenLabs v4 Turbo =====
+test('ttsRequest targets v4 Turbo with the Jeddawi voice', async () => {
+  process.env.ELEVENLABS_API_KEY = 'test-key';
+  const E = await import('../eleven.js');
+  const { url, init } = E.ttsRequest({ text: 'هلا', voice: E.JEDDAWI.voice, model: E.JEDDAWI.model });
+  assert.ok(url.endsWith('/v1/text-to-speech/yXEnnEln9armDCyhkXcA/stream?output_format=pcm_24000'), url);
+  assert.equal(JSON.parse(init.body).model_id, 'eleven_v4_turbo');
+  assert.equal(JSON.parse(init.body).text, 'هلا');
+  assert.equal(init.headers['xi-api-key'], 'test-key');
+  delete process.env.ELEVENLABS_API_KEY;
+});
+test('personaBlock gives جداوي a male Jeddawi identity', async () => {
+  const { personaBlock } = await import('../personas.js');
+  assert.match(personaBlock('jeddawi'), /جداوي/);
+  assert.match(personaBlock('jeddawi'), /مذكر/);
+  assert.equal(personaBlock('x'), '');
+});
+test('barge-in stops جداوي even between sentences', async () => {
+  const { shouldBargeIn } = await import('../gemini-live-agent.js');
+  assert.equal(shouldBargeIn({ mode: 'mine', playing: 0, pending: 1, buffered: '' }), true);
+  assert.equal(shouldBargeIn({ mode: 'mine', playing: 0, pending: 0, buffered: 'نص باقي' }), true);
+  assert.equal(shouldBargeIn({ mode: 'mine', playing: 0, pending: 0, buffered: '' }), false);
+  assert.equal(shouldBargeIn({ mode: 'live', playing: 3, pending: 1, buffered: 'x' }), false);
+});
+test('TTS upstream is aborted when the browser disconnects', async () => {
+  const { EventEmitter } = await import('node:events');
+  const E = await import('../eleven.js');
+  let signal; const enc = new TextEncoder();
+  const fetchImpl = async (url, init) => { signal = init.signal; let i = 0;
+    return { ok: true, body: new ReadableStream({ async pull(c) { await new Promise(r => setTimeout(r, 30)); if (signal.aborted || i++ > 50) return c.close(); c.enqueue(enc.encode('xx')); } }) }; };
+  const res = Object.assign(new EventEmitter(), { headersSent: false, writes: 0, setHeader() { this.headersSent = true; }, write() { this.writes++; if (this.writes === 1) setTimeout(() => this.emit('close'), 0); return true; }, end() {}, status() { return this; }, json() {} });
+  await E.streamTTS('هلا', res, { fetchImpl });
+  assert.equal(signal.aborted, true);
+  assert.ok(res.writes < 5, `writes=${res.writes}`);
+});

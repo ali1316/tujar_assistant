@@ -50,18 +50,31 @@ try {
     ok('view clears busy and skeleton', await btn.getAttribute('aria-busy') !== 'true' && !(await p.locator('#qaSkel').isVisible()));
   }
   if (!only || only === 'persona') {
-    // Task 7: اسم وجنس المساعد من مصدر واحد
+    // Task 7: اسم وجنس المساعد من مصدر واحد — نبدأ من الشاشة الرئيسية (رسم مفتوح من فحص سابق ما يتمدد مع تغيير العرض)
+    await p.reload(); await p.waitForTimeout(1500);
     for (const [eng, name, ready, say] of [['eleven', 'فواز', /جاهز(?!ة)/, 'اعرض لي المشاريع'], ['gemini', 'نورة', /جاهزة/, 'اعرضي لي المشاريع']]) {
       await p.selectOption('#engine', eng); await p.waitForTimeout(400);
       const g = await p.evaluate(() => ({ chip: document.querySelector('#chip').innerText, ph: document.querySelector('#txt').placeholder, inLbl: document.querySelector('#txt').getAttribute('aria-label'), mic: document.querySelector('#mic').getAttribute('aria-label'), micT: document.querySelector('#mic').title, opt: document.querySelector('#engine').selectedOptions[0].textContent, say: document.querySelector('.qa-btn[data-say]').dataset.say }));
       for (const w of [1280, 390]) {
-        await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(200);
+        await p.setViewportSize({ width: w, height: 800 }); await p.waitForFunction(x => innerWidth === x && new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true)))), w); await p.waitForTimeout(150);
         const fit = await p.evaluate(() => { const e = document.querySelector('#engine'); const c = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(e); c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; return { need: Math.ceil(c.measureText(e.selectedOptions[0].textContent).width) + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 18, have: e.clientWidth, cap: cs.maxWidth, sw: document.documentElement.scrollWidth, vw: innerWidth }; });
         ok(`engine label not clipped at ${w}px (${eng})`, fit.have >= fit.need && fit.cap === 'none' && fit.sw <= fit.vw, JSON.stringify(fit));
       }
       await p.setViewportSize({ width: 1280, height: 800 });
       ok(`persona ${eng}`, g.chip.includes(name) && ready.test(g.chip) && g.ph === `اسأل ${name}…` && g.inLbl.includes(name) && g.mic.includes(name) && g.micT.includes(name) && g.opt === `المساعد: ${name}` && g.say === say, JSON.stringify(g));
     }
+  }
+  if (!only || only === 'jeddawi') {
+    // جداوي: مساعد ثالث — عقل Gemini + صوت ElevenLabs v4 Turbo
+    const noKey = await p.evaluate(async () => { const r = await fetch('/api/speak/eleven', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-access-code': '322007' }, body: JSON.stringify({ text: 'هلا' }) }); return { s: r.status, j: await r.json() }; });
+    ok('speak route without key → clear error', noKey.s === 500 && /ELEVENLABS_API_KEY/.test(noKey.j.error), JSON.stringify(noKey));
+    await p.selectOption('#engine', 'jeddawi'); await p.waitForTimeout(400);
+    const g = await p.evaluate(() => { const a = window.__nora.agent(); return { opt: document.querySelector('#engine').selectedOptions[0].textContent, chip: document.querySelector('#chip').innerText, ph: document.querySelector('#txt').placeholder, speak: a.speakUrl, persona: a.persona, gemini: a.constructor.name, mode: window.__nora.modeFor() }; });
+    ok('جداوي in the selector with masculine strings', g.opt === 'المساعد: جداوي' && /جداوي/.test(g.chip) && /جاهز(?!ة)/.test(g.chip) && g.ph === 'اسأل جداوي…', JSON.stringify(g));
+    ok('جداوي = Gemini brain, mine mode, eleven speak URL', g.gemini === 'GeminiLiveAgent' && g.mode === 'mine' && g.speak === '/api/speak/eleven' && g.persona === 'jeddawi', JSON.stringify(g));
+    await p.selectOption('#engine', 'gemini'); await p.waitForTimeout(300);
+    const n = await p.evaluate(() => { const a = window.__nora.agent(); return { speak: a.speakUrl, persona: a.persona || '', mode: window.__nora.modeFor() }; });
+    ok('switching back restores Nora live mode', n.speak === '/api/speak' && n.persona === '' && n.mode === 'live', JSON.stringify(n));
   }
   await b.close();
 } finally { srv.kill(); }
