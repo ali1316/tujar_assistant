@@ -68,6 +68,8 @@ const para = await Q.tools.pdf_find_value.run({ query: 'المستخدمين ا�
 ok('قيمة داخل فقرة', para.matches?.some(m => m.value === truth.active_users), JSON.stringify(para.matches?.[0]?.raw));
 const foot = await Q.tools.pdf_find_value.run({ query: 'الربع الثاني البالغ' });
 ok('قيمة داخل حاشية', foot.matches?.some(m => m.value === truth.prev_quarter && m.source_type === 'footnote'));
+const inflected = await Q.tools.pdf_find_value.run({ query: 'نورة، كم الخدمات المنفذة لغرفة الرس حسب التقرير؟' });
+ok('سؤال بصيغة مختلفة عن العمود (حالة الاختبار الصوتي) يجد القيمة', inflected.matches?.[0]?.value === 1000 + 26 * 137, JSON.stringify(inflected.matches?.slice(0, 2).map(m => [m.raw, m.location || m.context])));
 const footOnly = await Q.tools.pdf_find_value.run({ query: 'الرقم في الحاشية' });
 ok('البحث في الحواشي فقط عند ذكر «الحاشية»', footOnly.matches?.length && footOnly.matches.every(m => m.source_type === 'footnote'), footOnly.matches?.map(m => m.source_type).join(','));
 const cell = await Q.tools.pdf_find_value.run({ query: 'غرفة جدة عدد الخدمات' });
