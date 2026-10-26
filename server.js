@@ -17,7 +17,9 @@ import { agentTools, initAgent, agentStatus } from './agent.js';
 import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
 import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
-import { knowledgeTools, importBundle, knowledgeCatalog, kList } from './knowledge.js';
+import { knowledgeTools, importBundle, knowledgeCatalog, kList, legacyFind } from './knowledge.js';
+import { ensureIndex, hybridSearch, cite, evaluate, invalidateIndex, W_COS, W_COV } from './retrieval.js';
+import crypto from 'node:crypto';
 import { historyTools, historyBlock, initHistory, chatStart, addTurns, digestNow, digestPending, recentForUI } from './history.js';
 
 const PORT = process.env.PORT || 3000;
@@ -43,6 +45,16 @@ const usageTools = {
       return { today: u.days[today] || {}, last_days: Object.fromEntries(Object.entries(u.days).sort().slice(-7)), recent_sessions: u.sessions.slice(-8), note: 'محرك فواز ما يرجّع أرقام توكنز، فالأرقام لنورة (Gemini) بالأساس' };
     },
   },
+};
+// search_documents: البحث الهجين (معنى + كلمات) بدل الكلمات فقط، مع الاستشهاد بالمصدر. القديم يبقى للقياس.
+const legacySearchDocs = docTools.search_documents.run;
+docTools.search_documents.run = async ({ query = '', document_id } = {}) => {
+  try {
+    await ensureIndex();
+    const { hits } = await hybridSearch(query, { k: 5, prefix: document_id ? `doc:${document_id}` : null });
+    if (hits.length) return { matches: hits.map(h => ({ cite: `[${h.n}] ${cite(h)}`, doc_id: h.src.startsWith('doc:') ? +h.src.slice(4) : h.src, name: h.title, section: h.section, page: h.page, content: h.text })) };
+  } catch (e) { console.warn('[rag] search fallback:', e.message); }
+  return legacySearchDocs({ query, document_id });
 };
 const tools = { ...dataTools, ...docTools, ...memoryTools, ...dashboardTools, ...historyTools, ...datasetTools, ...knowledgeTools, ...usageTools, ...driveTools, ...agentTools };
 initAgent(tools);
@@ -201,6 +213,7 @@ const SYSTEM_PROMPT = `أنتِ "نورة"، المساعدة الذكية لم�
 - مكتبة المعرفة (ملفات منظّمة من Drive Data-Knowledge): سؤال عن محتوى مستند/دراسة/تقرير محفوظ أو ما تعرفين وين البيانات → find_knowledge أولاً كأول خطوة (بدون read_document أو list_documents) — تعرض ملخص الملف على الشاشة تلقائياً (on_screen)، فابدئي جوابك بالأرقام اللي في on_screen وبعدها التفاصيل من الأقسام، واذكري اسم الملف. لشارت من جدول في المكتبة مرّري dataset_id حقه لـ data_chart مباشرة. لو النتيجة فيها quality_pending أو الحالة «جزئية» قوليها بجملة قصيرة.
 - أي طلب شارت أو رقم عن عمود موجود في «بيانات الملف» أو «مكتبة المعرفة» → data_chart/query_data مباشرة حتى لو آخر ملف مرفوع PDF. ممنوع تقولين «ما عندي بيانات» قبل ما تجربين data_chart (هي تدوّر بنفسها في كل الجداول).
 - أداة وحدة لكل سؤال: query_data مع group_by ترسم الشارت تلقائياً، فلا تستدعين بعدها data_chart أو find_knowledge لنفس السؤال (الشاشة تتبدّل وتتأخرين).
+- نتائج find_knowledge وsearch_documents فيها استشهادات [n] (الملف · القسم · الصفحة): اذكري المصدر باختصار مع الجواب («حسب ملف كذا، القسم كذا»)، ولا تذكرين رقم ما هو موجود في المقاطع اللي رجعت.
 - لو رجع data_chart بخطأ «ما لقيت العمود»، أعيدي الاستدعاء فوراً باسم العمود كما هو مكتوب في قائمة الأعمدة داخل الخطأ (بدون list_documents أو read_document). عنوان الشارت دايماً بالعربي.
 - أي شارت يطلبه عن الملف → data_chart فوراً (bar/hbar/stacked/line/area/pie/donut) ويطلع على الشاشة الرئيسية مكان البيانات. لا تستخدمين render_visual لبيانات الملف.
     - search_documents/read_document للملفات النصية (PDF/Word) أو للبحث عن نص.
@@ -458,13 +471,18 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ما وصل ملف' });
   const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8'); // أسماء عربية
+  const digest = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
   if (/\.dk\.json$/i.test(name)) { // حزمة من مهارة fawaz-data-intake → مكتبة المعرفة
     try { return res.json({ knowledge: await importBundle(JSON.parse(req.file.buffer.toString('utf8'))) }); }
     catch (e) { return res.status(400).json({ error: e.message }); }
   }
+  const dup = db.prepare('SELECT id, name, chars FROM documents WHERE sha256=?').get(digest);
+  if (dup) return res.json({ ...dup, duplicate: true, datasets: [] }); // نفس الملف بالبصمة: ما نكرره
   try {
     const text = await extractText(req.file.buffer, name);
     const doc = saveDocument(name, req.file.mimetype, req.file.size, text);
+    db.prepare('UPDATE documents SET sha256=? WHERE id=?').run(digest, doc.id);
+    invalidateIndex(); setTimeout(() => ensureIndex().catch(e => console.warn('[rag]', e.message)), 4000); // بعد التصنيف (الملخص) بشوي
     snapshotSoon();
     // ملفات Excel/CSV: نحوّلها لجداول منظّمة جاهزة للتحليل والشارتات الفورية
     let datasets = [];
@@ -481,6 +499,23 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 // مكتبة المعرفة: استيراد حزمة JSON مباشرة + قائمة الملفات
 app.post('/api/knowledge/import', async (req, res) => { try { res.json(await importBundle(req.body)); } catch (e) { res.status(400).json({ error: e.message }); } });
 app.get('/api/knowledge', async (req, res) => res.json({ entries: (await kList()).map(({ sections, values, ...e }) => ({ ...e, sections: sections.length })) }));
+
+// تقييم الاسترجاع: نفس الأسئلة على البحث القديم والجديد (Hit@1/3/5 و MRR والزمن)
+app.get('/api/retrieval/status', async (req, res) => res.json({ ...(await ensureIndex()), weights: { cos: W_COS, cov: W_COV } }));
+app.post('/api/retrieval/eval', express.json({ limit: '2mb' }), async (req, res) => {
+  try {
+    await ensureIndex();
+    const cases = (req.body?.cases || []).slice(0, 200);
+    const legacyKnTexts = async q => (await legacyFind({ question: q })).results.flatMap(r => [`${r.title} ${r.summary || ''} ${r.purpose || ''}`, ...(r.sections || []).map(x => (typeof x === 'string' ? x : x.text))]);
+    const report = await evaluate(cases, {
+      legacy_knowledge: legacyKnTexts,
+      legacy_documents: async q => (legacySearchDocs({ query: q }).matches || []).map(m => m.content),
+      keyword_only: async q => (await hybridSearch(q, { k: 5, useVectors: false })).hits.map(h => `${h.title} ${h.section || ''} ${h.text}`),
+      hybrid: async q => (await hybridSearch(q, { k: 5 })).hits.map(h => `${h.title} ${h.section || ''} ${h.text}`),
+    });
+    res.json({ cases: cases.length, report });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // لوحة الملف: تتولد تلقائياً بعد الرفع وتظهر داخل الشاشة الرئيسية
 app.post('/api/docs/:id/dashboard', async (req, res) => {
@@ -535,4 +570,5 @@ initHistory(ai);
 initStore()
   .then(restoreSqlite)
   .catch(e => console.error('[store] init failed:', e.message))
+  .finally(() => { ensureIndex().catch(e => console.warn('[rag] boot index failed:', e.message)); })
   .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend}, designer: ${designerName()}, agent: ${JSON.stringify(agentStatus())})`)));

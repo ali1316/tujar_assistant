@@ -4,6 +4,8 @@
 import { kvGet, kvSet, datasetAdd, datasetsRecent } from './store.js';
 import { parseWorkbook, profile } from './datasets.js';
 import { snapshotSoon } from './persist.js';
+import { db } from './db.js';
+import { ensureIndex, hybridSearch, cite, invalidateIndex } from './retrieval.js';
 
 const KEY = 'knowledge';
 let cache = null;
@@ -37,6 +39,7 @@ export async function importBundle(b) {
     dataset_ids, imported_at: new Date().toISOString(),
   };
   await save([...entries.filter(e => e.id !== b.id), entry]);
+  invalidateIndex(); ensureIndex().catch(e => console.warn('[rag]', e.message));
   console.log(`[knowledge] ${old ? 'updated' : 'imported'} ${b.id} «${b.title}» tables=${dataset_ids.join(',') || '-'} sections=${entry.sections.length}`);
   return { status: old ? 'updated' : 'imported', id: b.id, title: b.title, dataset_ids, sections: entry.sections.length };
 }
@@ -74,6 +77,35 @@ export const knowledgeTools = {
       parameters: { type: 'OBJECT', properties: { question: { type: 'STRING', description: 'سؤال المستخدم أو كلماته المفتاحية' }, id: { type: 'STRING', description: 'رقم الملف ds-xxxxxxxx لو معروف (اختياري)' } }, required: ['question'] },
     },
     run: async ({ question = '', id } = {}) => {
+      // البحث الهجين على كل المصادر (مكتبة المعرفة + الملفات المرفوعة) مع استشهاد بالمصدر
+      try {
+        await ensureIndex();
+        const { hits } = await hybridSearch(question || id || '', { k: 6, prefix: id ? `kn:${id}` : null });
+        if (hits.length) {
+          const list = await kList(), groups = new Map();
+          for (const h of hits) { if (!groups.has(h.src)) groups.set(h.src, []); groups.get(h.src).push(h); }
+          const results = [...groups].slice(0, 2).map(([src, hs]) => {
+            const e = list.find(x => `kn:${x.id}` === src);
+            const doc = e ? null : db.prepare('SELECT id, name, summary FROM documents WHERE id=?').get(+src.split(':')[1]);
+            return {
+              id: e?.id || src, title: e?.title || doc?.name || hs[0].title, status: e?.status || 'ملف مرفوع', purpose: e?.purpose || '', summary: e?.summary || doc?.summary || '',
+              ...(e?.dataset_ids?.length ? { dataset_ids: e.dataset_ids, columns: e.columns } : {}),
+              sections: hs.filter(h => h.section !== 'دليل الملف').slice(0, 2).map(h => ({ section: h.section, text: h.text.slice(0, 1800), cite: `[${h.n}] ${cite(h)}` })),
+              quality_pending: e?.quality_pending || [], source_file: e?.source_file || doc?.name || '',
+            };
+          });
+          return { results, citations: hits.map(h => ({ n: h.n, source: cite(h) })) };
+        }
+      } catch (err) { console.warn('[rag] hybrid failed, legacy fallback:', err.message); }
+      return legacyFind({ question, id });
+    },
+  },
+};
+
+// البحث القديم (كلمات فقط على مكتبة المعرفة) — يبقى احتياطاً ولقياس الفرق
+export async function legacyFind({ question = '', id } = {}) {
+  {
+    {
       const list = await kList();
       if (!list.length) return { results: [], note: 'مكتبة المعرفة فاضية' };
       const toks = tokens(question);
@@ -90,6 +122,6 @@ export const knowledgeTools = {
           };
         }),
       };
-    },
-  },
-};
+    }
+  }
+}

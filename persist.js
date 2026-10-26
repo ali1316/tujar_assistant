@@ -1,11 +1,11 @@
 // بيانات SQLite (المشاريع، التذاكر، طلبات التطوير، الملفات) تنمسح مع كل نشر في Render المجاني.
 // الحل: نأخذ نسخة منها في Postgres بعد كل تعديل، ونرجّعها تلقائياً أول ما يشتغل السيرفر.
 import { db } from './db.js';
-import { indexDocument } from './docs.js';
+import { indexDocument, normalize } from './docs.js';
 import { kvGet, kvSet, backend } from './store.js';
 import { dataChanged } from './events.js';
 
-const TABLES = ['projects', 'tickets', 'dev_requests', 'documents', 'tasks', 'agent_jobs'];
+const TABLES = ['projects', 'tickets', 'dev_requests', 'documents', 'tasks', 'agent_jobs', 'rag_chunks']; // rag_chunks: مقاطع البحث مع متجهاتها (عشان ما نعيد الـ embeddings مع كل نشر)
 let timer;
 
 export async function snapshot() {
@@ -25,12 +25,14 @@ export async function restore() {
     db.transaction(() => {
       db.prepare(`DELETE FROM ${t}`).run();
       if (t === 'documents') db.prepare('DELETE FROM doc_chunks').run();
+      if (t === 'rag_chunks') db.prepare('DELETE FROM rag_fts').run();
       for (const r of rows) {
         const cols = Object.keys(r);
         db.prepare(`INSERT INTO ${t} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...cols.map(c => r[c]));
       }
     })();
     if (t === 'documents') rows.forEach(r => indexDocument(r.id, r.content));
+    if (t === 'rag_chunks') { const ins = db.prepare('INSERT INTO rag_fts (norm, chunk_id) VALUES (?,?)'); db.transaction(() => rows.forEach(r => ins.run(normalize(`${r.title} ${r.section || ''} ${r.text}`), r.id)))(); }
     restored += rows.length;
   } } finally { db.pragma(`foreign_keys = ${fk ? 'ON' : 'OFF'}`); }
   console.log(`[persist] restored ${restored} rows from postgres`);

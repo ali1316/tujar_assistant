@@ -378,7 +378,7 @@ const screenToolsExtra = {
     const items = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l).slice(0, 7) : [];
     if (items.length >= 2) lines.splice(0, lines.length, ...items);
     if (e.status && !/كاملة/.test(e.status)) lines.push('⚠️ ' + e.status);
-    hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
+    hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: top?.cite ? 'المصدر ' + top.cite : secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
     return { ...r, on_screen: lines };
   },
 };
@@ -514,6 +514,7 @@ async function uploadFile(file) {
   const r = await api('/api/upload', { method: 'POST', body: fd });
   const d = await r.json();
   if (!r.ok) return note('❌ ' + d.error);
+  if (d.duplicate) { note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id}) — نفس البصمة، ما كررته`); return; }
   if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»${k.dataset_ids?.length ? ` (جداول ${k.dataset_ids.map(i => '#' + i).join('، ')})` : ''}${k.sections ? ` · ${k.sections} قسم` : ''}`); return; }
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
   loadDashboard();
