@@ -73,10 +73,13 @@ async function sources() {
   return out;
 }
 
-let building = null, vecCache = null;
-export function invalidateIndex() { vecCache = null; }
+let building = null, vecCache = null, dirty = true, lastStatus = null, lastMissingTry = 0;
+// يتعلّم الفهرس مرة عند التشغيل وبعد أي رفع/استيراد فقط؛ غير كذا يرجع فوراً (ما يأخر أدوات نورة)
+export function invalidateIndex() { vecCache = null; dirty = true; }
 export function ensureIndex() {
+  if (!dirty && lastStatus && !building) return Promise.resolve(lastStatus);
   if (!building) building = (async () => {
+    dirty = false;
     const t0 = Date.now(); let added = 0;
     const srcs = await sources();
     const have = new Map(db.prepare('SELECT src, MIN(src_hash) h FROM rag_chunks GROUP BY src').all().map(r => [r.src, r.h]));
@@ -91,7 +94,7 @@ export function ensureIndex() {
       db.transaction(() => {
         delF.run(s.src); del.run(s.src);
         s.chunks.forEach((c, i) => {
-          const id = ins.run(s.src, s.hash, s.title, c.section || null, c.page, c.line_from, c.line_to, c.text, vecs ? JSON.stringify(vecs[i].map(v => +v.toFixed(5))) : null).lastInsertRowid;
+          const id = ins.run(s.src, s.hash, s.title, c.section || null, c.page, c.line_from, c.line_to, c.text, vecs?.[i] ? JSON.stringify(vecs[i].map(v => +v.toFixed(5))) : null).lastInsertRowid;
           insF.run(normalize(`${s.title} ${c.section || ''} ${c.text}`), id);
         });
       })();
@@ -99,14 +102,16 @@ export function ensureIndex() {
     }
     if (added) { vecCache = null; snapshotSoon(); }
     // مصادر فهرسناها وقت تعطّل الـ embeddings: نكمل متجهاتها
-    const missing = db.prepare('SELECT id, title, section, text FROM rag_chunks WHERE vec IS NULL LIMIT 400').all();
+    const missing = Date.now() - lastMissingTry > 600e3 ? db.prepare('SELECT id, title, section, text FROM rag_chunks WHERE vec IS NULL LIMIT 400').all() : [];
     if (missing.length) {
+      lastMissingTry = Date.now();
       const vecs = await embedMany(missing.map(c => `${c.title} | ${c.section || ''}\n${c.text}`.slice(0, 6000)));
-      if (vecs) { const up = db.prepare('UPDATE rag_chunks SET vec=? WHERE id=?'); db.transaction(() => missing.forEach((c, i) => up.run(JSON.stringify(vecs[i].map(v => +v.toFixed(5))), c.id)))(); vecCache = null; snapshotSoon(); }
+      if (vecs?.some(Boolean)) { const up = db.prepare('UPDATE rag_chunks SET vec=? WHERE id=?'); db.transaction(() => missing.forEach((c, i) => vecs[i] && up.run(JSON.stringify(vecs[i].map(v => +v.toFixed(5))), c.id)))(); vecCache = null; snapshotSoon(); }
     }
     const n = db.prepare('SELECT COUNT(*) c, SUM(vec IS NOT NULL) v FROM rag_chunks').get();
     console.log(`[rag] index ready: ${n.c} chunks (${n.v} with vectors), +${added} in ${Date.now() - t0}ms`);
-    return n;
+    if (n.c && n.v < n.c) dirty = true; // نكمل المتجهات الناقصة في المرة الجاية (بعد 10 دقائق)
+    lastStatus = n; return n;
   })().finally(() => { building = null; });
   return building;
 }
@@ -128,7 +133,8 @@ export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true 
     for (const r of db.prepare('SELECT chunk_id id, bm25(rag_fts) b FROM rag_fts WHERE rag_fts MATCH ? ORDER BY b LIMIT 40').all(match)) cand.set(r.id, { cos: 0 });
   }
   let qv = null;
-  if (useVectors) {
+  const st = lastStatus || db.prepare('SELECT COUNT(*) c, SUM(vec IS NOT NULL) v FROM rag_chunks').get();
+  if (useVectors && st.c && st.v / st.c >= 0.9) {
     qv = await embed(String(q));
     if (qv) {
       const scored = vectors().map(x => ({ id: x.id, c: cos(qv, x.v) })).sort((a, b) => b.c - a.c).slice(0, 40);

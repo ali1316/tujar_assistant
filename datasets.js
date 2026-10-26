@@ -157,7 +157,7 @@ export function runQuery(ds, { group_by, measure, agg: fn = measure ? 'sum' : 'c
   else if (sort === 'asc') out.sort((a, b) => a.total - b.total);
   else if (sort === 'name') out.sort((a, b) => String(a.key).localeCompare(String(b.key), 'ar'));
   else out.sort((a, b) => b.total - a.total);
-  if (isDate) out.forEach(o => { o.key = dateLabel(o.key, date_unit || 'month'); });
+  if (isDate) { const oneYear = new Set(out.map(o => String(o.key).slice(0, 4))).size === 1; out.forEach(o => { o.key = oneYear && (date_unit || 'month') === 'month' ? AR_MONTHS[+String(o.key).slice(5, 7) - 1] : dateLabel(o.key, date_unit || 'month'); }); } // سنة وحدة: الشهر بدون السنة (أقصر وأوضح)
   const limit = top || (isDate ? 60 : 15);
   if (!isDate && out.length > limit) {
     const rest = out.slice(limit - 1); out = out.slice(0, limit - 1);
@@ -186,10 +186,14 @@ export function toVegaLite(res, type = 'bar') {
   const multi = res.series.length > 1 || res.series[0] !== '_';
   const values = res.rows.flatMap(r => multi ? res.series.map(s => ({ k: r.key, s, v: r.values[s] })) : [{ k: r.key, v: r.total }]);
   const order = res.rows.map(r => r.key);
-  if (type === 'pie' || type === 'donut') return { data: { values }, mark: { type: 'arc', innerRadius: type === 'donut' ? 60 : 0 }, encoding: { theta: { field: 'v', type: 'quantitative', title: res.measure }, color: { field: 'k', type: 'nominal', title: res.group_by, sort: order } } };
+  // الدائري: الرقم مكتوب جنب كل شريحة (لغة الأرقام ظاهرة دايماً)
+  if (type === 'pie' || type === 'donut') return { data: { values }, encoding: { theta: { field: 'v', type: 'quantitative', stack: true, title: res.measure }, color: { field: 'k', type: 'nominal', title: res.group_by, sort: order }, order: { field: 'v', sort: 'descending' } },
+    layer: [{ mark: { type: 'arc', innerRadius: type === 'donut' ? 60 : 0, outerRadius: 120 } }, { mark: { type: 'text', radius: 145, fontWeight: 700, fontSize: 13 }, encoding: { text: { field: 'v', type: 'quantitative', format: res.agg === 'avg' ? ',.1f' : ',.2~f' }, color: { value: '#eef2f7' } } }] };
   const mark = type === 'line' || type === 'area' ? { type: type === 'area' ? 'area' : 'line', point: true, opacity: type === 'area' ? .5 : 1 } : { type: 'bar' };
   const hz = type === 'hbar';
-  const k = { field: 'k', type: 'nominal', title: res.group_by, sort: order }, v = { field: 'v', type: 'quantitative', title: res.agg === 'count' ? 'العدد' : `${AGG_AR[res.agg] || ''} ${res.measure}`.trim() };
+  // أسماء الفئات أفقية لما تكفي المساحة (أسهل قراءة من المائلة/العمودية)
+  const longest = Math.max(0, ...order.map(x => String(x).length));
+  const k = { field: 'k', type: 'nominal', title: res.group_by, sort: order, axis: { labelAngle: hz ? 0 : (order.length <= 8 && longest <= 16 ? 0 : -35), labelLimit: 150, labelPadding: 6, labelFontSize: 12 } }, v = { field: 'v', type: 'quantitative', title: res.agg === 'count' ? 'العدد' : `${AGG_AR[res.agg] || ''} ${res.measure}`.trim() };
   const enc = hz ? { y: k, x: v } : { x: k, y: v };
   if (multi) { enc.color = { field: 's', type: 'nominal', title: '' }; if (type !== 'stacked' && mark.type === 'bar') enc[hz ? 'yOffset' : 'xOffset'] = { field: 's' }; }
   enc.tooltip = [{ field: 'k', title: res.group_by || '' }, ...(multi ? [{ field: 's', title: '' }] : []), { field: 'v', title: res.measure, format: ',' }];
@@ -267,7 +271,7 @@ export const datasetTools = {
     run: async ({ title, chart_type = 'bar', ...args }) => {
       const ds = await resolveDs({ ...args, title }); const r = runQuery(ds, args);
       if (args.measure && r.measure === 'العدد') title = `العدد حسب ${r.group_by || ''}`.trim(); // العمود نصي فتحوّل لعدّ
-      if (!/[\u0600-\u06FF]/.test(title || '')) title = `${AGG_AR[r.agg] || ''} ${r.measure} حسب ${r.group_by || ''}`.replace(/\s+/g, ' ').trim();
+      if (!/[\u0600-\u06FF]/.test(title || '')) title = `${r.measure === 'العدد' ? 'عدد السجلات' : `${AGG_AR[r.agg] || ''} ${r.measure}`} حسب ${r.group_by || ''}`.replace(/\s+/g, ' ').trim();
       const total = r.rows.reduce((a, x) => a + x.total, 0);
       const sorted = [...r.rows].sort((a, b) => b.total - a.total), top1 = sorted[0], low = sorted.at(-1);
       const n = x => new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(x);

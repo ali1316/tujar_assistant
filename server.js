@@ -303,6 +303,15 @@ app.use(express.json({ limit: '1mb' }));
 // الواجهة (ملفات محددة فقط)
 for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'ui-control.js', 'assistant.js', 'eleven-agent.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.', headers: { 'Cache-Control': 'no-cache' } })); // دايماً أحدث نسخة بعد كل تحديث
+// مكتبات الرسم والخط من السيرفر نفسه (بدل CDN): الشارت ما يتعطل لو الـ CDN بطّأ أو انحجب، وأسرع بعد أول تحميل
+const VENDOR = {
+  'vega.min.js': 'node_modules/vega/build/vega.min.js', 'vega-lite.min.js': 'node_modules/vega-lite/build/vega-lite.min.js',
+  'vega-embed.min.js': 'node_modules/vega-embed/build/vega-embed.min.js', 'chart.umd.js': 'node_modules/chart.js/dist/chart.umd.js',
+  'echarts.min.js': 'node_modules/echarts/dist/echarts.min.js', 'tabulator.min.js': 'node_modules/tabulator-tables/dist/js/tabulator.min.js',
+  'tabulator_midnight.min.css': 'node_modules/tabulator-tables/dist/css/tabulator_midnight.min.css',
+};
+app.get('/vendor/:f', (req, res) => VENDOR[req.params.f] ? res.sendFile(VENDOR[req.params.f], { root: '.', maxAge: '30d', immutable: true }) : res.status(404).end());
+app.get(/^\/vendor\/plex\/((?:files\/)?[\w.-]+\.(?:css|woff2?))$/, (req, res) => res.sendFile(`node_modules/@fontsource/ibm-plex-sans-arabic/${req.params[0]}`, { root: '.', maxAge: '30d', immutable: true }, e => e && res.status(404).end()));
 app.get('/health', (req, res) => res.send('ok'));
 // هوية اتحاد الغرف (الشعار)
 app.get('/brand/:f', (req, res) => {

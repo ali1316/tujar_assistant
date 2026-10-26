@@ -11,9 +11,10 @@ const CSS = `
 @keyframes hud-out{to{opacity:0;transform:translateY(-8px)}}
 .hud header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--ln)}
 .hud .eyebrow{font-size:12px;font-weight:700;color:var(--c);letter-spacing:0}
-.hud h3{margin:6px 0 0;font-size:24px;font-weight:700;color:#fff}
+.hud .eyebrow::before{content:"";display:inline-block;width:6px;height:6px;background:var(--c);border-radius:1px;margin-inline-end:8px;vertical-align:middle}
+.hud h3{margin:6px 0 0;font-size:clamp(18px,4.8vw,24px);line-height:1.35;font-weight:700;color:#fff;text-wrap:balance}
 .hud .sub{color:var(--mt);font-size:13px;margin-top:4px}
-.hud .x{background:transparent;border:1px solid #2b4a6c;color:var(--c);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
+.hud .x{background:transparent;border:1px solid #2b4a6c;color:var(--c);border-radius:8px;padding:6px 12px;min-height:36px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
 .hud .x:hover{background:rgba(209,166,92,.12)}
 .hud .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .hud .cell{border:1px solid var(--ln);background:#0b1d31;border-radius:10px;padding:14px;min-width:0;opacity:0;animation:hud-cell .45s ease-out both}
@@ -49,7 +50,11 @@ const CSS = `
 const STATUS_COLOR = { 'مكتمل': 'var(--ok)', 'متأخر': 'var(--bad)', 'متوقف': 'var(--warn)', 'قيد التنفيذ': 'var(--c2)' };
 const PRI_COLOR = { 'عالية': '#e0705f', 'متوسطة': '#e6b450', 'منخفضة': '#59c48f' };
 const PALETTE = ['#d1a65c', '#5f86b3', '#e8d3a8', '#4fb3a9', '#c97a5b', '#8fa7c4', '#9b86c9', '#7fae6e'];
-const fmt = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA').format(Math.round(n));
+// الأرقام بنفس دقة المصدر (9.4 تبقى 9.4 مو 9) عشان الشاشة تطابق الكلام والشارت
+const fmt = (n, dec = 0) => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA', { maximumFractionDigits: dec, minimumFractionDigits: 0 }).format(dec ? n : Math.round(n));
+const decOf = v => (Number.isInteger(+v) ? 0 : 1);
+// نفس شكل الأرقام في كل النصوص (عربية ١٢٣ أو إنجليزية 123 حسب الإعداد)
+export const localDigits = t => (window.NORA_NUMERALS === 'latin' ? String(t) : String(t).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]).replace(/(?<=[٠-٩])\.(?=[٠-٩])/g, '٫'));
 // أسماء الشهور والأيام بالعربي في رسوم Vega (بدل January/Monday)
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 const AR_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -90,8 +95,8 @@ export function createHUD({ api, mount }) {
     [...panels].forEach(p => close(p, true));
     const el = document.createElement('section');
     el.className = 'hud';
-    el.innerHTML = `<header><div><div class="eyebrow"></div><h3></h3><div class="sub"></div></div><button class="x" type="button">↩ رجوع للرئيسية</button></header><div class="body"></div>`;
-    el.querySelector('.eyebrow').textContent = '✦ ' + (EYEBROW[eyebrow] || eyebrow);
+    el.innerHTML = `<header><div><div class="eyebrow"></div><h3></h3><div class="sub"></div></div><button class="x" type="button">رجوع للرئيسية</button></header><div class="body"></div>`;
+    el.querySelector('.eyebrow').textContent = EYEBROW[eyebrow] || eyebrow;
     el.querySelector('h3').textContent = title;
     el.querySelector('.sub').textContent = sub || '';
     el.querySelector('.x').onclick = () => closeAll();
@@ -118,13 +123,13 @@ export function createHUD({ api, mount }) {
     const T = ' ' + String(text).replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي') + ' ';
     const hits = HL.map(h => ({ ...h, at: T.lastIndexOf(norm(h.label)) })).filter(h => norm(h.label).length > 1 && h.at >= 0).sort((a, b) => b.at - a.at).slice(0, 3).reverse();
     const key = hits.map(h => h.label).join('|'); if (key === lastHL) return; lastHL = key;
-    el.querySelector('.hl').innerHTML = hits.map(h => `<span>${esc(h.label)}<b>${fmt(h.value)}${h.unit ? ' ' + esc(h.unit) : ''}</b></span>`).join('');
+    el.querySelector('.hl').innerHTML = hits.map(h => `<span>${esc(h.label)}<b>${fmt(h.value, decOf(h.value))}${h.unit ? ' ' + esc(h.unit) : ''}</b></span>`).join('');
   }
   const setHL = rows => { HL = rows.filter(r => r.label != null && r.value != null && isFinite(+r.value)).map(r => ({ ...r, label: String(r.label) })); };
 
   function countUp(el, to, suffix = '') {
     const t0 = performance.now(), d = 1300;
-    const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3); el.innerHTML = fmt(to * e) + suffix; if (p < 1) requestAnimationFrame(step); };
+    const dec = decOf(to); const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3); el.innerHTML = fmt(p < 1 ? to * e : to, dec) + suffix; if (p < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   }
   function cell(parent, html, delay, span) {
@@ -238,9 +243,9 @@ export function createHUD({ api, mount }) {
   const loadScript = src => new Promise((ok, bad) => { const t = document.createElement('script'); t.src = src; t.onload = ok; t.onerror = () => bad(new Error('تعذّر تحميل ' + src)); document.head.append(t); });
   function loadVega() {
     return vegaReady ??= (async () => {
-      await loadScript('https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js');
-      await loadScript('https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js');
-      await loadScript('https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js');
+      await loadScript('/vendor/vega.min.js');
+      await loadScript('/vendor/vega-lite.min.js');
+      await loadScript('/vendor/vega-embed.min.js');
     })();
   }
   const VEGA_CONFIG = {
@@ -259,6 +264,22 @@ export function createHUD({ api, mount }) {
     text: { color: '#e8d3a8', fontSize: 12 },
   };
 
+  function mobileSpec(spec) {
+    const layers = spec.layer || [spec];
+    const markOf = l => (typeof l.mark === 'object' ? l.mark?.type : l.mark);
+    const nominalX = layers.some(l => l.encoding?.x?.type === 'nominal' && markOf(l) === 'bar');
+    if (nominalX) {
+      for (const l of layers) {
+        const e = l.encoding; if (!e) continue;
+        [e.x, e.y] = [e.y, e.x]; if (e.xOffset) { e.yOffset = e.xOffset; delete e.xOffset; }
+        if (e.y?.axis) e.y.axis = { ...e.y.axis, labelAngle: 0, labelLimit: 110 };
+        if (markOf(l) === 'text' && typeof l.mark === 'object') Object.assign(l.mark, { align: 'left', baseline: 'middle', dx: 5, dy: 0 });
+      }
+      const vals = spec.data?.values || layers.find(l => l.data)?.data.values || [];
+      spec.height = Math.max(240, 34 * new Set(vals.map(d => d.k)).size + 60);
+    }
+    for (const l of layers) { const x = l.encoding?.x; if (x && x.type && x.type !== 'quantitative') x.axis = { ...(x.axis || {}), labelAngle: -55, labelFontSize: 11, labelLimit: 80 }; }
+  }
   async function showVisual({ title, subtitle = '', vega_lite, kpis = [], insights = [] }) {
     let spec;
     try { spec = typeof vega_lite === 'string' ? JSON.parse(vega_lite) : vega_lite; }
@@ -270,6 +291,8 @@ export function createHUD({ api, mount }) {
     const font = brandFont();
     spec.config = { ...VEGA_CONFIG, font, axis: { ...VEGA_CONFIG.axis, labelFont: font, titleFont: font }, legend: { ...VEGA_CONFIG.legend, labelFont: font, titleFont: font }, title: { ...VEGA_CONFIG.title, font, subtitleFont: font }, text: { ...VEGA_CONFIG.text, font } };
     spec.autosize = { type: 'fit', contains: 'padding' };
+    // الجوال: الأعمدة العمودية بأسماء عربية تتزاحم → نقلبها أفقية (الاسم يمين والرقم جنب العمود)، ومحاور التواريخ أصغر وأميل
+    if ((layer.clientWidth || innerWidth) < 600) mobileSpec(spec);
     try { await loadVega(); } catch (e) { return { error: e.message }; }
 
     const el = panel('LIVE · RENDER', title, subtitle);
@@ -295,7 +318,7 @@ export function createHUD({ api, mount }) {
     }
     if (insights.length) {
       const ul = document.createElement('ul'); ul.className = 'ins'; body.append(ul);
-      insights.slice(0, 3).forEach((t, i) => { const li = document.createElement('li'); li.textContent = t; li.style.animationDelay = `${1300 + i * 450}ms`; ul.append(li); });
+      insights.slice(0, 3).forEach((t, i) => { const li = document.createElement('li'); li.textContent = localDigits(t); li.style.animationDelay = `${1300 + i * 450}ms`; ul.append(li); });
     }
     animate(el);
     return { shown: true, title };
@@ -305,7 +328,7 @@ export function createHUD({ api, mount }) {
   function showNote({ title, subtitle = '', text = '', eyebrow = 'نتيجة' }) {
     const el = panel(eyebrow, title, subtitle);
     const ul = document.createElement('ul'); ul.className = 'ins';
-    String(text).split(/\n+/).map(t => t.trim()).filter(Boolean).forEach((t, i) => { const li = document.createElement('li'); li.textContent = t; li.style.animationDelay = `${150 + i * 200}ms`; ul.append(li); });
+    String(text).split(/\n+/).map(t => t.trim()).filter(Boolean).forEach((t, i) => { const li = document.createElement('li'); li.textContent = localDigits(t); li.style.animationDelay = `${150 + i * 200}ms`; ul.append(li); });
     el.querySelector('.body').append(ul);
     return { shown: true };
   }

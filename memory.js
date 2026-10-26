@@ -15,17 +15,13 @@ export async function embed(text) {
     return r.embeddings?.[0]?.values || null;
   } catch (e) { console.warn('[memory] embed failed:', e.message); return null; }
 }
-// دفعة نصوص مرة وحدة (للفهرس): يرجع مصفوفة متجهات بنفس الترتيب، أو null لو فشل
-export async function embedMany(texts, taskType) {
+// دفعة نصوص للفهرس: طلب لكل نص بالتوازي (8 في نفس الوقت) — مصفوفة بنفس الترتيب، والفاشل null
+export async function embedMany(texts) {
   if (!ai || !texts.length) return null;
-  const out = [];
-  try {
-    for (let i = 0; i < texts.length; i += 50) {
-      const r = await ai.models.embedContent({ model: EMBED_MODEL, contents: texts.slice(i, i + 50), config: { outputDimensionality: DIMS, ...(taskType ? { taskType } : {}) } });
-      out.push(...(r.embeddings || []).map(e => e.values));
-    }
-    return out.length === texts.length ? out : null;
-  } catch (e) { console.warn('[memory] embedMany failed:', e.message); return null; }
+  const out = new Array(texts.length).fill(null); let next = 0;
+  const worker = async () => { while (next < texts.length) { const i = next++; out[i] = await embed(texts[i]); } };
+  await Promise.all(Array.from({ length: Math.min(8, texts.length) }, worker));
+  return out;
 }
 export const cos = (a, b) => { let d = 0, x = 0, y = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; x += a[i] * a[i]; y += b[i] * b[i]; } return d / (Math.sqrt(x * y) || 1); };
 const norm = s => s.replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').toLowerCase();

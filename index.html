@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>لوحة المشاريع · نورة</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="/vendor/chart.umd.js"></script>
+<link rel="stylesheet" href="/vendor/plex/400.css"><link rel="stylesheet" href="/vendor/plex/600.css"><link rel="stylesheet" href="/vendor/plex/700.css">
 <style>
   /* هوية اتحاد الغرف التجارية السعودية: كحلي + ذهبي — نفس هوية الداشبوردات */
   :root{--bg:#081726;--card:#0e2238;--line:#1d3a5a;--ink:#eef2f7;--mute:#8ea3bd;--acc:#d1a65c;--sand:#e8d3a8;--steel:#5f86b3;--ok:#59c48f;--warn:#e6b450;--bad:#e0705f;--font:'IBM Plex Sans Arabic';--radius:12px;--fs-table:1;--fs-kpi:1;--fs-chat:1;--fs-header:1;--fs-titles:1}
@@ -59,8 +59,9 @@
   #gate form{display:flex;gap:8px;flex-direction:column;width:300px} #gate input{padding:12px;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px} #gate button{padding:10px;background:var(--acc);color:#081726;border:0;border-radius:10px;font-weight:700}
   /* ===== نورة: شريط صوتي صغير أسفل الشاشة (مثل ChatGPT) ===== */
   #dock{position:fixed;inset-inline:0;bottom:0;z-index:20;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 16px 14px;pointer-events:none;
-    background:linear-gradient(to top,var(--bg) 55%,transparent)}
+    background:var(--bg);border-top:1px solid #12304d;padding-top:10px}
   #dock>*{pointer-events:auto;width:min(780px,100%)}
+  @media(max-width:600px){.chipbtn,.chipsel{min-height:40px}}
   .composer{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid #2b4a6c;border-radius:30px;padding:7px 8px;box-shadow:0 10px 30px #0006}
   .composer input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--ink);font-size:16px;padding:8px 6px}
   .composer input::placeholder{color:var(--mute)}
@@ -72,8 +73,8 @@
   .chipbtn{background:transparent;color:var(--mute);border:0;font-size:13px;cursor:pointer;padding:6px} .chipbtn:hover{color:var(--ink)}
   #status{color:var(--mute);font-size:12px;text-align:center;min-height:16px}
   #caption{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:calc(15px*var(--fs-chat));line-height:1.7;cursor:pointer;max-height:150px;overflow:auto;box-shadow:0 10px 30px #0005;animation:capin .25s ease-out}
-  #caption[hidden]{display:none} #caption .cu{color:var(--mute);font-size:13px} #caption .cu:empty{display:none} #caption .ca::before{content:"✦ نورة: ";color:var(--acc);font-weight:700}
-  #caption .ca:empty{display:none} body.eng-eleven #caption .ca::before{content:"✦ فواز: "}
+  #caption[hidden]{display:none} #caption .cu{color:var(--mute);font-size:13px} #caption .cu:empty{display:none} #caption .ca::before{content:"نورة: ";color:var(--acc);font-weight:700}
+  #caption .ca:empty{display:none} body.eng-eleven #caption .ca::before{content:"فواز: "}
   @keyframes capin{from{opacity:0;transform:translateY(6px)}}
   #drawer{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px #0007;display:flex;flex-direction:column;max-height:min(55vh,520px)}
   #drawer[hidden]{display:none}
@@ -112,7 +113,7 @@
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
-      <div id="fdWait" class="fd-wait" hidden><b>✦ نورة تحلل الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
+      <div id="fdWait" class="fd-wait" hidden><b>نورة تحلل الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
       <iframe id="fdFrame" title="لوحة الملف"></iframe>
     </div>
     <div class="kpis" id="kpis" data-v="overview" hidden></div>
@@ -327,7 +328,7 @@ window.showDash = async (id, title = '', sub = '', save = true, show = true) => 
   if (!id) return;
   CUR_DASH = { id, title };
   $('#fdWait').hidden = true; $('#fdFrame').hidden = false;
-  $('#fdTitle').textContent = '✦ لوحة الملف'; $('#fdSub').textContent = sub || title || '';
+  $('#fdTitle').textContent = 'لوحة الملف'; $('#fdSub').textContent = sub || title || '';
   $('#fdOpen').href = `/d/${id}`;
   $('#fdFrame').src = `/d/${id}?embed=1`;
   if (show) showView('file_dashboard');
@@ -376,9 +377,12 @@ const screenToolsExtra = {
     // لو فيه قسم مطابق للسؤال نعرض بنوده هو (هي اللي بتتكلم عنها نورة)، وإلا الملخص
     const top = (e.sections || []).find(x => typeof x !== 'string' && x.text);
     const items = top ? top.text.split(/\n+/).map(l => l.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim()).filter(l => l.length > 3 && !/^#/.test(l)).map(l => l.length > 180 ? l.slice(0, 177) + '…' : l).slice(0, 7) : [];
-    if (items.length >= 2) lines.splice(0, lines.length, ...items);
-    if (e.status && !/كاملة/.test(e.status)) lines.push('⚠️ ' + e.status);
-    hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: top?.cite ? 'المصدر ' + top.cite : secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
+    // سطر عنوان بدون رقم + سطر قيمة يبدأ برقم = بند واحد «العنوان: القيمة»؛ ونشيل تكرار العنوان والقسم
+    const heads = [e.title, top?.section || ''].map(x => x.replace(/^\d+\.\s*/, ''));
+    const merged = items.filter(l => !heads.some(h => h && (h.includes(l) || l.includes(h)))).reduce((a, l) => { const p = a.at(-1); if (p && !/\d/.test(p) && /^[\d٠-٩]/.test(l) && p.length < 60) a[a.length - 1] = `${p}: ${l}`; else a.push(l); return a; }, []).slice(0, 6);
+    if (merged.length >= 2) lines.splice(0, lines.length, ...merged);
+    if (e.status && !/كاملة/.test(e.status)) lines.push('تنبيه: ' + e.status);
+    hud.showNote({ eyebrow: 'مكتبة المعرفة', title: e.title, subtitle: top?.cite ? 'المصدر ' + top.cite.replace(`${e.title} · `, '') : secs.length ? 'من: ' + secs.slice(0, 2).join(' · ') : (e.source_file || ''), text: lines.join('\n') });
     return { ...r, on_screen: lines };
   },
 };
@@ -410,7 +414,7 @@ const agentOpts = {
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; hud.highlight(pend.a.slice(-220)); },
     turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
-    toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `✦ عرض: ${fc.args?.title || VIEW_LABEL[fc.args?.view] || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
+    toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `عرض: ${fc.args?.title || VIEW_LABEL[fc.args?.view] || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
     toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => note('❌ ' + JSON.stringify(e)),
     usage: u => trackUsage(u),
@@ -545,18 +549,18 @@ function connectLive() {
   const es = window.__live = new EventSource(`/api/events?code=${encodeURIComponent(CODE)}`);
   es.addEventListener('hello', e => {
     const { boot } = JSON.parse(e.data);
-    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; $('#status').textContent = '✦ فيه تحديث جديد — ينطبق بعد ما تخلص المحادثة'; } else location.reload(); }
+    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; $('#status').textContent = 'فيه تحديث جديد — ينطبق بعد ما تخلص المحادثة'; } else location.reload(); }
     BOOT ||= boot;
   });
   es.addEventListener('data', () => { clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });
   es.addEventListener('job', async e => {
     const j = JSON.parse(e.data);
     const who = j.kind === 'gpt' ? 'GPT' : 'Claude';
-    if (j.status === 'قيد التنفيذ') { $('#status').textContent = `✦ ${who} شغال: ${j.step?.text || '…'}`; return; }
-    note(`✦ ${who} خلّص المهمة #${j.id} (${j.status})`);
+    if (j.status === 'قيد التنفيذ') { $('#status').textContent = `${who} شغال: ${j.step?.text || '…'}`; return; }
+    note(`${who} خلّص المهمة #${j.id} (${j.status})`);
     // النتيجة تطلع على الشاشة بنفس وقت ما نورة تقولها
     if (j.result) hud.showNote({ eyebrow: `نتيجة ${who}`, title: `مهمة #${j.id}`, subtitle: j.status, text: j.result });
-    $('#status').textContent = `✦ ${who} خلّص المهمة #${j.id}`;
+    $('#status').textContent = `${who} خلّص المهمة #${j.id}`;
     const msg = `[تنبيه النظام] ${who} خلّص المهمة رقم ${j.id} (${j.status}). النتيجة: ${String(j.result || '').slice(0, 1500)}\nقولي لفواز النتيجة باختصار بصوتك.`;
     if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch { return; } }
     agent.sendText(msg, { silent: true });
@@ -564,6 +568,18 @@ function connectLive() {
 }
 const _origClosed = agentOpts.on.closed;
 agentOpts.on.closed = (...a) => { _origClosed(...a); if (pendingReload) location.reload(); };
+
+// ===== حالات اختبار التصميم (?fixture=…): نفس كود الشاشة الحقيقي، عشان اختبار التصميم يصوّرها على الجوال والشاشة الكبيرة =====
+const FIXTURES = {
+  bar: () => screenToolsExtra.data_chart({ title: 'متوسط مدة الإنجاز حسب المنطقة', chart_type: 'bar', group_by: 'المنطقة', measure: 'مدة الإنجاز', agg: 'avg' }),
+  hbar: () => screenToolsExtra.data_chart({ title: 'إجمالي الرسوم حسب نوع الخدمة', chart_type: 'hbar', group_by: 'نوع الخدمة', measure: 'الرسوم', agg: 'sum' }),
+  pie: () => screenToolsExtra.data_chart({ title: 'عدد الطلبات حسب الحالة', chart_type: 'pie', group_by: 'الحالة', about: 'الطلبات' }),
+  stacked: () => screenToolsExtra.data_chart({ title: 'الطلبات حسب المنطقة والحالة', chart_type: 'stacked', group_by: 'المنطقة', series_by: 'الحالة', about: 'الطلبات' }),
+  line: () => screenToolsExtra.data_chart({ title: 'الطلبات شهرياً', chart_type: 'line', group_by: 'تاريخ الطلب', date_unit: 'month', about: 'الطلبات' }),
+  note: () => screenToolsExtra.find_knowledge({ question: 'وش النطاق السعري المقترح للمسار السريع' }),
+};
+const FIX = new URLSearchParams(location.search).get('fixture');
+if (FIX && FIXTURES[FIX]) Promise.resolve().then(FIXTURES[FIX]).catch(e => console.error('fixture', e)).finally(() => { document.documentElement.dataset.fixture = 'ready'; });
 </script>
 </body>
 </html>
