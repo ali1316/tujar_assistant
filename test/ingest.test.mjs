@@ -95,6 +95,16 @@ await kvSet(`ingest:data:${r1.version_id}`, null);
 const again = await P.getData(r1.version_id);
 ok('بعد ضياع الكاش: البيانات تُقرأ من الحزمة بدون إعادة تحليل', again?.rebuilt_from_storage === true && again.datasets.length === data.datasets.length);
 
+// 8) جدول بلوحتين متجاورتين بنفس الأعمدة (حالة حقيقية من تقرير تجار ص6): لا تضيع اللوحة الثانية
+const { unstackRepeated } = await import('../ingest/organize.js');
+const two = unstackRepeated({ columns: ['الغرفة', 'المستخدمون', 'الغرفة', 'المستخدمون'].map(name => ({ name })), rows: [['أ', '10', 'ج', '3'], ['ب', '7', 'الإجمالي', '20']], row_kinds: ['detail', 'detail'], header_rows: [] });
+ok('جدول بلوحتين متجاورتين يُفك إلى صفوف بدون فقد', two.columns.length === 2 && two.rows.length === 4 && two.rows.map(r => r[0]).join(',') === 'أ,ب,ج,الإجمالي', JSON.stringify(two.rows));
+
+// 9) إعادة معالجة صريحة: إصدار جديد من نفس الأصل، والسابق يبقى
+const r4 = await P.reprocess(r1.version_id);
+await wait(r4.attempt_id);
+ok('إعادة المعالجة تنشئ إصداراً جديداً وتبقي السابق', r4.duplicate === false && r4.version === 3 && fs.existsSync(path.join(dir, r1.document_id, 'v1', 'metadata.json')), `v${r4.version}`);
+
 const failed = results.filter(r => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} passed · storage: ${dir}`);
 fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify(results, null, 1));
