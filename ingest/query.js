@@ -5,8 +5,13 @@ import { VERIFY, USABLE_FOR_METRICS, STAGE_AR } from './contracts.js';
 import { digitsKey } from './normalize.js';
 
 const nz = x => String(x ?? '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[^\p{L}\p{N}%.\s]/gu, ' ').replace(/\s+/g, ' ').trim();
-const STOP = new Set('في من على الى عن مع او و ثم لا ما هذا هذه كل كم وش ايش عطيني وريني ابي ابغى اعرضي اعرض قولي حسب الملف كان كانت بلغ بلغت عدد قيمه رقم'.split(' '));
-const toks = q => nz(q).split(' ').filter(t => t.length > 1 && !STOP.has(t)).map(t => (t.length > 4 && t.startsWith('ال') ? t.slice(2) : t));
+const STOP = new Set('نوره يا في من على الى عن مع او و ثم لا ما هذا هذه كل كم وش ايش عطيني وريني ابي ابغى اعرضي اعرض قولي حسب الملف كان كانت بلغ بلغت عدد قيمه رقم'.split(' '));
+// تجذيع خفيف للعربية: «المشتركين/المشتركون» و«الفعّالين/الفعّالون» و«للربع/الربع» تتطابق (حالة حقيقية: سؤال صوتي عن «المشتركين الفعالين» فشل لأن العمود «المشتركون الفعّالون»)
+const stem = t => { let x = t; if (x.length > 4 && /^(ال|لل|بال|وال|فال|كال)/.test(x)) x = x.replace(/^(بال|وال|فال|كال|ال|لل)/, ''); if (x.length > 4) x = x.replace(/(ين|ون|ات|ان|يه|ه|ي)$/, ''); return x; };
+const toks = q => nz(q).split(' ').filter(t => t.length > 1 && !STOP.has(t)).map(stem);
+// بدائل الحرف الجار الملتصق («لغرفة/بغرفة» ← «غرفة») تُجرّب مع الكلمة نفسها، حتى لا نقص كلمات أصلها يبدأ بلام أو باء
+const variants = k => (k.length > 4 && /^[لب]/.test(k) ? [k, stem(k.slice(1))] : [k]);
+const stems = h => new Set(nz(h).split(' ').filter(Boolean).map(stem));
 const usable = v => v.value != null && v.verification.some(x => USABLE_FOR_METRICS.has(x)) && !v.verification.includes(VERIFY.ESTIMATED) && !v.verification.includes(VERIFY.CONFLICT);
 const VER_AR = { matched_text_layer: 'مطابق لنص الصفحة', total_reconciled: 'مطابق للمجموع', vision_only: 'مقروء من الصورة فقط', visual_estimate: 'تقدير بصري (غير مؤكد)', conflict: 'متعارض', cross_referenced: 'متطابق مع موضع آخر' };
 
@@ -36,8 +41,14 @@ const pub = (v, data) => ({
 
 function score(v, data, ts) {
   const t = data.tables.find(x => x.id === v.source.table_id);
-  const hay = nz([v.context, v.source.column, Object.values(v.dims || {}).join(' '), t?.title, v.raw].join(' '));
-  let s = 0; for (const k of ts) if (hay.includes(k)) s += 1; else if (k.length > 4 && hay.includes(k.slice(0, -1))) s += 0.6;
+  const text = [v.context, v.source.column, Object.keys(v.dims || {}).join(' '), Object.values(v.dims || {}).join(' '), t?.title, v.raw, data.meta?.file_name, data.meta?.data_period].join(' ');
+  const hay = nz(text), hs = stems(text);
+  let s = 0;
+  for (const k0 of ts) {
+    const vs = variants(k0);
+    if (vs.some(k => hs.has(k) || hay.includes(k))) s += 1;
+    else if (vs.some(k => k.length > 3 && [...hs].some(h => h.startsWith(k) || (k.startsWith(h) && h.length > 3)))) s += 0.6;
+  }
   if (ts.some(k => /^\d/.test(k) && digitsKey(v.raw) === digitsKey(k))) s += 2;
   return s / Math.max(1, ts.length);
 }
