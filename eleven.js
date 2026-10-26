@@ -73,3 +73,35 @@ export async function listVoices() {
   cache = { at: Date.now(), list };
   return list;
 }
+
+// ===== جداوي: صوت ElevenLabs v4 Turbo لجلسة Gemini (العقل Gemini، والنطق هنا) =====
+// Eleven Realtime ما يقبل غير eleven_realtime_v1_*، فـ v4 Turbo يُستخدم كـ TTS لنص Gemini جملة جملة
+export const JEDDAWI = {
+  get voice() { return process.env.JEDDAWI_VOICE || 'yXEnnEln9armDCyhkXcA'; },
+  get model() { return process.env.JEDDAWI_TTS_MODEL || 'eleven_v4_turbo'; },
+};
+export function ttsRequest({ text, voice = JEDDAWI.voice, model = JEDDAWI.model }) {
+  return {
+    url: `${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`,
+    init: { method: 'POST', headers: { 'xi-api-key': KEY(), 'content-type': 'application/json', accept: 'audio/pcm' }, body: JSON.stringify({ text, model_id: model }) },
+  };
+}
+
+// يمرّر صوت ElevenLabs للمتصفح، ولو المتصفح قطع (مقاطعة) نوقف الطلب عند ElevenLabs فوراً
+export async function streamTTS(text, res, { fetchImpl = fetch } = {}) {
+  const ac = new AbortController();
+  res.on('close', () => ac.abort());
+  const { url, init } = ttsRequest({ text });
+  let sent = 0;
+  try {
+    const r = await fetchImpl(url, { ...init, signal: ac.signal });
+    if (!r.ok) { const t = (await r.text()).slice(0, 300); console.error('[speak/eleven]', r.status, t); return res.status(502).json({ error: `ElevenLabs ${r.status}: ${t}` }); }
+    res.setHeader('Content-Type', 'audio/l16; rate=24000; channels=1');
+    for await (const chunk of r.body) { if (ac.signal.aborted) break; res.write(chunk); sent += chunk.length; }
+    console.log(`[speak/eleven] ${JEDDAWI.model} ${text.length} chars → ${(sent / 48000).toFixed(1)}s${ac.signal.aborted ? ' (قوطع)' : ''}`);
+  } catch (e) {
+    if (e.name === 'AbortError' || ac.signal.aborted) return;
+    console.error('[speak/eleven] error:', e.message);
+    if (!res.headersSent) return res.status(500).json({ error: e.message });
+  } finally { if (!ac.signal.aborted) res.end(); }
+}

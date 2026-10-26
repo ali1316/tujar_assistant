@@ -2,10 +2,14 @@
 // الاستخدام:
 //   const agent = new GeminiLiveAgent({ sessionUrl: '/api/session', toolUrl: n => `/api/tools/${n}`, on: {...} });
 //   await agent.start();  agent.sendText('...');  agent.stop();
+import { stripToolTags } from './text-guard.js';
+// مقاطعة في وضع «صوت خارجي» (جداوي/صوتي): توقف حتى لو ما فيه صوت يشتغل لحظتها — جملة جاية بالطريق أو نص منتظر
+export const shouldBargeIn = ({ mode, playing, pending, buffered }) => mode === 'mine' && !!(playing || pending || buffered);
 const WS_BASE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage';
 
 export class GeminiLiveAgent {
-  constructor({ sessionUrl = '/api/session', toolUrl = n => `/api/tools/${n}`, speakUrl = '/api/speak', headers = () => ({}), clientTools = {}, on = {} } = {}) {
+  constructor({ sessionUrl = '/api/session', toolUrl = n => `/api/tools/${n}`, speakUrl = '/api/speak', persona = '', headers = () => ({}), clientTools = {}, on = {} } = {}) {
+    this.persona = persona; // هوية على نفس عقل Gemini (مثل «جداوي»)
     this.clientTools = clientTools; // أدوات تنفّذ في المتصفح (مثل النوافذ المنبثقة)
     this.voice = '';
     this.headers = headers;
@@ -38,7 +42,7 @@ export class GeminiLiveAgent {
   }
 
   async #connect(version) {
-    const q = new URLSearchParams({ mode: this.mode, ...(this.voice ? { voice: this.voice } : {}), ...(version ? { v: version } : {}) });
+    const q = new URLSearchParams({ mode: this.mode, ...(this.persona ? { persona: this.persona } : {}), ...(this.voice ? { voice: this.voice } : {}), ...(version ? { v: version } : {}) });
     const r = await fetch(`${this.sessionUrl}?${q}`, { headers: this.headers() });
     const s = await r.json();
     if (!r.ok) throw new Error(s.error || 'session error');
@@ -86,12 +90,12 @@ export class GeminiLiveAgent {
         if (part.inlineData?.data && this.mode !== 'mine') this.#play(part.inlineData.data); // في وضع «صوتي» نتجاهل صوت Live
       }
       if (sc.inputTranscription?.text) {
-        if (this.mode === 'mine' && this.sources.size) this.#stopPlayback(); // قاطعته وهو يتكلم بصوتك
+        if (shouldBargeIn({ mode: this.mode, playing: this.sources.size, pending: this.aborts.size, buffered: this.textBuf.trim() })) this.#stopPlayback(); // قاطعته وهو يتكلم (حتى بين جملتين)
         this.emit('userText', sc.inputTranscription.text, false);
       }
       if (sc.outputTranscription?.text) {
         this.emit('modelText', sc.outputTranscription.text);
-        if (this.mode === 'mine') this.#queueText(sc.outputTranscription.text);
+        if (this.mode === 'mine') this.#queueText(stripToolTags(sc.outputTranscription.text, { trim: false })); // وسوم الأدوات ما تنقرأ بالصوت
       }
       if (sc.turnComplete && this.mode === 'mine') this.#queueText('', true);
       if (sc.turnComplete) this.emit('turnComplete');

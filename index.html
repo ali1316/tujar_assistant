@@ -327,7 +327,7 @@
   <form id="f" class="composer">
     <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button><span class="vsep" aria-hidden="true"></span>
     <input id="txt" placeholder="اسأل نورة…" autocomplete="off" aria-label="اكتب سؤالك لنورة">
-    <span class="vsep" aria-hidden="true"></span><select id="engine" class="chipsel engine" title="المساعد" aria-label="اختيار المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option></select>
+    <span class="vsep" aria-hidden="true"></span><select id="engine" class="chipsel engine" title="المساعد" aria-label="اختيار المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option><option value="jeddawi">جداوي</option></select>
     <span class="vsep" aria-hidden="true"></span><button type="button" class="chipbtn" id="logBtn" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg><span class="lbl-t">السجل</span></button><span class="vsep" aria-hidden="true"></span>
     <button class="ic send" id="send" title="إرسال" aria-label="إرسال"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L10.5 13.5"/><path d="M21 3l-6.8 18-3.7-7.5L3 9.8z"/></svg></button>
     <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة" aria-label="تكلّم مع نورة بالصوت" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
@@ -750,7 +750,7 @@ const screenTools = {
   },
 };
 
-window.__nora = { screenTools, ui, hud, status: t => setStatus(t), agent: () => agent, connected: () => !!agent?.connected };
+window.__nora = { screenTools, ui, hud, status: t => setStatus(t), modeFor: () => modeFor(), agent: () => agent, connected: () => !!agent?.connected };
 // محركين للمقارنة: Gemini Live أو ElevenLabs Realtime — نفس نورة ونفس الأدوات والشاشة والذاكرة
 const agentOpts = {
   headers: H,
@@ -777,11 +777,12 @@ function trackUsage(u) {
   clearTimeout(usageTimer); usageTimer = setTimeout(() => { const d = usagePend; usagePend = null; apiJson('/api/usage', { chatId: agent.chatId, engine: ENGINE, ...d }).catch(() => {}); }, 1500);
 }
 let ENGINE = 'gemini'; try { ENGINE = localStorage.getItem('noraEngine') || 'gemini'; } catch {}
-const makeAgent = e => e === 'eleven' ? new ElevenRealtimeAgent(agentOpts) : new GeminiLiveAgent(agentOpts);
+// جداوي: نفس عقل Gemini (الأدوات والذاكرة)، والنطق بصوت ElevenLabs v4 Turbo جملة جملة (وضع mine)
+const makeAgent = e => e === 'eleven' ? new ElevenRealtimeAgent(agentOpts) : e === 'jeddawi' ? new GeminiLiveAgent({ ...agentOpts, speakUrl: '/api/speak/eleven', persona: 'jeddawi' }) : new GeminiLiveAgent(agentOpts);
 let agent = makeAgent(ENGINE);
 
 let running = false;
-const MODE = 'live';
+const modeFor = () => ENGINE === 'jeddawi' ? 'mine' : 'live';
 // أصوات نورة (نسائية) — الاختيار ينحفظ في المتصفح
 const VOICE_DESC = { Sulafat: 'دافئ', Despina: 'ناعم', Aoede: 'منساب', Leda: 'شبابي', Kore: 'حازم', Zephyr: 'مشرق', Achernar: 'هادئ', Callirrhoe: 'مريح', Autonoe: 'مشرق', Erinome: 'واضح', Laomedeia: 'مرح', Gacrux: 'ناضج', Pulcherrima: 'جريء', Vindemiatrix: 'لطيف' };
 let GVOICE = 'Sulafat'; try { GVOICE = localStorage.getItem('noraVoice') || 'Sulafat'; } catch {}
@@ -792,7 +793,7 @@ let ELEVEN_VOICES = [];
 let VOICE = ENGINE === 'eleven' ? EVOICE : GVOICE;
 // الاسم يتبع المحرك: Gemini = نورة، ElevenLabs = فواز (بصوته)
 // مصدر واحد للاسم والتذكير/التأنيث: كل نص في الواجهة (وأسماء قارئ الشاشة) يُشتق منه
-const PERSONA = { gemini: { name: 'نورة', fem: true }, eleven: { name: 'فواز', fem: false } };
+const PERSONA = { gemini: { name: 'نورة', fem: true }, eleven: { name: 'فواز', fem: false }, jeddawi: { name: 'جداوي', fem: false } };
 function applyPersona() {
   const eleven = ENGINE === 'eleven', P = PERSONA[ENGINE] || PERSONA.gemini, f = (m, w) => P.fem ? w : m;
   document.body.classList.toggle('eng-eleven', eleven);
@@ -804,6 +805,7 @@ function applyPersona() {
 }
 applyPersona();
 async function fillVoices() {
+  if (ENGINE === 'jeddawi') { $('#voice').innerHTML = '<option value="jeddawi">جداوي · Jeddawi Echo (v4 Turbo)</option>'; VOICE = ''; return; }
   if (ENGINE === 'eleven') {
     try {
       const r = await apiJson('/api/eleven/voices');
@@ -824,8 +826,7 @@ $('#engine').onchange = async () => {
   ENGINE = $('#engine').value; try { localStorage.setItem('noraEngine', ENGINE); } catch {}
   agent = makeAgent(ENGINE);
   applyPersona();
-  note(`⚙️ المساعد صار: ${ENGINE === 'eleven' ? 'فواز' : 'نورة'}`);
-  setStatus(`${ENGINE === 'eleven' ? 'فواز' : 'نورة'} جاهز${ENGINE === 'eleven' ? '' : 'ة'}، اضغط زر الصوت أو اكتب`);
+  { const P = PERSONA[ENGINE] || PERSONA.gemini; note(`⚙️ المساعد صار: ${P.name}`); setStatus(`${P.name} ${P.fem ? 'جاهزة' : 'جاهز'}، اضغط زر الصوت أو اكتب`); }
   await fillVoices();
 };
 fillVoices();
@@ -838,9 +839,10 @@ $('#voice').onchange = async () => {
 // معاينة الصوت: جملة قصيرة عبر Gemini TTS بنفس الصوت
 $('#preview').onclick = async () => {
   if (ENGINE === 'eleven') { const v = ELEVEN_VOICES.find(x => x.id === VOICE); if (v?.preview) new Audio(v.preview).play(); return; }
+  const jed = ENGINE === 'jeddawi';
   $('#preview').disabled = true;
   try {
-    const r = await api('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ voice: VOICE, text: 'هلا والله! أنا نورة، مساعدتك الذكية. اسألني عن أي مشروع، وأطلّع لك كل شي على الشاشة.' }) });
+    const r = await api(jed ? '/api/speak/eleven' : '/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(jed ? { text: 'هلا والله! أنا جداوي، مساعدك الذكي. إيش تبغى نشوف اليوم؟' } : { voice: VOICE, text: 'هلا والله! أنا نورة، مساعدتك الذكية. اسألني عن أي مشروع، وأطلّع لك كل شي على الشاشة.' }) });
     if (!r.ok) throw new Error(await r.text());
     const buf = new Uint8Array(await r.arrayBuffer());
     const ctx = new AudioContext({ sampleRate: 24000 });
@@ -854,7 +856,7 @@ $('#preview').onclick = async () => {
 };
 $('#mic').onclick = async () => {
   if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); $('#mic').setAttribute('aria-pressed', 'false'); if (pendingReload) location.reload(); return; }
-  try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); $('#mic').setAttribute('aria-pressed', 'true'); }
+  try { await agent.start({ mode: modeFor(), voice: VOICE }); running = true; $('#mic').classList.add('on'); $('#mic').setAttribute('aria-pressed', 'true'); }
   catch (e) { setStatus('❌ ' + e.message); }
 };
 // اختصارات الشاشة الأولى: ترسل الطلب لنورة (عشان تتكلم وتعرض بنفس اللحظة)، و«حلّل ملفاً» يفتح اختيار الملف
@@ -878,11 +880,11 @@ document.querySelectorAll('.qa-btn').forEach(b => b.onclick = () => {
 });
 $('#retry').onclick = async () => {
   setStatus('جاري الاتصال…');
-  try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); }
+  try { await agent.start({ mic: false, mode: modeFor(), voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); }
 };
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
-  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); return; } }
+  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: modeFor(), voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); return; } }
   agent.sendText(t); $('#txt').value = ''; $('#send').setAttribute('aria-disabled', 'true');
 };
 
@@ -1032,7 +1034,7 @@ function trackIngest(ing, jr) {
         }
         if (j.stage === 'failed') { note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || '')); jr?.fail(null, 'فشلت المعالجة، والإصدار السابق باقي كما هو'); }
         else {
-          if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
+          if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: modeFor(), voice: VOICE }); running = true; } catch {} }
           if (agent?.connected) agent.sendText(`[تنبيه النظام] انتهت معالجة PDF «${j.file_name}» بحالة ${j.stage_ar} (${j.pages_done}/${j.pages_total} صفحة، ${j.issues} مشكلة). الإصدار ${j.version_id}. استخدمي pdf_sources ثم pdf_* للأسئلة، واذكري رقم الصفحة، ولا تخترعي ما ليس في المصدر.`, { silent: true });
           jr?.finish(j.stage === 'ready' ? 'الملف جاهز ومتحقق منه' : 'جاهز جزئياً — شوف تقرير الجودة', [arN(j.pages_total, 'صفحة', 'صفحات'), `الإصدار ${j.version_id.split('@')[1]}`, j.issues ? arN(j.issues, 'ملاحظة', 'ملاحظات') : 'بدون ملاحظات'],
             [['📁 المجلد', j.links?.folder], ['📊 Excel', j.links?.review_xlsx], ['🧾 تقرير الجودة', j.links?.quality_report]]);
@@ -1076,7 +1078,7 @@ async function uploadFile(file) {
   const notice = g.ok
     ? `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وانبنت منه تلقائياً لوحة #${g.id} «${g.title}» وهي معروضة الحين في الشاشة الرئيسية. رحّبي بجملة قصيرة وقولي أبرز رقمين أو ثلاثة منها (من الملف)، وبعدها جاوبي أسئلته عنها من الملف بـ search_documents/read_document.`
     : `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وفشل البناء التلقائي. اقرئيه كامل بـ read_document وابني منه داشبورد بـ build_dashboard الحين.`;
-  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
+  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: modeFor(), voice: VOICE }); running = true; } catch {} }
   if (agent.connected) { agent.sendText(notice, { silent: true }); jr.set('nora', 'ok', 'وصلها'); } else jr.set('nora', 'bad', 'غير متصلة');
   const st = jr.stats;
   const archived = jr.steps.find(s => s.key === 'archived');
@@ -1120,7 +1122,7 @@ function connectLive() {
     if (j.result) hud.showNote({ eyebrow: `نتيجة ${who}`, title: `مهمة #${j.id}`, subtitle: j.status, text: j.result });
     setStatus(`${who} خلّص المهمة #${j.id}`);
     const msg = `[تنبيه النظام] ${who} خلّص المهمة رقم ${j.id} (${j.status}). النتيجة: ${String(j.result || '').slice(0, 1500)}\nقولي لفواز النتيجة باختصار بصوتك.`;
-    if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch { return; } }
+    if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: modeFor(), voice: VOICE }); running = true; } catch { return; } }
     agent.sendText(msg, { silent: true });
   });
 }

@@ -17,7 +17,8 @@ import { sseRoute, BOOT_ID, uploadStep } from './events.js';
 import { freshStart, freshStartPreview } from './fresh-start.js';
 import { agentTools, initAgent, agentStatus } from './agent.js';
 import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
-import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
+import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL, streamTTS } from './eleven.js';
+import { personaBlock } from './personas.js';
 import { datasetTools, ingestDocument, latestCatalog } from './datasets.js';
 import { knowledgeTools, importBundle, knowledgeCatalog, kList, legacyFind } from './knowledge.js';
 import { initIngest, ingestTools, ingestRoutes, sourcesBlock } from './ingest/index.js';
@@ -358,7 +359,7 @@ app.get('/api/session', async (req, res) => {
   const mode = req.query.mode === 'mine' ? 'mine' : 'live';
   try {
     const [mem, hist, chatId, screen] = await Promise.all([memoryBlock(), historyBlock(), chatStart(), screenBlock()]);
-    const sys = promptFor(mode) + screen + mem + hist; // ذاكرة نورة + سجل المحادثات تنحقن مع كل جلسة
+    const sys = personaBlock(String(req.query.persona || '')) + promptFor(mode) + screen + mem + hist; // ذاكرة نورة + سجل المحادثات تنحقن مع كل جلسة (+ هوية جداوي لو مطلوبة)
     digestPending(chatId); // نراجع الجلسات السابقة اللي ما تراجعت (بالخلفية)
     const now = Date.now();
     const config = {
@@ -477,6 +478,14 @@ app.post('/api/speak', async (req, res) => {
     console.error('[speak] error:', e.message);
     if (!res.headersSent) res.status(500).json({ error: e.message }); else res.end();
   }
+});
+
+// صوت جداوي: نص جملة → ElevenLabs v4 Turbo → PCM 24kHz بنفس عقد /api/speak
+app.post('/api/speak/eleven', async (req, res) => {
+  const text = String(req.body?.text || '').trim().slice(0, 1500);
+  if (!text) return res.status(400).json({ error: 'نص فاضي' });
+  if (!elevenReady()) return res.status(500).json({ error: 'ELEVENLABS_API_KEY غير مضبوط في Render — صوت جداوي يحتاجه' });
+  await streamTTS(text, res);
 });
 
 // إعدادات الواجهة (نورة تحفظها هنا)
