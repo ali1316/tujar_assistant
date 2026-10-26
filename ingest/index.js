@@ -1,5 +1,5 @@
 // ربط مسار PDF بنورة: مسارات API، أدوات وقت التشغيل، سياق الشاشة، والداشبورد المرتبط بالمصدر.
-import { receive, getJob, publicJob, kick, resumePending, getIndex, getData, currentVersions, onIngestChange } from './pipeline.js';
+import { receive, reprocess, getJob, publicJob, kick, resumePending, getIndex, getData, currentVersions, onIngestChange } from './pipeline.js';
 import { tools as queryTools, searchSources } from './query.js';
 import { initExtract, visionReady, EXTRACT_MODEL, doclingReady } from './extract.js';
 import { storage } from './storage.js';
@@ -79,6 +79,7 @@ export function ingestRoutes(app, upload) {
   app.get('/api/ingest/index', async (req, res) => res.json(await getIndex()));
   app.get('/api/ingest/jobs/:id', async (req, res) => { const j = await getJob(req.params.id); return j ? res.json(publicJob(j)) : res.status(404).json({ error: 'not found' }); });
   app.post('/api/ingest/jobs/:id/resume', async (req, res) => { const j = await getJob(req.params.id); if (!j) return res.status(404).json({ error: 'not found' }); kick(j.attempt_id); res.json({ ok: true, stage: j.stage }); });
+  app.post('/api/ingest/versions/:vid/reprocess', async (req, res) => { try { res.json(await reprocess(decodeURIComponent(req.params.vid))); } catch (e) { res.status(400).json({ error: e.message }); } });
   app.post('/api/ingest/upload', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'ما وصل ملف' });
     const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8');

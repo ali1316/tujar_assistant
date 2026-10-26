@@ -26,12 +26,12 @@ export const publicJob = j => j && ({
 });
 
 // ===== الاستقبال =====
-export async function receive({ buffer, fileName, mime = 'application/pdf', uploadedBy = 'fawaz', sourceRef = null }) {
+export async function receive({ buffer, fileName, mime = 'application/pdf', uploadedBy = 'fawaz', sourceRef = null, reprocessOf = null }) {
   if (!/pdf/i.test(mime) && !/\.pdf$/i.test(fileName)) throw new Error('المسار يقبل PDF فقط');
   const hash = sha256(buffer);
   const ix = await getIndex();
   // نفس المحتوى سبق رفعه (بأي اسم): لا نكرر المعالجة ولا البيانات
-  for (const d of Object.values(ix.documents)) for (const v of d.versions) if (v.sha256 === hash) {
+  if (!reprocessOf) for (const d of Object.values(ix.documents)) for (const v of d.versions) if (v.sha256 === hash) {
     if (!['failed'].includes(v.status)) {
       const j = v.attempt_id ? await getJob(v.attempt_id) : null;
       if (j && !TERMINAL.has(j.stage)) kick(j.attempt_id);
@@ -40,7 +40,7 @@ export async function receive({ buffer, fileName, mime = 'application/pdf', uplo
   }
   const docId = documentId(fileName);
   const doc = ix.documents[docId] || (ix.documents[docId] = { document_id: docId, file_name: fileName, created_at: new Date().toISOString(), versions: [], current_version: null });
-  const failedSame = doc.versions.find(v => v.sha256 === hash && v.status === 'failed');
+  const failedSame = reprocessOf ? null : doc.versions.find(v => v.sha256 === hash && v.status === 'failed');
   const n = failedSame ? failedSame.n : doc.versions.length + 1;
   const vid = versionId(docId, n);
   const att = attemptId();
@@ -49,7 +49,7 @@ export async function receive({ buffer, fileName, mime = 'application/pdf', uplo
   // الأصل أولاً كما هو (بدون تعديل) — هو مرجع الاستكمال
   const orig = await st.putFile(`${docId}/v${n}/original.pdf`, buffer, 'application/pdf');
   const v = failedSame || { n, version_id: vid, sha256: hash };
-  Object.assign(v, { status: 'queued', attempt_id: att, file_name: fileName, size: buffer.length, uploaded_at: new Date().toISOString(), uploaded_by: uploadedBy, original: orig, source_ref: sourceRef });
+  Object.assign(v, { status: 'queued', attempt_id: att, file_name: fileName, size: buffer.length, uploaded_at: new Date().toISOString(), uploaded_by: uploadedBy, original: orig, source_ref: sourceRef, ...(reprocessOf ? { reprocess_of: reprocessOf, reason: 'إعادة معالجة بنسخة أحدث من المسار (نفس الأصل)' } : {}) });
   if (!failedSame) doc.versions.push(v);
   doc.file_name = fileName;
   await saveIndex(ix);
@@ -58,6 +58,19 @@ export async function receive({ buffer, fileName, mime = 'application/pdf', uplo
   job.stage = 'queued'; job.history.push({ stage: 'queued', at: new Date().toISOString() }); await saveJob(job);
   kick(att);
   return { duplicate: false, document_id: docId, version: n, version_id: vid, attempt_id: att, status: 'queued' };
+}
+
+// إعادة معالجة صريحة لإصدار موجود (بعد تحسين المسار): إصدار جديد من نفس الأصل المحفوظ، والسابق يبقى كما هو
+export async function reprocess(versionIdArg) {
+  const ix = await getIndex();
+  for (const d of Object.values(ix.documents)) {
+    const v = d.versions.find(x => x.version_id === versionIdArg);
+    if (!v) continue;
+    const st = storage();
+    const buf = await st.getFile(`${d.document_id}/v${v.n}/original.pdf`);
+    return receive({ buffer: buf, fileName: v.file_name || d.file_name, uploadedBy: 'reprocess', reprocessOf: v.version_id });
+  }
+  throw new Error('الإصدار غير موجود');
 }
 
 // ===== المشغّل =====

@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 
 export const SCHEMA_VERSION = 'nora-ingest/1';
-export const PIPELINE_VERSION = 'nora-ingest-pipeline/1.0.0';
+export const PIPELINE_VERSION = 'nora-ingest-pipeline/1.1.0';
 
 export const STAGES = ['uploaded', 'queued', 'extracting', 'organizing', 'validating', 'ready', 'partial', 'failed'];
 export const STAGE_AR = { uploaded: 'تم الرفع', queued: 'في الانتظار', extracting: 'استخراج', organizing: 'تنظيم', validating: 'تحقق', ready: 'جاهز', partial: 'جاهز جزئياً', failed: 'فشل' };

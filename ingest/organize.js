@@ -11,6 +11,29 @@ const isNumericCol = (rows, j) => {
 };
 const sameCols = (a, b) => a.columns.length === b.columns.length && (a.columns.every((c, i) => c.name.trim() === b.columns[i].name.trim()) || b.continues_from_previous);
 
+// جدول بلوحتين (أو أكثر) جنباً إلى جنب بنفس الأعمدة: نفكّه إلى صفوف بدل أن تطغى أعمدة على أخرى بنفس الاسم
+const normCol = x => String(x || '').replace(/\s+/g, ' ').trim();
+export function unstackRepeated(t) {
+  const names = t.columns.map(c => normCol(c.name)), n = names.length;
+  for (let g = 1; g <= n / 2; g++) {
+    if (n % g) continue;
+    if (!names.every((x, i) => x === names[i % g])) continue;
+    const k = n / g;
+    if (new Set(names.slice(0, g)).size !== g) continue;
+    const rows = [], kinds = [];
+    for (let s = 0; s < k; s++) t.rows.forEach((r, i) => {
+      const part = r.slice(s * g, s * g + g);
+      if (part.every(c => String(c ?? '').trim() === '')) return; // لوحة أقصر من الأخرى
+      rows.push(part); kinds.push(t.row_kinds[i] || 'detail');
+    });
+    return { ...t, columns: t.columns.slice(0, g), rows, row_kinds: kinds, header_rows: (t.header_rows || []).map(h => h.slice(0, g)), unstacked: { panels: k, group: g } };
+  }
+  // أسماء مكررة بلا نمط واضح: نميّزها بلاحقة حتى لا تضيع خلايا بصمت
+  const seen = {};
+  const columns = t.columns.map(c => { const b = normCol(c.name) || 'عمود'; seen[b] = (seen[b] || 0) + 1; return seen[b] > 1 ? { ...c, name: `${b} (${seen[b]})` } : c; });
+  return { ...t, columns };
+}
+
 // أرقام طبقة النص لكل صفحة (للتحقق: هل الرقم مطبوع حرفياً في الصفحة؟)
 function textLayerKeys(analysis) {
   const m = new Map();
@@ -34,7 +57,9 @@ export function organize({ vid, analysis, pages }) {
   // 1) الجداول المنطقية: ضم الأجزاء المتتالية عبر الصفحات
   const logical = [];
   for (const pg of pages) {
-    (pg.tables || []).forEach((t, idx) => {
+    (pg.tables || []).forEach((t0, idx) => {
+      const t = unstackRepeated(t0);
+      if (t.unstacked) lineage.push({ id: `${vid}#p${pg.page}-t${idx + 1}:unstack`, kind: 'reshape', output: `p${pg.page}-t${idx + 1}`, inputs: [`p${pg.page}`], method: `جدول من ${t.unstacked.panels} لوحات متجاورة بنفس الأعمدة (${t.unstacked.group} أعمدة) — فُكّ إلى صفوف بترتيب اللوحات، بدون تعديل القيم` });
       const prev = logical.at(-1);
       const firstOnPage = idx === 0;
       const lastPart = prev?.parts.at(-1);
