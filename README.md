@@ -39,6 +39,19 @@ await agent.start();
 | LOCK_CONFIG | true |
 | ALLOW_WRITES | true (false = قراءة فقط) |
 | ACCESS_CODE | رمز دخول الصفحة (فاضي = بدون رمز) |
+| MY_VOICE_ID | معرّف الصوت المستنسخ في Gemini (يُضبط في Render فقط) |
+| TTS_MODEL | gemini-3.8-flash-tts |
+
+## وضع «صوتي»
+زر 🗣️ صوتي: Live يسمع ويفهم ويستخدم الأدوات ويرد **نص**، والنص يتحول جملة جملة لصوتك عبر Gemini 3.8 Flash TTS (`/api/speak`). أبطأ من ⚡ صوت Live بحوالي ثانية.
+
+## مسار PDF الموثّق (`ingest/`)
+رفع PDF ⇒ مهمة خلفية بمراحل حقيقية ⇒ استخراج صفحة صفحة (Gemini، واحتياطي طبقة النص) ⇒ تنظيم الجداول ⇒ تحقق المجاميع ⇒ حزمة خاصة في Drive لكل إصدار ⇒ أدوات `pdf_*` لنورة وداشبورد مربوط بالمصدر وتتبع كل رقم لصفحته.
+- الإعداد والتشغيل: `docs/ingest/INGEST_SETUP.md`
+- مصفوفة القدرات وقرار محرك الرسوم: `docs/ingest/CAPABILITY_MATRIX.md`
+- الانتقال لقاعدة بيانات: `docs/ingest/MIGRATION.md`
+- نتائج اختبار الإنتاج وما بقي متعذراً: `docs/ingest/TEST_RESULTS.md`
+- عقود البيانات: `contracts/*.schema.json` · الاختبار: `node --test test/ingest.test.mjs`
 
 ## حدود لازم تعرفها
 - جلسة الصوت ~15 دقيقة، والاتصال نفسه ~10 دقائق (لأطول: session resumption).
