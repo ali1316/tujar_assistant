@@ -666,7 +666,7 @@ const screenTools = {
   },
 };
 
-window.__nora = { screenTools, ui };
+window.__nora = { screenTools, ui, agent: () => agent, connected: () => !!agent?.connected };
 // محركين للمقارنة: Gemini Live أو ElevenLabs Realtime — نفس نورة ونفس الأدوات والشاشة والذاكرة
 const agentOpts = {
   headers: H,

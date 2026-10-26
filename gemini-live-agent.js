@@ -72,6 +72,9 @@ export class GeminiLiveAgent {
 
   #send(obj) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(obj)); }
 
+  // صوت PCM 16kHz جاهز (base64) عبر نفس قناة المايك — للاختبار الآلي للمسار الصوتي بدون مايك فعلي
+  sendAudio(b64) { this.#send({ realtimeInput: { audio: { data: b64, mimeType: 'audio/pcm;rate=16000' } } }); }
+  endAudio() { this.#send({ realtimeInput: { audioStreamEnd: true } }); }
   sendText(text, { silent = false } = {}) { this.#send({ realtimeInput: { text } }); if (!silent) this.emit('userText', text, true); }
   get connected() { return this.ws?.readyState === 1; }
 
