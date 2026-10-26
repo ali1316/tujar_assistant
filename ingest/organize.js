@@ -15,7 +15,8 @@ const sameCols = (a, b) => a.columns.length === b.columns.length && (a.columns.e
 // جدول بلوحتين (أو أكثر) جنباً إلى جنب بنفس الأعمدة: نفكّه إلى صفوف بدل أن تطغى أعمدة على أخرى بنفس الاسم
 const normCol = x => String(x || '').replace(/\s+/g, ' ').trim();
 // رقم اللوحة الذي قد يضيفه المحرك للأسماء: «الغرفة (2)» / «الغرفة 2» / «الغرفة - 2»
-const panelBase = x => normCol(x).replace(/\s*[-–—]?\s*[(（\[]?\s*[0-9٠-٩]+\s*[)）\]]?\s*$/, '').trim();
+// رقم لوحة = خانة أو خانتين فقط؛ السنوات «المشتركون 2023» ليست لوحات (اختبار: دمج سنتين في عمود واحد)
+const panelBase = x => normCol(x).replace(/\s*[-–—]?\s*[(（\[]?\s*(?<![0-9٠-٩])[0-9٠-٩]{1,2}\s*[)）\]]?\s*$/, '').trim();
 export function unstackRepeated(t) {
   const n = t.columns.length;
   // نجرب أسماء الأعمدة بعد حذف رقم اللوحة، ثم صف العناوين المطبوع (حصل فعلاً: v5 أعاد «(1)/(2)» في الأسماء لكن العناوين مكررة حرفياً)
@@ -34,6 +35,8 @@ function tryUnstack(t, names) {
     if (!names.every((x, i) => x === names[i % g])) continue;
     const k = n / g;
     if (new Set(names.slice(0, g)).size !== g) continue;
+    // صف عناوين آخر يختلف بين اللوحات (سنة/منطقة لكل لوحة) = معلومة تضيع لو فككنا ⇒ لا فك
+    if ((t.header_rows || []).some(h => h.length === n && h.some((x, i) => panelBase(x) !== panelBase(h[i % g])))) continue;
     const rows = [], kinds = [];
     for (let s = 0; s < k; s++) t.rows.forEach((r, i) => {
       const part = r.slice(s * g, s * g + g);
