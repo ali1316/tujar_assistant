@@ -99,6 +99,8 @@ ok('بعد ضياع الكاش: البيانات تُقرأ من الحزمة ب
 const { unstackRepeated } = await import('../ingest/organize.js');
 const two = unstackRepeated({ columns: ['الغرفة', 'المستخدمون', 'الغرفة', 'المستخدمون'].map(name => ({ name })), rows: [['أ', '10', 'ج', '3'], ['ب', '7', 'الإجمالي', '20']], row_kinds: ['detail', 'total'], header_rows: [] });
 ok('جدول بلوحتين متجاورتين يُفك إلى صفوف بدون فقد', two.columns.length === 2 && two.rows.length === 4 && two.rows.map(r => r[0]).join(',') === 'أ,ب,ج,الإجمالي', JSON.stringify(two.rows));
+const { TOTAL_RE } = await import('../ingest/organize.js');
+ok('كشف صف الإجمالي بالعربية', ['الإجمالي', 'إجمالي الغرف', 'المجموع', 'Total'].every(x => TOTAL_RE.test(x)) && !['إجماليات سابقة', 'الإجماليون'].some(x => TOTAL_RE.test(x)));
 ok('صف يجمع غرفة وإجمالياً في لوحتين: الغرفة لا تُعلَّم إجمالياً', two.row_kinds[1] === 'detail', two.row_kinds.join(','));
 
 // 9) إعادة معالجة صريحة: إصدار جديد من نفس الأصل، والسابق يبقى
