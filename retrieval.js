@@ -157,8 +157,8 @@ export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true 
     const hay = normalize(`${r.title} ${r.section || ''} ${r.text}`), hs = hay.replace(/\s+/g, '');
     const cov = ts.length ? ts.filter(t => hay.includes(t) || hs.includes(t)).length / ts.length : 0;
     const c = Math.max(0, cand.get(r.id)?.cos || 0);
-    const q = 1 - Math.min(0.4, garble(r.text) * 2); // نص PDF مكسور («غر فة تجار ية17») ينزل تحت النص السليم
-    return { ...r, cos: +c.toFixed(4), cov: +cov.toFixed(3), quality: +q.toFixed(3), score: +((qv ? W_COS * c + W_COV * cov : cov) * q).toFixed(4) };
+    // جودة النص للعرض فقط (ما تغيّر الترتيب: بعض الأجوبة الصحيحة موجودة في نص أرقامه ملتصقة)
+    return { ...r, cos: +c.toFixed(4), cov: +cov.toFixed(3), quality: +(1 - garble(r.text)).toFixed(3), score: +(qv ? W_COS * c + W_COV * cov : cov).toFixed(4) };
   }).sort((a, b) => b.score - a.score).slice(0, k).map((h, i) => ({ n: i + 1, ...h }));
   return { hits, ms: performance.now() - t0, mode: qv ? 'hybrid' : 'keyword' };
 }
