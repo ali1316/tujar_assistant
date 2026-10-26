@@ -12,7 +12,7 @@ import { memDelete } from './store.js';
 import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { designerName } from './designer.js';
-import { sseRoute, BOOT_ID } from './events.js';
+import { sseRoute, BOOT_ID, uploadStep } from './events.js';
 import { agentTools, initAgent, agentStatus } from './agent.js';
 import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
 import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
@@ -498,6 +498,9 @@ ingestRoutes(app, upload);
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ما وصل ملف' });
   const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8'); // أسماء عربية
+  const trace = String(req.get('x-upload-trace') || '').replace(/[^\w-]/g, '').slice(0, 40); // رحلة الرفع في الواجهة
+  const step = (s, info) => uploadStep(trace, s, info);
+  step('received', { bytes: req.file.size, name });
   const digest = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
   if (/\.dk\.json$/i.test(name)) { // حزمة من مهارة fawaz-data-intake → مكتبة المعرفة
     try { return res.json({ knowledge: await importBundle(JSON.parse(req.file.buffer.toString('utf8'))) }); }
@@ -510,20 +513,24 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     catch (e) { ingest = { error: e.message }; console.warn('[ingest] receive failed:', e.message); }
   }
   const dup = db.prepare('SELECT id, name, chars FROM documents WHERE sha256=?').get(digest);
+  step('checked', { duplicate: !!dup });
   if (dup) return res.json({ ...dup, duplicate: true, datasets: [], ingest }); // نفس الملف بالبصمة: ما نكرره
   try {
     const text = await extractText(req.file.buffer, name);
     const doc = saveDocument(name, req.file.mimetype, req.file.size, text);
+    step('read', { chars: text.length });
     db.prepare('UPDATE documents SET sha256=? WHERE id=?').run(digest, doc.id);
     invalidateIndex(); setTimeout(() => ensureIndex().catch(e => console.warn('[rag]', e.message)), 4000); // بعد التصنيف (الملخص) بشوي
     snapshotSoon();
     // ملفات Excel/CSV: نحوّلها لجداول منظّمة جاهزة للتحليل والشارتات الفورية
     let datasets = [];
     try { datasets = await ingestDocument(doc, req.file.buffer); } catch (e) { console.warn('[upload] ingest failed:', e.message); }
+    step('tables', datasets.stats || { sheets: 0, rows: 0, columns: 0, measures: 0 });
     console.log(`[upload] ${name} → doc #${doc.id} (${doc.chars} chars, ${datasets.length} tables)`);
     // أرشفة في Google Drive بالتصنيف الصح (بالخلفية)
-    archiveToDrive(doc, req.file.buffer, req.file.mimetype).catch(e => console.warn('[drive] archive failed:', e.message));
-    res.json({ ...doc, datasets, ingest });
+    archiveToDrive(doc, req.file.buffer, req.file.mimetype).then(r => step('archived', { category: r?.category || null, drive: r?.drive !== false }))
+      .catch(e => { console.warn('[drive] archive failed:', e.message); step('archived', { error: e.message.slice(0, 120) }); });
+    res.json({ ...doc, datasets, stats: datasets.stats || null, ingest });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

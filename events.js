@@ -11,7 +11,7 @@ export function sseRoute(app) {
     const send = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify(data ?? {})}\n\n`);
     send('hello', { boot: BOOT_ID });
     const on = (type, data) => send(type, data);
-    const types = ['data', 'job'];
+    const types = ['data', 'job', 'upload'];
     const handlers = types.map(t => [t, d => on(t, d)]);
     handlers.forEach(([t, h]) => bus.on(t, h));
     const ping = setInterval(() => res.write(': ping\n\n'), 25000);
@@ -19,3 +19,6 @@ export function sseRoute(app) {
   });
 }
 let dt; export const dataChanged = what => { clearTimeout(dt); dt = setTimeout(() => bus.emit('data', { what }), 150); };
+
+// خطوات رفع ملف (رحلة الرفع في الواجهة): تُرسل فقط عند اكتمال الخطوة فعلاً
+export const uploadStep = (trace, step, info = {}) => { if (trace) bus.emit('upload', { trace, step, at: Date.now(), ...info }); };

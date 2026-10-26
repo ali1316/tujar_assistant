@@ -190,6 +190,52 @@
     .tagline{bottom:12px}
   }
   @media(max-height:700px) and (min-width:601px){#empty{top:calc(18vh + 30px)} body.blank #dock{top:calc(18vh + 280px)} .tagline{display:none!important}}
+
+  /* ===== رحلة الرفع: محطات حقيقية (تتحرك فقط عند اكتمال خطوة فعلية في السيرفر) ===== */
+  #journeys{display:flex;flex-direction:column;gap:8px;width:min(760px,100%);pointer-events:auto}
+  .jr{position:relative;background:linear-gradient(180deg,#10273f,#0b1d31);border:1px solid color-mix(in srgb,var(--acc) 45%,#1d3a5a);border-radius:16px;padding:12px 14px 10px;box-shadow:0 12px 34px #0007;overflow:hidden;animation:jrIn .35s ease-out}
+  @keyframes jrIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .jr-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .jr-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#14304f;font-size:18px;flex:none}
+  .jr-tt{flex:1;min-width:0}
+  .jr-tt b{display:block;color:var(--ink);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jr-tt small{color:var(--mute);font-size:12px}
+  .jr-pct{font-weight:700;color:var(--acc);font-size:20px;font-variant-numeric:tabular-nums;min-width:56px;text-align:end}
+  .jr-x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:16px;padding:4px}
+  .jr-bar{height:10px;border-radius:99px;background:#0a1a2c;border:1px solid #1d3a5a;overflow:hidden}
+  .jr-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#b8893f,var(--acc),#f1d79c);transition:width .55s cubic-bezier(.2,.8,.2,1);position:relative}
+  .jr-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#fff5,transparent);animation:jrShine 1.6s linear infinite}
+  .jr.done .jr-fill::after,.jr.fail .jr-fill::after{display:none}
+  @keyframes jrShine{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+  .jr-steps{display:flex;gap:4px;margin-top:10px;align-items:flex-start}
+  .jr-st{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;position:relative}
+  .jr-st:not(:last-child)::after{content:"";position:absolute;top:13px;inset-inline-start:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:#1d3a5a}
+  .jr-st.ok:not(:last-child)::after{background:var(--acc)}
+  .jr-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;background:#0a1a2c;border:2px solid #2b4a6c;color:var(--mute);z-index:1;transition:all .3s}
+  .jr-st.ok .jr-dot{background:var(--acc);border-color:var(--acc);color:#081726;animation:jrPop .4s ease-out}
+  .jr-st.on .jr-dot{border-color:var(--acc);color:var(--acc);box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 60%,transparent);animation:jrPulse 1.4s ease-out infinite}
+  .jr-st.skip .jr-dot{opacity:.45}
+  .jr-st.bad .jr-dot{background:var(--bad);border-color:var(--bad);color:#fff}
+  @keyframes jrPop{0%{transform:scale(.6)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+  @keyframes jrPulse{to{box-shadow:0 0 0 8px transparent}}
+  .jr-st span{font-size:11px;color:var(--mute);line-height:1.35;max-width:100%}
+  .jr-st.ok span,.jr-st.on span{color:var(--ink)}
+  .jr-st em{font-style:normal;font-size:10.5px;color:var(--acc);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jr-msg{margin-top:8px;font-size:12.5px;color:var(--sand);min-height:17px}
+  .jr-win{display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--acc) 14%,#0b1d31);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+  .jr.done .jr-win{display:block;animation:jrIn .4s ease-out}
+  .jr-win b{color:var(--acc)}
+  .jr-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .jr-chips span{background:#0a1a2c;border:1px solid #2b4a6c;border-radius:99px;padding:3px 10px;font-size:12px;color:var(--ink)}
+  .jr-chips a{color:var(--acc);font-size:12px}
+  .jr.fail{border-color:var(--bad)} .jr.fail .jr-fill{background:var(--bad)}
+  .jr.mini .jr-steps,.jr.mini .jr-msg,.jr.mini .jr-win{display:none}
+  .jr.mini{padding:8px 12px;cursor:pointer}
+  .jr-conf{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .jr-conf i{position:absolute;top:-10px;width:7px;height:11px;border-radius:2px;opacity:.9;animation:jrFall 1.6s ease-in forwards}
+  @keyframes jrFall{to{transform:translateY(190px) rotate(540deg);opacity:0}}
+  @media(max-width:600px){.jr-st span{font-size:10px}.jr-st em{display:none}.jr-dot{width:24px;height:24px}.jr-st:not(:last-child)::after{top:11px}}
+  @media(prefers-reduced-motion:reduce){.jr,.jr-fill,.jr-dot{animation:none!important;transition:none!important}.jr-fill::after,.jr-conf{display:none}}
 </style>
 <style id="nora-css"></style>
 </head>
@@ -252,6 +298,7 @@
     <div class="dr-foot"><small id="usage"></small></div>
   </div>
   <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
+  <div id="journeys" aria-live="polite"></div>
   <form id="f" class="composer">
     <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button><span class="vsep" aria-hidden="true"></span>
     <input id="txt" placeholder="اسأل نورة…" autocomplete="off" aria-label="اكتب سؤالك لنورة">
@@ -784,12 +831,112 @@ $('#f').onsubmit = async e => {
 };
 
 // ===== رفع الملفات =====
+
+// ===== رحلة الرفع (Gamification بأرقام حقيقية) =====
+// النسبة = مجموع أوزان الخطوات المكتملة فعلاً (+ نسبة البايتات المرفوعة، + الصفحات المنجزة في PDF). لا مؤقتات ولا تقدم وهمي.
+const JR_STEPS = {
+  tabular: [['upload', 'رفع الملف', '⬆️', 15], ['checked', 'فحص البصمة', '🔎', 5], ['read', 'قراءة المحتوى', '📖', 15], ['tables', 'تحويل الأوراق لجداول', '🧮', 20], ['dash', 'بناء اللوحة', '📊', 30], ['nora', 'نورة تقرأ النتائج', '✨', 10], ['archived', 'حفظ في Drive', '☁️', 5]],
+  text:    [['upload', 'رفع الملف', '⬆️', 15], ['checked', 'فحص البصمة', '🔎', 5], ['read', 'قراءة المحتوى', '📖', 30], ['dash', 'بناء اللوحة', '📊', 35], ['nora', 'نورة تقرأ النتائج', '✨', 10], ['archived', 'حفظ في Drive', '☁️', 5]],
+  pdf:     [['upload', 'رفع الملف', '⬆️', 8], ['checked', 'فحص البصمة', '🔎', 4], ['original', 'حفظ الأصل', '🗄️', 4], ['extract', 'قراءة الصفحات', '📄', 54], ['organize', 'تنظيم الجداول', '🧩', 10], ['validate', 'التحقق والحزمة', '✅', 15], ['nora', 'نورة جاهزة', '✨', 5]],
+};
+const JR = new Map(); // trace → رحلة
+function journey(file) {
+  const kind = /\.pdf$/i.test(file.name) ? 'pdf' : /\.(xlsx|xls|csv)$/i.test(file.name) ? 'tabular' : 'text';
+  const trace = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const steps = JR_STEPS[kind].map(([key, label, icon, w]) => ({ key, label, icon, w, state: 'wait', frac: 0, detail: '' }));
+  const el = document.createElement('div'); el.className = 'jr';
+  el.innerHTML = `<div class="jr-top"><div class="jr-ic">${kind === 'pdf' ? '📕' : kind === 'tabular' ? '📗' : '📘'}</div><div class="jr-tt"><b></b><small></small></div><div class="jr-pct">0%</div><button class="jr-x" type="button" aria-label="إخفاء">✕</button></div>
+    <div class="jr-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="jr-fill"></div></div>
+    <div class="jr-steps">${steps.map(s => `<div class="jr-st" data-k="${s.key}"><div class="jr-dot">${s.icon}</div><span>${s.label}</span><em></em></div>`).join('')}</div>
+    <div class="jr-msg"></div><div class="jr-win"></div>`;
+  el.querySelector('.jr-tt b').textContent = file.name;
+  el.querySelector('.jr-x').onclick = e => { e.stopPropagation(); el.remove(); JR.delete(trace); };
+  el.onclick = () => el.classList.contains('mini') && el.classList.remove('mini');
+  $('#journeys').prepend(el);
+  const t0 = performance.now();
+  // عرض متدرج: كل محطة مكتملة تنعرض ثلث ثانية على الأقل (الأحداث نفسها حقيقية ومرتبة؛ نؤخر الرسم فقط)
+  const q = []; let busy = false;
+  const pump = () => { if (busy || !q.length) return; const [op, args] = q.shift(); const changed = j['_' + op](...args); const slow = op === 'finish' || (op === 'set' && changed === true); if (slow) { busy = true; setTimeout(() => { busy = false; pump(); }, 330); } else pump(); };
+  const j = { trace, kind, el, steps, done: false, ended: false,
+    set(...a) { q.push(['set', a]); pump(); }, finish(...a) { this.ended = true; q.push(['finish', a]); pump(); }, fail(...a) { this.ended = true; q.push(['fail', a]); pump(); }, msg(t) { q.push(['msg', [t]]); pump(); },
+    // تحديث خطوة: state = on | ok | skip | bad ، frac = جزء الخطوة المنجز (0..1) للخطوات القابلة للقياس
+    _set(key, state, detail = '', frac) {
+      const s = steps.find(x => x.key === key); if (!s || (s.state === 'ok' && state === 'on')) return false;
+      const was = s.state;
+      // كل الخطوات قبلها اكتملت فعلاً (السيرفر يرسلها بالترتيب)
+      if (state === 'ok' || state === 'on') steps.slice(0, steps.indexOf(s)).forEach(x => { if (x.state === 'wait' || x.state === 'on') { x.state = 'ok'; x.frac = 1; } });
+      s.state = state; s.frac = state === 'ok' || state === 'skip' ? 1 : frac ?? s.frac; if (detail) s.detail = detail;
+      this.render();
+      return was !== state && (state === 'ok' || state === 'skip'); // محطة جديدة اكتملت ⇒ نعطيها لحظة عرض
+    },
+    _msg(t) { if (!this.done) el.querySelector('.jr-msg').textContent = t; },
+    render() {
+      const total = steps.reduce((a, s) => a + s.w, 0), got = steps.reduce((a, s) => a + s.w * s.frac, 0);
+      const pct = Math.min(100, Math.round(got / total * 100));
+      el.querySelector('.jr-fill').style.width = pct + '%';
+      el.querySelector('.jr-pct').textContent = pct + '%';
+      el.querySelector('.jr-bar').setAttribute('aria-valuenow', pct);
+      const idx = steps.findIndex(s => s.state !== 'ok' && s.state !== 'skip');
+      el.querySelector('.jr-tt small').textContent = this.done ? `اكتملت الرحلة في ${((performance.now() - t0) / 1000).toFixed(1)} ثانية` : `المرحلة ${idx < 0 ? steps.length : idx + 1} من ${steps.length}`;
+      steps.forEach(s => { const n = el.querySelector(`[data-k="${s.key}"]`); n.className = 'jr-st ' + s.state; n.querySelector('em').textContent = s.detail; });
+    },
+    _finish(title, chips = [], links = [], { rest = 'ok' } = {}) {
+      // rest='skip': خطوات ما احتجناها (ملف مكرر) تنعرض متخطاة، مو منجزة
+      steps.forEach(s => { if (s.state === 'wait' || s.state === 'on') { s.state = rest; s.frac = 1; } });
+      this.done = true; el.classList.add('done'); el.querySelector('.jr-msg').textContent = ''; this.render();
+      const w = el.querySelector('.jr-win');
+      w.innerHTML = `<b>🏆 ${title}</b><div class="jr-chips">${chips.map(c => `<span></span>`).join('')}${links.filter(l => l[1]).map(() => '<a target="_blank" rel="noopener"></a>').join(' ')}</div>`;
+      [...w.querySelectorAll('.jr-chips span')].forEach((n, i) => n.textContent = chips[i]);
+      [...w.querySelectorAll('.jr-chips a')].forEach((a, i) => { const l = links.filter(x => x[1])[i]; a.textContent = l[0]; a.href = l[1]; });
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const c = document.createElement('div'); c.className = 'jr-conf';
+        c.innerHTML = Array.from({ length: 26 }, (_, i) => `<i style="left:${(i * 37) % 100}%;background:${['#d1a65c', '#59c48f', '#5f86b3', '#e8d3a8'][i % 4]};animation-delay:${(i % 9) * 60}ms"></i>`).join('');
+        el.append(c); setTimeout(() => c.remove(), 2200);
+      }
+      sr(`اكتمل رفع ${file.name}: ${title}`);
+      setTimeout(() => el.isConnected && el.classList.add('mini'), 15000);
+    },
+    _fail(key, why) {
+      this._set(key, 'bad'); el.classList.add('fail'); el.querySelector('.jr-msg').textContent = '❌ ' + why; this.done = true; this.render();
+    },
+  };
+  JR.set(trace, j); j.set('upload', 'on', '', 0); return j;
+}
+const arN = (n, one, few) => `${(+n).toLocaleString('en-US')} ${n >= 3 && n <= 10 ? few : one}`; // جمع عربي بسيط: 3–10 جمع
+function sr(t) { const n = $('#sr'); if (n) n.textContent = t; }
+// أحداث السيرفر: كل خطوة تنحسب بس لما تخلص فعلاً
+function onUploadEvent(ev) {
+  const j = JR.get(ev.trace); if (!j || j.ended) return;
+  const n = x => (+x || 0).toLocaleString('en-US');
+  if (ev.step === 'received') { j.set('upload', 'ok', ev.bytes >= 1048576 ? `${(ev.bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(ev.bytes / 1024))} KB`); j.set('checked', 'on'); j.msg('وصل الملف للسيرفر… نتأكد إنه ما انرفع قبل'); }
+  if (ev.step === 'checked') { j.set('checked', 'ok', ev.duplicate ? 'مكرر' : 'جديد'); if (!ev.duplicate && j.kind !== 'pdf') { j.set('read', 'on'); j.msg('نقرأ محتوى الملف…'); } }
+  if (ev.step === 'read') { j.set('read', 'ok', `${n(ev.chars)} حرف`); if (j.kind === 'tabular') { j.set('tables', 'on'); j.msg('نحوّل كل ورقة لجدول ونحلل أعمدتها…'); } }
+  if (ev.step === 'tables') { j.stats = ev; j.set('tables', ev.sheets ? 'ok' : 'skip', ev.sheets ? `${ev.sheets} أوراق · ${n(ev.rows)} صف` : 'لا جداول'); }
+  if (ev.step === 'archived') j.set('archived', ev.error ? 'bad' : 'ok', ev.error ? 'تعذّر' : (ev.category || (ev.drive ? 'Drive' : 'محلي')));
+}
+// رفع بـ XHR عشان نسبة الرفع الحقيقية بالبايت
+function xhrUpload(fd, trace, onProg) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest(); x.open('POST', '/api/upload');
+    const h = H(); for (const k in h) x.setRequestHeader(k, h[k]); x.setRequestHeader('x-upload-trace', trace);
+    x.upload.onprogress = e => e.lengthComputable && onProg(e.loaded / e.total);
+    x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch {} resolve({ ok: x.status < 300, d }); };
+    x.onerror = () => reject(new Error('انقطع الاتصال أثناء الرفع'));
+    x.send(fd);
+  });
+}
+
 // متابعة معالجة PDF بالخلفية: أرقام حقيقية من السيرفر (صفحات منجزة/الإجمالي، مشكلات) — بدون نسبة تقدم وهمية
 let INGEST_LAST = null;
-function trackIngest(ing) {
-  if (ing.error) return note('⚠️ مسار PDF: ' + ing.error);
-  if (ing.duplicate) return note(`🗂️ نفس الـ PDF معالج سابقاً (${ing.version_id} · ${ing.status}) — ما تكررت المعالجة`);
+function trackIngest(ing, jr) {
+  if (ing.error) { jr?.fail('original', 'مسار PDF: ' + ing.error); return note('⚠️ مسار PDF: ' + ing.error); }
+  if (ing.duplicate) {
+    note(`🗂️ نفس الـ PDF معالج سابقاً (${ing.version_id} · ${ing.status}) — ما تكررت المعالجة`);
+    jr?.finish('الملف معالج من قبل — جاهز للأسئلة', [`الإصدار ${ing.version_id.split('@')[1] || ing.version_id}`, { ready: 'جاهز ومتحقق', partial: 'جاهز جزئياً', failed: 'فشل', queued: 'في الانتظار', extracting: 'قيد الاستخراج', organizing: 'قيد التنظيم', validating: 'قيد التحقق' }[ing.status] || ing.status], [], { rest: 'skip' });
+    return;
+  }
   const id = ing.attempt_id; if (!id) return;
+  jr?.set('original', 'ok', ing.version_id?.split('@')[1] || ''); jr?.set('extract', 'on', '', 0); jr?.msg('نقرأ الصفحات وحدة وحدة…');
   const el = Object.assign(document.createElement('div'), { className: 'm t ingest-card' });
   $('#log').append(el); $('#log').scrollTop = 1e9;
   let last = '', tries = 0;
@@ -800,13 +947,24 @@ function trackIngest(ing) {
       const pages = j.pages_total ? ` · الصفحات ${j.pages_done}/${j.pages_total}` : '';
       const txt = `📑 ${j.file_name} (${j.version_id}) — ${j.stage_ar}${pages} · مشكلات ${j.issues}`;
       if (txt !== last) { el.textContent = txt; last = txt; }
+      if (jr && !jr.ended) {
+        const frac = j.pages_total ? j.pages_done / j.pages_total : 0;
+        if (j.stage === 'extracting' || j.stage === 'queued' || j.stage === 'uploaded') { jr.set('extract', 'on', j.pages_total ? `${j.pages_done}/${j.pages_total} صفحة` : '', frac); jr.msg(j.pages_total ? `قرأنا ${j.pages_done} من ${j.pages_total} صفحة${j.issues ? ` · ${j.issues} ملاحظة` : ''}` : 'نجهّز الصفحات…'); }
+        if (j.stage === 'organizing') { jr.set('extract', 'ok', arN(j.pages_total, 'صفحة', 'صفحات')); jr.set('organize', 'on'); jr.msg('نرتّب الجداول ونربط الممتد منها…'); }
+        if (j.stage === 'validating') { jr.set('organize', 'ok'); jr.set('validate', 'on'); jr.msg('نطابق المجاميع مع المطبوع ونبني الحزمة في Drive…'); }
+      }
       if (['ready', 'partial', 'failed'].includes(j.stage)) {
         if (j.links) {
           const a = (u, t) => u ? ` <a href="${u}" target="_blank" rel="noopener">${t}</a>` : '';
           el.insertAdjacentHTML('beforeend', `<div class="ingest-links">${a(j.links.folder, 'المجلد')}${a(j.links.review_xlsx, 'Excel')}${a(j.links.quality_report, 'تقرير الجودة')}${a(j.links.document_md, 'النص الكامل')}</div>`);
         }
-        if (j.stage === 'failed') note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || ''));
-        else if (agent?.connected) agent.sendText(`[تنبيه النظام] انتهت معالجة PDF «${j.file_name}» بحالة ${j.stage_ar} (${j.pages_done}/${j.pages_total} صفحة، ${j.issues} مشكلة). الإصدار ${j.version_id}. استخدمي pdf_sources ثم pdf_* للأسئلة، واذكري رقم الصفحة، ولا تخترعي ما ليس في المصدر.`, { silent: true });
+        if (j.stage === 'failed') { note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || '')); jr?.fail('validate', 'فشلت المعالجة، والإصدار السابق باقي كما هو'); }
+        else {
+          if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
+          if (agent?.connected) agent.sendText(`[تنبيه النظام] انتهت معالجة PDF «${j.file_name}» بحالة ${j.stage_ar} (${j.pages_done}/${j.pages_total} صفحة، ${j.issues} مشكلة). الإصدار ${j.version_id}. استخدمي pdf_sources ثم pdf_* للأسئلة، واذكري رقم الصفحة، ولا تخترعي ما ليس في المصدر.`, { silent: true });
+          jr?.finish(j.stage === 'ready' ? 'الملف جاهز ومتحقق منه' : 'جاهز جزئياً — شوف تقرير الجودة', [arN(j.pages_total, 'صفحة', 'صفحات'), `الإصدار ${j.version_id.split('@')[1]}`, j.issues ? arN(j.issues, 'ملاحظة', 'ملاحظات') : 'بدون ملاحظات'],
+            [['📁 المجلد', j.links?.folder], ['📊 Excel', j.links?.review_xlsx], ['🧾 تقرير الجودة', j.links?.quality_report]]);
+        }
         return;
       }
     }
@@ -816,28 +974,47 @@ function trackIngest(ing) {
 }
 async function uploadFile(file) {
   note(`⏫ جاري رفع ${file.name}…`);
+  const jr = journey(file);
   const fd = new FormData(); fd.append('file', file);
-  const r = await api('/api/upload', { method: 'POST', body: fd });
-  const d = await r.json();
-  if (!r.ok) return note('❌ ' + d.error);
+  let r;
+  try { r = await xhrUpload(fd, jr.trace, f => { jr.set('upload', 'on', `${Math.round(f * 100)}%`, f); jr.msg(f < 1 ? 'نرفع الملف للسيرفر…' : 'وصل الملف، السيرفر يستلمه…'); }); }
+  catch (e) { jr.fail('upload', e.message); return note('❌ ' + e.message); }
+  const d = r.d;
+  if (!r.ok) { jr.fail(jr.steps.find(s => s.state === 'on')?.key || 'upload', d.error || 'تعذّر الرفع'); return note('❌ ' + (d.error || 'تعذّر الرفع')); }
+  // الاستجابة وصلت = كل خطوات السيرفر خلصت فعلاً (لو فاتنا حدث لحظي)
+  jr.set('checked', 'ok', d.duplicate ? 'مكرر' : 'جديد');
+  if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»`); jr.finish('انضاف لمكتبة المعرفة', [k.title || k.id], [], { rest: 'skip' }); return; }
+  // PDF: المسار الموثق (مهمة خلفية) — اللوحة والأسئلة من البيانات المتحققة بعد ما تخلص
+  if (jr.kind === 'pdf' && d.ingest) { if (d.duplicate) note(`📄 «${d.name}» مرفوع قبل`); trackIngest(d.ingest, jr); return; }
   if (d.ingest) trackIngest(d.ingest);
-  if (d.duplicate) { note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id})، نفس البصمة فما كررته`); return; }
-  if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»${k.dataset_ids?.length ? ` (جداول ${k.dataset_ids.map(i => '#' + i).join('، ')})` : ''}${k.sections ? ` · ${k.sections} قسم` : ''}`); return; }
+  if (d.duplicate) { note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id})، نفس البصمة فما كررته`); jr.finish('الملف مرفوع من قبل — ما كررناه', [`ملف #${d.id}`], [], { rest: 'skip' }); return; }
+  jr.set('read', 'ok', `${(d.chars || 0).toLocaleString('en-US')} حرف`);
+  if (jr.kind === 'tabular') { const st = d.stats || jr.stats; jr.set('tables', st?.sheets ? 'ok' : 'skip', st?.sheets ? `${st.sheets} أوراق · ${st.rows.toLocaleString('en-US')} صف` : 'لا جداول'); jr.stats = st; }
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
   loadDashboard();
-  // نعلم المساعد إن فيه ملف جديد عشان يقدر يسأل عنه مباشرة
   window.NORA_LAST_DOC = d;
   // 1) نبني لوحة الملف تلقائياً ونعرضها داخل الشاشة الرئيسية
+  jr.set('dash', 'on'); jr.msg('نبني لوحة الملف…');
   dashWaiting(d.name);
   const g = await apiJson(`/api/docs/${d.id}/dashboard`, {}).catch(e => ({ error: e.message }));
-  if (g.ok) { showDash(g.id, g.title, 'من ملف: ' + d.name, false); note(`📊 لوحة الملف جاهزة #${g.id}: ${g.title}`); loadDashboard(); }
-  else { VIEW = null; renderView(); note('⚠️ ما قدرت أبني اللوحة تلقائياً: ' + (g.error || '')); }
+  if (g.ok) { showDash(g.id, g.title, 'من ملف: ' + d.name, false); note(`📊 لوحة الملف جاهزة #${g.id}: ${g.title}`); loadDashboard(); jr.set('dash', 'ok', `لوحة #${g.id}`); }
+  else { VIEW = null; renderView(); note('⚠️ ما قدرت أبني اللوحة تلقائياً: ' + (g.error || '')); jr.set('dash', 'bad', 'تعذّر'); }
   // 2) نبلّغ نورة عشان تتكلم عنها وتجاوب أسئلتك
+  jr.set('nora', 'on'); jr.msg('نبلّغ نورة بالملف…');
   const notice = g.ok
     ? `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وانبنت منه تلقائياً لوحة #${g.id} «${g.title}» وهي معروضة الحين في الشاشة الرئيسية. رحّبي بجملة قصيرة وقولي أبرز رقمين أو ثلاثة منها (من الملف)، وبعدها جاوبي أسئلته عنها من الملف بـ search_documents/read_document.`
     : `[تنبيه النظام] رفع فواز ملف «${d.name}» (رقم ${d.id}) وفشل البناء التلقائي. اقرئيه كامل بـ read_document وابني منه داشبورد بـ build_dashboard الحين.`;
   if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch {} }
-  if (agent.connected) agent.sendText(notice, { silent: true });
+  if (agent.connected) { agent.sendText(notice, { silent: true }); jr.set('nora', 'ok', 'وصلها'); } else jr.set('nora', 'bad', 'غير متصلة');
+  const st = jr.stats;
+  const archived = jr.steps.find(s => s.key === 'archived');
+  if (archived.state === 'wait') jr.set('archived', 'on', 'بالخلفية');
+  // الأرشفة في Drive تكمل بالخلفية؛ الرحلة تكتمل لما يوصل حدثها الحقيقي (أو بعد دقيقة نعلن إنها ما زالت جارية)
+  const close = () => jr.finish(g.ok ? 'الملف جاهز ولوحته معروضة' : 'الملف محفوظ — اللوحة تحتاج طلب من نورة',
+    [...(st?.sheets ? [arN(st.sheets, 'ورقة', 'أوراق'), arN(st.rows, 'صف', 'صفوف'), arN(st.measures, 'مقياس', 'مقاييس')] : [`${(d.chars || 0).toLocaleString('en-US')} حرف`]), ...(archived.state === 'ok' ? [`Drive: ${archived.detail}`] : [])]);
+  const wait0 = performance.now();
+  const waitArchive = () => { if (archived.state === 'ok' || archived.state === 'bad') return close(); if (performance.now() - wait0 > 60000) { jr.set('archived', 'skip', 'جارية'); return close(); } setTimeout(waitArchive, 500); };
+  waitArchive();
 }
 $('#attach').onclick = () => $('#file').click();
 $('#file').onchange = e => { [...e.target.files].forEach(uploadFile); e.target.value = ''; };
@@ -856,6 +1033,7 @@ function connectLive() {
     BOOT ||= boot;
   });
   es.addEventListener('data', () => { clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });
+  es.addEventListener('upload', e => { try { onUploadEvent(JSON.parse(e.data)); } catch {} });
   es.addEventListener('job', async e => {
     const j = JSON.parse(e.data);
     const who = j.kind === 'gpt' ? 'GPT' : 'Claude';

@@ -81,7 +81,14 @@ export async function ingestDocument(doc, buffer) {
   if (!isTabular(doc.name)) return [];
   const sheets = parseWorkbook(buffer, doc.name);
   const ids = [];
-  for (const s of sheets) ids.push(await datasetAdd({ doc_id: doc.id, doc_name: doc.name, sheet: s.sheet, columns: s.columns, rows: s.rows, profile: profile(s.columns, s.rows) }));
+  const stats = { sheets: 0, rows: 0, columns: 0, measures: 0 };
+  for (const s of sheets) {
+    const pr = profile(s.columns, s.rows);
+    ids.push(await datasetAdd({ doc_id: doc.id, doc_name: doc.name, sheet: s.sheet, columns: s.columns, rows: s.rows, profile: pr }));
+    stats.sheets++; stats.rows += s.rows.length; stats.columns += s.columns.length;
+    stats.measures += (pr.columns || []).filter(c => c.role === 'measure').length;
+  }
+  ids.stats = stats; // أرقام حقيقية لرحلة الرفع في الواجهة
   return ids;
 }
 
