@@ -13,6 +13,7 @@ import { restore as restoreSqlite, snapshotSoon } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { designerName } from './designer.js';
 import { sseRoute, BOOT_ID, uploadStep } from './events.js';
+import { freshStart, freshStartPreview } from './fresh-start.js';
 import { agentTools, initAgent, agentStatus } from './agent.js';
 import { driveTools, archiveToDrive, driveSetup, driveReady } from './drive.js';
 import { mintSecret, listVoices, toRealtimeTools, elevenReady, ELEVEN_MODEL } from './eleven.js';
@@ -561,6 +562,12 @@ app.post('/api/retrieval/eval', express.json({ limit: '2mb' }), async (req, res)
 app.post('/api/docs/:id/dashboard', async (req, res) => {
   try { const r = await dashboardFromDocument(+req.params.id); res.status(r.ok ? 200 : 400).json(r); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+// «بداية جديدة»: معاينة ثم تنفيذ بعبارة تأكيد صريحة (نسخة احتياطية في Drive قبل أي مسح)
+app.get('/api/admin/fresh-start', async (req, res) => { try { res.json(await freshStartPreview()); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.post('/api/admin/fresh-start', async (req, res) => {
+  if (req.body?.confirm !== 'ابدأ من جديد') return res.status(400).json({ error: 'لازم عبارة التأكيد' });
+  try { res.json(await freshStart({ archiveName: String(req.body.archive || 'أرشيف نورة — قبل البداية الجديدة').slice(0, 80) })); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/drive/setup', async (req, res) => { try { res.json(await driveSetup()); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.get('/api/current-dash', async (req, res) => res.json((await getCurrentDash()) || {}));

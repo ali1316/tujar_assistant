@@ -149,3 +149,26 @@ export async function withLock(key, fn) {
     if (client) { await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]).catch(() => {}); client.release(); }
   }
 }
+
+// ===== إدارة: قراءة/مسح جداول التخزين الدائم (للبداية الجديدة فقط) =====
+export const STORE_TABLES = ['memories', 'dashboards', 'chat_sessions', 'chat_turns', 'datasets'];
+export async function storeDump(t) {
+  if (!STORE_TABLES.includes(t)) throw new Error('جدول غير معروف');
+  if (pool) return (await pool.query(`SELECT * FROM ${t}`)).rows;
+  return db.prepare(`SELECT * FROM ${t}`).all();
+}
+export async function storeClear(t) {
+  if (!STORE_TABLES.includes(t)) throw new Error('جدول غير معروف');
+  if (pool) return (await pool.query(`DELETE FROM ${t}`)).rowCount;
+  return db.prepare(`DELETE FROM ${t}`).run().changes;
+}
+export async function kvKeys(prefixes) {
+  const like = prefixes.map(p => p.endsWith('*') ? p.slice(0, -1) + '%' : p);
+  if (pool) return (await pool.query('SELECT key FROM kv WHERE key LIKE ANY($1)', [like])).rows.map(r => r.key);
+  return db.prepare(`SELECT key FROM kv WHERE ${like.map(() => 'key LIKE ?').join(' OR ')}`).all(...like).map(r => r.key);
+}
+export async function kvDelete(keys) {
+  if (!keys.length) return 0;
+  if (pool) return (await pool.query('DELETE FROM kv WHERE key = ANY($1)', [keys])).rowCount;
+  const s = db.prepare('DELETE FROM kv WHERE key=?'); return keys.reduce((a, k) => a + s.run(k).changes, 0);
+}

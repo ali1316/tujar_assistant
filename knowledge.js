@@ -9,6 +9,7 @@ import { ensureIndex, hybridSearch, cite, invalidateIndex, confidence } from './
 
 const KEY = 'knowledge';
 let cache = null;
+export const resetKnowledgeCache = () => { cache = null; };
 export async function kList() { if (!cache) cache = (await kvGet(KEY)) || { entries: [] }; return cache.entries; }
 async function save(entries) { cache = { entries }; await kvSet(KEY, cache); snapshotSoon(); }
 
