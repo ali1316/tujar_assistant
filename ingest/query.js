@@ -7,10 +7,12 @@ import { digitsKey } from './normalize.js';
 const nz = x => String(x ?? '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[^\p{L}\p{N}%.\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 const STOP = new Set('نوره يا في من على الى عن مع او و ثم لا ما هذا هذه كل كم وش ايش عطيني وريني ابي ابغى اعرضي اعرض قولي حسب الملف كان كانت بلغ بلغت عدد قيمه رقم'.split(' '));
 // تجذيع خفيف للعربية: «المشتركين/المشتركون» و«الفعّالين/الفعّالون» و«للربع/الربع» تتطابق (حالة حقيقية: سؤال صوتي عن «المشتركين الفعالين» فشل لأن العمود «المشتركون الفعّالون»)
-const stem = t => { let x = t; if (x.length > 4 && /^(ال|لل|بال|وال|فال|كال)/.test(x)) x = x.replace(/^(بال|وال|فال|كال|ال|لل)/, ''); if (x.length > 4) x = x.replace(/(ين|ون|ات|ان|يه|ه|ي)$/, ''); return x; };
-const toks = q => nz(q).split(' ').filter(t => t.length > 1 && !STOP.has(t)).map(stem);
+const stem = t => { let x = t; if (x.length > 4 && /^(ال|لل|بال|وال|فال|كال)/.test(x)) x = x.replace(/^(بال|وال|فال|كال|ال|لل)/, ''); if (x.length >= 4) x = x.replace(/(ين|ون|ات|ان|يه|ه|ي)$/, ''); return x; };
+// كلمات عامة في صياغة السؤال لا تدل على المطلوب (تُستبعد بعد التجذيع أيضاً)
+const GENERIC = new Set('رقم ارقام قيمه قيم عدد اعداد مذكور ذكور موجود مكتوب تقرير ملف مستند صفح صفحه جدول فقر حاشي هامش رسم اجمال مجموع كم وش ايش لي لنا'.split(' '));
+const toks = q => nz(q).split(' ').filter(t => t.length > 1 && !STOP.has(t)).map(stem).filter(t => !STOP.has(t));
 // بدائل الحرف الجار الملتصق («لغرفة/بغرفة» ← «غرفة») تُجرّب مع الكلمة نفسها، حتى لا نقص كلمات أصلها يبدأ بلام أو باء
-const variants = k => (k.length > 4 && /^[لب]/.test(k) ? [k, stem(k.slice(1))] : [k]);
+const variants = k => (k.length > 3 && /^[لب]/.test(k) ? [k, stem(k.slice(1))] : [k]);
 const stems = h => new Set(nz(h).split(' ').filter(Boolean).map(stem));
 const usable = v => v.value != null && v.verification.some(x => USABLE_FOR_METRICS.has(x)) && !v.verification.includes(VERIFY.ESTIMATED) && !v.verification.includes(VERIFY.CONFLICT);
 const VER_AR = { matched_text_layer: 'مطابق لنص الصفحة', total_reconciled: 'مطابق للمجموع', vision_only: 'مقروء من الصورة فقط', visual_estimate: 'تقدير بصري (غير مؤكد)', conflict: 'متعارض', cross_referenced: 'متطابق مع موضع آخر' };
@@ -76,7 +78,15 @@ export const tools = {
       const q = where && !source_type ? query.replace(/(في\s+)?(الحاشية|حاشية|الحواشي|الهامش|هامش|الفقرة|فقرة|في النص|الرسم|رسم|الشارت)/g, ' ') : query;
       const ts = toks(q);
       const all = [];
-      for (const data of await sources(document_id)) for (const v of data.values) {
+      // كلمة جوهرية في السؤال غير موجودة في المستند كله ⇒ المطلوب غير موجود في المصدر (لا نرجع أرقام كيان آخر). حالة حقيقية: «عدد الموظفين في غرفة الرس» رجّع أرقام المشتركين
+      const srcs = await sources(document_id);
+      const docStems = new Set();
+      for (const data of srcs) { for (const v of data.values) for (const x of stems([v.context, v.source.column, Object.keys(v.dims || {}).join(' '), Object.values(v.dims || {}).join(' ')].join(' '))) docStems.add(x);
+        for (const x of stems([data.meta?.file_name, data.meta?.data_period, data.meta?.report_date, ...(data.tables || []).map(t => `${t.title} ${(t.notes || []).join(' ')} ${(t.columns || []).map(c => c.name).join(' ')}`)].join(' '))) docStems.add(x); }
+      const has = k => variants(k).some(x => docStems.has(x) || [...docStems].some(h => h.length > 3 && x.length > 3 && (h.startsWith(x) || x.startsWith(h))));
+      const missing = ts.filter(k => k.length > 2 && !GENERIC.has(k) && !/^\d/.test(k) && !has(k));
+      if (missing.length) return { found: false, missing_terms: missing, message: `«${missing.join('، ')}» غير موجود في المصدر — لن أرجع أرقاماً لشيء آخر.` };
+      for (const data of srcs) for (const v of data.values) {
         if (where && v.source.type !== where) continue;
         const s = ts.length ? score(v, data, ts) : 1; if (s >= 0.5) all.push({ s, v, data });
       }
