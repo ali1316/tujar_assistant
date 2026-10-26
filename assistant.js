@@ -65,6 +65,12 @@ export function createAssistant({ api, hud, note = () => {} }) {
       if (r.ok) { note(`📊 داشبورد جديد #${r.id}: ${args.title}`); if (window.showDash) return { ...r, ...(await window.showDash(r.id, args.title, args.subtitle || '')) }; return { ...r, ...openUrl(r.url, `داشبورد: ${args.title}`) }; }
       return r;
     },
+    // داشبورد PDF يُبنى بالسيرفر (من بيانات متحققة) — ونعرضه هنا على الشاشة الرئيسية؛ قبل كان ينبني وما ينعرض
+    async pdf_dashboard(args) {
+      const r = await api('/api/tools/pdf_dashboard', args);
+      if (r?.ok && r.id != null && window.showDash) return { ...r, ...(await window.showDash(r.id, args.title || r.title || 'داشبورد PDF', '')) };
+      return r;
+    },
     async open_dashboard({ id }) {
       if (window.showDash) return window.showDash(id, `داشبورد #${id}`);
       return openUrl(`/d/${id}`, `داشبورد #${id}`);
