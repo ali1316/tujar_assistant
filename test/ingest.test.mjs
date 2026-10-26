@@ -108,6 +108,28 @@ const r4 = await P.reprocess(r1.version_id);
 await wait(r4.attempt_id);
 ok('إعادة المعالجة تنشئ إصداراً جديداً وتبقي السابق', r4.duplicate === false && r4.version === 3 && fs.existsSync(path.join(dir, r1.document_id, 'v1', 'metadata.json')), `v${r4.version}`);
 
+// 11) نفس الجدول مقسوماً إلى جزأين في نفس الصفحة («تتمة») — حالة حقيقية من v4: يُضم ويطابق الإجمالي
+{
+  const { organize } = await import('../ingest/organize.js');
+  const { validate } = await import('../ingest/validate.js');
+  const cols = ['الغرفة', 'الخدمات'].map(name => ({ name, unit: '' }));
+  const base = { caption: '', units: '', notes: [], header_rows: [], continues_on_next: false, bbox: [] };
+  const pages = [{ page: 6, engine: 'test', printed_page_number: '6', blocks: [], charts: [], tables: [
+    { ...base, title: 'الغرف مرتبة', continues_from_previous: false, columns: cols, rows: [['أ', '10'], ['ب', '7']], row_kinds: ['detail', 'detail'] },
+    { ...base, title: 'الغرف مرتبة (تتمة)', continues_from_previous: false, columns: cols, rows: [['ج', '3'], ['الإجمالي', '20']], row_kinds: ['detail', 'total'] },
+  ] }];
+  const org = organize({ vid: 'pdf-0000000000@v1', analysis: { pages: [{ page: 6, text_layer: '10 7 3 20' }] }, pages });
+  const val = validate(org);
+  const totalOk = val.checks.find(c => c.type === 'total' && c.result === 'pass');
+  ok('جزءا جدول في نفس الصفحة («تتمة») يُضمان ويطابق الإجمالي', org.tables.length === 1 && org.tables[0].rows.length === 4 && !!totalOk, `${org.tables.length} جدول، ${totalOk?.detail || 'لا تطابق'}`);
+}
+
+// 10) استدعاء رؤية معلّق لا يوقف المهمة: مهلة ثم خطأ واضح
+const { withTimeout } = await import('../ingest/extract.js');
+let tErr = null; const t0 = Date.now();
+try { await withTimeout(() => new Promise(() => {}), 200, 'interactions'); } catch (e) { tErr = e.message; }
+ok('استدعاء معلّق ينتهي بمهلة بدل التعليق', !!tErr && Date.now() - t0 < 2000, tErr);
+
 const failed = results.filter(r => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} passed · storage: ${dir}`);
 fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify(results, null, 1));
