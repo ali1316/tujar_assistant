@@ -7,6 +7,7 @@ import { pageAsPdf } from './pdf.js';
 export const EXTRACT_MODEL = () => process.env.INGEST_MODEL || 'gemini-3.8-flash';
 let ai = null;
 export function initExtract(client) { ai = client; }
+export { withTimeout };
 export const visionReady = () => !!ai && !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
 
 const S = (d) => ({ type: 'string', description: d });
@@ -57,31 +58,41 @@ const PROMPT = (p) => `أنت محرك استخراج مستندات. هذه ا�
 - أي جزء غير مقروء أو مقطوع أو منخفض الجودة: سجّله في problems مع السبب، ولا تخمّن محتواه.
 ${p.text_layer ? `طبقة النص المستخرجة آلياً من هذه الصفحة (للمساعدة فقط؛ قد تكون مرتبة خطأ):\n"""\n${p.text_layer.slice(0, 6000)}\n"""` : 'هذه الصفحة بدون طبقة نص (غالباً ممسوحة ضوئياً): اقرأها بصرياً.'}`;
 
+// مهلة لكل استدعاء: استدعاء معلّق لا يوقف المهمة كلها (حصل فعلاً في الإنتاج: صفحة علقت بدون خطأ)
+const PAGE_TIMEOUT = () => +process.env.INGEST_PAGE_TIMEOUT_MS || 90000;
+function withTimeout(fn, ms, label) {
+  const ctl = new AbortController();
+  let timer;
+  const t = new Promise((_, rej) => { timer = setTimeout(() => { ctl.abort(); rej(new Error(`${label}: انتهت المهلة ${Math.round(ms / 1000)} ثانية`)); }, ms); });
+  return Promise.race([fn(ctl.signal), t]).finally(() => clearTimeout(timer));
+}
+
 async function callGemini(pdfB64, prompt) {
   const model = EXTRACT_MODEL();
+  const ms = PAGE_TIMEOUT();
   // واجهة interactions (الحالية حسب مهارة gemini-api-dev)، ثم generateContent احتياطياً
   try {
-    const it = await ai.interactions.create({
+    const it = await withTimeout(signal => ai.interactions.create({
       model,
       input: [{ type: 'document', data: pdfB64, mime_type: 'application/pdf' }, { type: 'text', text: prompt }],
       response_format: { type: 'text', mime_type: 'application/json', schema: PAGE_SCHEMA },
       store: false,
-    });
+    }, { signal }), ms, 'interactions');
     return { json: JSON.parse(it.output_text), api: 'interactions', model };
   } catch (e) {
     const first = e.message;
     try {
-      const r = await ai.models.generateContent({
+      const r = await withTimeout(signal => ai.models.generateContent({
         model,
         contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'application/pdf', data: pdfB64 } }, { text: prompt }] }],
-        config: { responseMimeType: 'application/json', responseJsonSchema: PAGE_SCHEMA, temperature: 0 },
-      });
+        config: { responseMimeType: 'application/json', responseJsonSchema: PAGE_SCHEMA, temperature: 0, abortSignal: signal },
+      }), ms, 'generateContent');
       return { json: JSON.parse(r.text), api: 'generateContent', model };
     } catch (e2) { throw new Error(`gemini: ${first.slice(0, 160)} | fallback: ${e2.message.slice(0, 160)}`); }
   }
 }
 
-export async function extractPageGemini(pdfBuffer, pageInfo, { retries = 2 } = {}) {
+export async function extractPageGemini(pdfBuffer, pageInfo, { retries = 1 } = {}) {
   const one = await pageAsPdf(pdfBuffer, pageInfo.page);
   let lastErr;
   for (let i = 0; i <= retries; i++) {
