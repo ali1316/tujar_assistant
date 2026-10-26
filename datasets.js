@@ -168,6 +168,10 @@ export function runQuery(ds, { group_by, measure, agg: fn = measure ? 'sum' : 'c
 
 // ===== 4) تحويل النتيجة لرسم =====
 const AGG_AR = { sum: 'مجموع', avg: 'متوسط', count: 'عدد', min: 'أقل', max: 'أعلى', distinct: 'عدد مميز' };
+// «مجموع عدد الأعمال» ركيكة: لو العمود نفسه عدد نكتب «إجمالي عدد…»
+const aggLabel = (agg, measure) => (agg === 'sum' && /^(عدد|إجمالي|مجموع)\s/.test(measure || '') ? `إجمالي ${String(measure).replace(/^(إجمالي|مجموع)\s+/, '')}` : `${AGG_AR[agg] || ''} ${measure || ''}`).trim();
+// أسماء المصادر للعرض: بدون شرطات طويلة، وبدون تكرار اسم الملف والورقة لو نفس الشي
+const srcLabel = (doc, sheet) => { const c = x => String(x || '').replace(/\s+—\s+/g, '، ').trim(); const d = c(doc), sh = c(sheet); return d && sh && (d === sh || d.startsWith(sh) || sh.startsWith(d)) ? `«${d.length >= sh.length ? d : sh}»` : [d && `«${d}»`, sh].filter(Boolean).join(' · '); };
 export function toECharts(res, type = 'bar') {
   const cats = res.rows.map(r => r.key);
   const multi = res.series.length > 1 || res.series[0] !== '_';
@@ -193,7 +197,10 @@ export function toVegaLite(res, type = 'bar') {
   const hz = type === 'hbar';
   // أسماء الفئات أفقية لما تكفي المساحة (أسهل قراءة من المائلة/العمودية)
   const longest = Math.max(0, ...order.map(x => String(x).length));
-  const k = { field: 'k', type: 'nominal', title: res.group_by, sort: order, axis: { labelAngle: hz ? 0 : (order.length <= 8 && longest <= 16 ? 0 : -35), labelLimit: 150, labelPadding: 6, labelFontSize: 12 } }, v = { field: 'v', type: 'quantitative', title: res.agg === 'count' ? 'العدد' : `${AGG_AR[res.agg] || ''} ${res.measure}`.trim() };
+  const k = { field: 'k', type: 'nominal', title: res.group_by, sort: order, axis: { labelAngle: hz ? 0 : (order.length <= 8 && longest <= 16 ? 0 : -35), labelLimit: 150, labelPadding: 6, labelFontSize: 12 } }, v = { field: 'v', type: 'quantitative', title: res.agg === 'count' ? 'العدد' : aggLabel(res.agg, res.measure) };
+  // قيم صحيحة (أعداد) = تدريج صحيح بدون 0.5
+  if (values.every(x => Number.isInteger(+x.v))) v.axis = { format: 'd', tickMinStep: 1 };
+  if (hz) k.axis.labelLimit = 240;
   const enc = hz ? { y: k, x: v } : { x: k, y: v };
   if (multi) { enc.color = { field: 's', type: 'nominal', title: '' }; if (type !== 'stacked' && mark.type === 'bar') enc[hz ? 'yOffset' : 'xOffset'] = { field: 's' }; }
   enc.tooltip = [{ field: 'k', title: res.group_by || '' }, ...(multi ? [{ field: 's', title: '' }] : []), { field: 'v', title: res.measure, format: ',' }];
@@ -271,7 +278,7 @@ export const datasetTools = {
     run: async ({ title, chart_type = 'bar', ...args }) => {
       const ds = await resolveDs({ ...args, title }); const r = runQuery(ds, args);
       if (args.measure && r.measure === 'العدد') title = `العدد حسب ${r.group_by || ''}`.trim(); // العمود نصي فتحوّل لعدّ
-      if (!/[\u0600-\u06FF]/.test(title || '')) title = `${r.measure === 'العدد' ? 'عدد السجلات' : `${AGG_AR[r.agg] || ''} ${r.measure}`} حسب ${r.group_by || ''}`.replace(/\s+/g, ' ').trim();
+      if (!/[\u0600-\u06FF]/.test(title || '')) title = `${r.measure === 'العدد' ? 'عدد السجلات' : aggLabel(r.agg, r.measure)} حسب ${r.group_by || ''}`.replace(/\s+/g, ' ').trim();
       const total = r.rows.reduce((a, x) => a + x.total, 0);
       const sorted = [...r.rows].sort((a, b) => b.total - a.total), top1 = sorted[0], low = sorted.at(-1);
       const n = x => new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(x);
@@ -283,8 +290,8 @@ export const datasetTools = {
         ...(sorted.length > 2 && r.agg !== 'avg' ? [`أعلى ${Math.min(3, sorted.length)} فئات = ${Math.round(sorted.slice(0, 3).reduce((a, x) => a + x.total, 0) / total * 100)}٪ من الإجمالي`] : []),
       ] : [];
       const qn = await qualityNote(ds.id);
-      return { ...(qn ? { knowledge: qn } : {}), title, subtitle: `من «${ds.doc_name}» · ${ds.sheet} · ${r.matched_rows} صف`, vega_lite: toVegaLite(r, chart_type), insights,
-        kpis: [{ label: r.measure === 'العدد' ? 'عدد السجلات' : `${AGG_AR[r.agg] || ''} ${r.measure}`.trim(), value: r.agg === 'avg' ? +(total / Math.max(1, r.rows.length)).toFixed(1) : total }, ...(top1 ? [{ label: `الأعلى · ${top1.key}`, value: +(+top1.total).toFixed(1) }] : []), { label: 'عدد الفئات', value: r.rows.length }],
+      return { ...(qn ? { knowledge: qn } : {}), title, subtitle: `من ${srcLabel(ds.doc_name, ds.sheet)} · ${r.matched_rows} صف`, vega_lite: toVegaLite(r, chart_type), insights,
+        kpis: [{ label: r.measure === 'العدد' ? 'عدد السجلات' : aggLabel(r.agg, r.measure), value: r.agg === 'avg' ? +(total / Math.max(1, r.rows.length)).toFixed(1) : total }, ...(top1 ? [{ label: `الأعلى · ${top1.key}`, value: +(+top1.total).toFixed(1) }] : []), { label: 'عدد الفئات', value: r.rows.length }],
         top: r.rows.slice(0, 5).map(x => ({ [r.group_by || '']: x.key, [r.measure]: x.total })) };
     },
   },
