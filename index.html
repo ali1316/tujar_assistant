@@ -349,6 +349,13 @@ const ICON = {
 // اسم الملف: نعزل «26.pdf» باتجاه يسار-يمين عشان ما ينقلب إلى «pdf.26»
 const short = (x, n = 60) => { x = String(x ?? '').trim(); x = x.length > n ? x.slice(0, n - 1) + '…' : x; return x.replace(/([\d._-]*\.[A-Za-z0-9]{2,5})$/, '\u2066$1\u2069'); };
 const TOOL_AR = {
+  pdf_sources: ['أراجع ملفات PDF المعالجة', 'جبت قائمة ملفات PDF'],
+  pdf_find_value: [a => `أدوّر في PDF: ${short(a.query || '', 40)}`, (a, r) => r.results?.length ? `لقيت ${r.results.length} قيمة في PDF` : 'ما لقيت القيمة في المصدر'],
+  pdf_get_table: ['أفتح جدول PDF', (a, r) => r.title ? `فتحت جدول: ${short(r.title, 40)}` : 'جبت الجدول'],
+  pdf_metric: [a => `أحسب من PDF: ${short(a.measure || a.dataset || '', 40)}`, (a, r) => r.available === false ? 'التفصيل غير متاح في المصدر' : `حسبت: ${short(r.measure || '', 30)}`],
+  pdf_trace: ['أتتبع الرقم لمكانه في الملف', (a, r) => r.page ? `الرقم من صفحة ${r.page}` : 'تتبعت الرقم'],
+  pdf_dashboard: ['أبني داشبورد من PDF', (a, r) => r.error ? null : 'بنيت داشبورد PDF'],
+  pdf_job_status: ['أشيك على معالجة الملف', (a, r) => r.stage_ar ? `حالة الملف: ${r.stage_ar}` : 'شيكت على الملف'],
   show_screen: [a => `أعرض ${VIEW_LABEL[a.view] || 'القسم'}`, (a, r) => r.error ? null : `عرضت ${VIEW_LABEL[a.view] || r.shown_on_screen || 'القسم'}`],
   close_visuals: ['أرجع للشاشة الأساسية', 'رجعت للشاشة الأساسية'],
   find_knowledge: ['أدوّر في مكتبة المعرفة', (a, r) => r.confidence === 'low' ? 'ما لقيت الجواب في الملفات' : `جبت ملف: ${short(r.on_screen_source || r.results?.[0]?.title || a.question)}`],
@@ -566,7 +573,12 @@ function dashWaiting(name) {
 $('#fdHide').onclick = () => { VIEW = null; renderView(); };
 $('header.top h1').onclick = () => { hud.closeAll(); VIEW = null; renderView(); };
 $('#crumb').onclick = () => { hud.closeAll(); VIEW = null; renderView(); };
-addEventListener('message', e => { if (e.origin === location.origin && e.data?.noraDashHeight) $('#fdFrame').style.height = Math.min(Math.max(e.data.noraDashHeight, 300), 3000) + 'px'; });
+let DASH_CTX = null;
+addEventListener('message', e => {
+  if (e.origin !== location.origin) return;
+  if (e.data?.noraDashHeight) $('#fdFrame').style.height = Math.min(Math.max(e.data.noraDashHeight, 300), 3000) + 'px';
+  if (e.data?.noraDashCtx) DASH_CTX = e.data.noraDashCtx; // مصدر اللوحة وفلاترها الحالية: نورة تشوفها في look_at_screen
+});
 async function loadCurrentDash() {
   try { const c = await apiJson('/api/current-dash'); if (c?.id) showDash(c.id, c.title, c.doc_name ? 'من ملف: ' + c.doc_name : '', false, false); } catch {}
 }
@@ -646,6 +658,8 @@ const screenTools = {
       kpis: [...document.querySelectorAll('.kpi')].map(k => `${k.querySelector('span')?.innerText}: ${k.querySelector('b')?.innerText}`),
       projects: rows('#projects'), tickets: rows('#tickets'),
       file_dashboard_on_screen: $('#filedash').hidden ? null : $('#fdTitle').innerText + ' ' + $('#fdSub').innerText,
+      dashboard_source: $('#filedash').hidden || !DASH_CTX ? null : { title: DASH_CTX.title, provenance: DASH_CTX.provenance, measure: DASH_CTX.measure, group_by: DASH_CTX.group_by, filters: DASH_CTX.filters, bars_on_screen: DASH_CTX.groups, selected_bar: DASH_CTX.selected },
+      pdf_processing: INGEST_LAST ? { file: INGEST_LAST.file_name, version: INGEST_LAST.version_id, stage: INGEST_LAST.stage_ar, pages: `${INGEST_LAST.pages_done}/${INGEST_LAST.pages_total ?? '?'}`, issues: INGEST_LAST.issues } : null,
       files: list('#docs'), generated_dashboards: list('#dashes'), memories_count: document.querySelectorAll('#mems .memdel').length, dev_requests: list('#devreq'),
       style: { font: ui.state.font, digits: ui.state.numerals || 'arabic', numbers_font: ui.state.numFont || ui.state.font, table: ui.state.table, theme_colors: ui.state.colors, custom_css: (ui.state.css || []).map(c => c.description) },
     };
@@ -770,12 +784,43 @@ $('#f').onsubmit = async e => {
 };
 
 // ===== رفع الملفات =====
+// متابعة معالجة PDF بالخلفية: أرقام حقيقية من السيرفر (صفحات منجزة/الإجمالي، مشكلات) — بدون نسبة تقدم وهمية
+let INGEST_LAST = null;
+function trackIngest(ing) {
+  if (ing.error) return note('⚠️ مسار PDF: ' + ing.error);
+  if (ing.duplicate) return note(`🗂️ نفس الـ PDF معالج سابقاً (${ing.version_id} · ${ing.status}) — ما تكررت المعالجة`);
+  const id = ing.attempt_id; if (!id) return;
+  const el = Object.assign(document.createElement('div'), { className: 'm t ingest-card' });
+  $('#log').append(el); $('#log').scrollTop = 1e9;
+  let last = '', tries = 0;
+  const tick = async () => {
+    const j = await apiJson(`/api/ingest/jobs/${encodeURIComponent(id)}`).catch(() => null);
+    if (j && !j.error) {
+      INGEST_LAST = j;
+      const pages = j.pages_total ? ` · الصفحات ${j.pages_done}/${j.pages_total}` : '';
+      const txt = `📑 ${j.file_name} (${j.version_id}) — ${j.stage_ar}${pages} · مشكلات ${j.issues}`;
+      if (txt !== last) { el.textContent = txt; last = txt; }
+      if (['ready', 'partial', 'failed'].includes(j.stage)) {
+        if (j.links) {
+          const a = (u, t) => u ? ` <a href="${u}" target="_blank" rel="noopener">${t}</a>` : '';
+          el.insertAdjacentHTML('beforeend', `<div class="ingest-links">${a(j.links.folder, 'المجلد')}${a(j.links.review_xlsx, 'Excel')}${a(j.links.quality_report, 'تقرير الجودة')}${a(j.links.document_md, 'النص الكامل')}</div>`);
+        }
+        if (j.stage === 'failed') note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || ''));
+        else if (agent?.connected) agent.sendText(`[تنبيه النظام] انتهت معالجة PDF «${j.file_name}» بحالة ${j.stage_ar} (${j.pages_done}/${j.pages_total} صفحة، ${j.issues} مشكلة). الإصدار ${j.version_id}. استخدمي pdf_sources ثم pdf_* للأسئلة، واذكري رقم الصفحة، ولا تخترعي ما ليس في المصدر.`, { silent: true });
+        return;
+      }
+    }
+    if (++tries < 2000) setTimeout(tick, 3000);
+  };
+  tick();
+}
 async function uploadFile(file) {
   note(`⏫ جاري رفع ${file.name}…`);
   const fd = new FormData(); fd.append('file', file);
   const r = await api('/api/upload', { method: 'POST', body: fd });
   const d = await r.json();
   if (!r.ok) return note('❌ ' + d.error);
+  if (d.ingest) trackIngest(d.ingest);
   if (d.duplicate) { note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id})، نفس البصمة فما كررته`); return; }
   if (d.knowledge) { const k = d.knowledge; note(k.status === 'unchanged' ? `📚 «${k.id}» موجود في مكتبة المعرفة بنفس النسخة` : `📚 انضاف لمكتبة المعرفة: «${k.title}»${k.dataset_ids?.length ? ` (جداول ${k.dataset_ids.map(i => '#' + i).join('، ')})` : ''}${k.sections ? ` · ${k.sections} قسم` : ''}`); return; }
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);

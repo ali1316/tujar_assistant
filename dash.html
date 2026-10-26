@@ -50,6 +50,17 @@
   @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:720px){.grid{grid-template-columns:1fr}.panel.span2{grid-column:auto}.top{flex-wrap:wrap;padding:12px 16px}.wrap{padding:0 16px 16px}.kpi .v{font-size:28px}}
   @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  /* مصدر البيانات (PDF) والتفاعل */
+  .prov{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--mute);margin-top:10px}
+  .prov b{color:var(--sand);font-weight:600}
+  .prov .st{padding:2px 10px;border-radius:99px;background:#1b3553;color:var(--sand)} .prov .st.ready{background:#16392e;color:var(--ok)} .prov .st.ready_with_notes{background:#3a3218;color:var(--warn)} .prov .st.blocked{background:#3d2226;color:var(--bad)}
+  .prov a{color:var(--gold)}
+  .ix-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;align-items:center}
+  .ix-bar label{font-size:12px;color:var(--mute);display:flex;gap:6px;align-items:center}
+  .ix-bar select{background:#0b1d31;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-family:inherit}
+  .drill{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px} .drill td,.drill th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:start} .drill th{color:var(--mute);font-weight:500}
+  .drill button{background:none;border:1px solid #2b4a6c;color:var(--gold);border-radius:6px;padding:2px 8px;cursor:pointer;font-family:inherit}
+  .trace{font-size:12px;color:var(--mute);margin-top:8px;white-space:pre-wrap}
   /* ملخص نورة */
   .summary{border-inline-start:3px solid var(--gold)}
   .summary ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
@@ -296,11 +307,59 @@ function countUp(el, to, unit) {
     });
   });
 
+  // مصدر البيانات: الملف والإصدار والتاريخ وحالة التحقق والصفحات والمعادلة (لوحات PDF)
+  const pv = spec.provenance;
+  const ST_AR = { ready: 'متحقق', ready_with_notes: 'جاهز بملاحظات', blocked: 'محجوب', text_only: 'نصي فقط' };
+  if (pv) {
+    const items = [['المصدر', pv.document], ['الإصدار', pv.version_id], pv.report_date && ['تاريخ التقرير', pv.report_date], pv.data_period && ['فترة البيانات', pv.data_period],
+      ['عولج', pv.processed_at ? new Date(pv.processed_at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' }) : ''], ['الصفحات', (pv.pages || []).join('، ')], ['المعادلة', pv.formula]].filter(Boolean);
+    $('.hero').insertAdjacentHTML('beforeend', `<div class="prov">${items.map(([k, v]) => `<span>${k}: <b>${esc(v || '—')}</b></span>`).join('')}<span class="st ${esc(pv.verification || '')}" title="${esc(pv.verification_note || '')}">${esc(ST_AR[pv.verification] || pv.verification || 'غير معروف')}</span>${pv.folder ? `<a href="${esc(pv.folder)}" target="_blank" rel="noopener">مجلد المصدر</a>` : ''}</div>`);
+    $('#source').textContent = `المصدر: ${pv.document} · ${pv.version_id} · ${ST_AR[pv.verification] || ''}`;
+  }
+  // تفاعل حقيقي على صفوف المصدر: فلاتر بالأبعاد الموجودة فقط، تجميع بالكود، وتفصيل بأرقام الصفحات وتتبع كل رقم
+  const ix = spec.interactive;
+  const CTX = { provenance: pv || null, filters: {}, group_by: ix?.group_by || null, measure: ix?.measure || null, groups: [], selected: null };
+  const sendCtx = () => { try { parent.postMessage({ noraDashCtx: { id, title: spec.title, ...CTX, groups: CTX.groups.slice(0, 30) } }, location.origin); } catch {} };
+  if (ix?.rows?.length) {
+    const p = panel('full', 'استكشاف البيانات', `<span class="count">${fmt(ix.rows.length)} صف تفصيلي</span>`);
+    const bar = document.createElement('div'); bar.className = 'ix-bar'; p.append(bar);
+    const sel = (label, opts, val, on) => { const l = document.createElement('label'); l.textContent = label; const s = document.createElement('select'); opts.forEach(([v, t]) => s.add(new Option(t, v, false, v === val))); s.onchange = () => on(s.value); l.append(s); bar.append(l); };
+    sel('المقياس', ix.measures.map(m => [m, m]), CTX.measure, v => { CTX.measure = v; draw(); });
+    if (ix.dimensions.length) sel('التجميع حسب', ix.dimensions.map(d => [d, d]), CTX.group_by, v => { CTX.group_by = v; draw(); });
+    ix.filters.forEach(f => sel(f.dimension, [['', 'الكل'], ...f.values.map(v => [v, v])], '', v => { if (v) CTX.filters[f.dimension] = v; else delete CTX.filters[f.dimension]; draw(); }));
+    const box = document.createElement('div'); box.className = 'chart'; p.append(box);
+    const det = document.createElement('div'); p.append(det);
+    const ch = echarts.init(box, null, { renderer: 'canvas' }); charts.push(ch); ch.__redraw = () => draw();
+    const rowsNow = () => ix.rows.filter(r => Object.entries(CTX.filters).every(([d, v]) => r.dims[d] === v));
+    function draw() {
+      const g = new Map();
+      for (const r of rowsNow()) { const v = r.values[CTX.measure]; if (v == null) continue; const k = CTX.group_by ? (r.dims[CTX.group_by] || '—') : 'الكل'; const e = g.get(k) || { key: k, value: 0, rows: [] }; e.value += v; e.rows.push(r); g.set(k, e); }
+      CTX.groups = [...g.values()].sort((a, b) => b.value - a.value).map(e => ({ key: e.key, value: +e.value.toFixed(6), rows: e.rows.length }));
+      const opt = { xAxis: { type: 'category', data: CTX.groups.map(e => e.key) }, yAxis: { type: 'value' }, series: [{ type: 'bar', data: CTX.groups.map(e => e.value) }] };
+      ch.setOption(makeOpt({ option: opt }, MONO_ON), true);
+      ch.__groups = g; showRows(null); sendCtx();
+    }
+    function showRows(key) {
+      CTX.selected = key;
+      const rs = key == null ? [] : (ch.__groups.get(key)?.rows || []);
+      if (!rs.length) { det.innerHTML = `<div class="trace">اضغط عمود لعرض الصفوف ومصدرها في الملف.</div>`; return; }
+      det.innerHTML = `<table class="drill"><tr>${ix.dimensions.map(d => `<th>${esc(d)}</th>`).join('')}<th>${esc(CTX.measure)}</th><th>الصفحة</th><th></th></tr>${rs.map(r => `<tr>${ix.dimensions.map(d => `<td>${esc(r.dims[d] || '')}</td>`).join('')}<td class="num">${esc(r.raw[CTX.measure] ?? '')}</td><td>${esc(r.page)}</td><td><button data-rid="${esc(r.records[CTX.measure] || '')}">من وين؟</button></td></tr>`).join('')}</table><div class="trace" id="traceOut"></div>`;
+      det.querySelectorAll('button[data-rid]').forEach(b => b.onclick = async () => {
+        const t = await (await fetch(`/api/ingest/trace/${encodeURIComponent(b.dataset.rid)}`, { headers: { 'x-access-code': CODE } })).json();
+        $('#traceOut').textContent = t.error ? t.error : `${t.location || ''}\nالقيمة كما طُبعت: ${t.raw ?? ''} · الحالة: ${(t.verification || []).join('، ')}${t.bbox?.length ? ` · الموضع ${t.bbox.join(',')}` : ''}`;
+      });
+      sendCtx();
+    }
+    ch.on('click', e => showRows(e.name));
+    p.dataset.say = 'استكشاف البيانات حسب ' + (CTX.group_by || CTX.measure);
+    draw();
+  } else if (pv) sendCtx();
+
   // أبيض وأسود: كل شي رمادي إلا المشاكل تبقى حمراء
   $('#tools').hidden = false;
   $('#mono').onclick = () => {
     MONO_ON = !MONO_ON; $('#mono').setAttribute('aria-pressed', String(MONO_ON)); document.body.classList.toggle('mono', MONO_ON);
-    charts.forEach(ch => ch.setOption(makeOpt(ch.__spec, MONO_ON), true));
+    charts.forEach(ch => ch.__redraw ? ch.__redraw() : ch.setOption(makeOpt(ch.__spec, MONO_ON), true));
   };
   // العرض التلقائي للشاشات الكبيرة: يمر على السطر الأهم ثم كل رسم وجوابه ثم الإجراءات
   if (EMBED) { $('#play').outerHTML = `<a class="tbtn" href="/d/${id}?autoplay=1" target="_blank" rel="noopener"><span aria-hidden="true">▶</span>عرض تلقائي</a>`; }

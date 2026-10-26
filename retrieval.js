@@ -55,8 +55,11 @@ export function chunkText(text) {
 }
 
 // ===== 2) بناء الفهرس (تدريجي: يعيد بناء المصدر اللي تغيّر محتواه فقط) =====
+const extraSources = [];
+export function registerSource(fn) { extraSources.push(fn); }
 async function sources() {
   const out = [];
+  for (const fn of extraSources) { try { out.push(...(await fn())); } catch (e) { console.warn('[rag] extra source failed:', e.message); } }
   for (const d of db.prepare('SELECT id, name, content, summary FROM documents').all()) {
     const chunks = chunkText(d.content).map(c => ({ ...c, section: c.text.split('\n')[0].slice(0, 70) }));
     if (d.summary) chunks.unshift({ text: `${d.name}\n${d.summary}`, section: 'دليل الملف', page: null, line_from: null, line_to: null, guide: true });

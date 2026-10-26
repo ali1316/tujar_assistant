@@ -21,6 +21,7 @@ function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).set
 function doPost(e) {
   try {
     const q = JSON.parse(e.postData.contents);
+    const ing = ingest_(q); if (ing) return out_(ing);
     if (q.action === 'setup') { CATEGORIES.forEach(folder_); return out_({ ok: true, root: root_().getUrl() }); }
     if (q.action === 'upload') {
       const blob = Utilities.newBlob(Utilities.base64Decode(q.data), q.mime || 'application/octet-stream', q.name);
@@ -44,4 +45,49 @@ function doPost(e) {
     return out_({ ok: false, error: 'unknown action' });
   } catch (err) { return out_({ ok: false, error: String(err) }); }
 }
+
+// ===== مسار مصادر PDF (nora-ingest/1): مجلد لكل مستند، ومجلد لكل إصدار. الملفات خاصة (بدون مشاركة عامة). =====
+function iroot_(name) { const it = DriveApp.getFoldersByName(name); return it.hasNext() ? it.next() : DriveApp.createFolder(name); }
+function child_(parent, seg, label, create) {
+  const it = parent.getFolders();
+  while (it.hasNext()) { const f = it.next(), n = f.getName(); if (n === seg || n.indexOf(seg + ' — ') === 0) return f; }
+  return create ? parent.createFolder(label ? seg + ' — ' + label : seg) : null;
+}
+function walk_(q, create) {
+  let f = iroot_(q.root || 'نورة — مصادر PDF');
+  const labels = q.labels || {};
+  for (let i = 0; i < (q.path || []).length; i++) { f = child_(f, q.path[i], labels[i], create); if (!f) return null; }
+  return f;
+}
+function fileIn_(folder, name) { const it = folder.getFilesByName(name); return it.hasNext() ? it.next() : null; }
+function finfo_(f) { return { id: f.getId(), name: f.getName(), url: f.getUrl(), size: f.getSize(), mime: f.getMimeType(), updated: f.getLastUpdated() }; }
+function ingest_(q) {
+  if (q.action === 'dir') { const f = walk_(q, true); return { ok: true, folder: { id: f.getId(), url: f.getUrl(), name: f.getName() } }; }
+  if (q.action === 'put') {
+    const folder = walk_(q, true);
+    const old = fileIn_(folder, q.name);
+    if (q.text != null && old && old.getMimeType().indexOf('google-apps') < 0) { old.setContent(q.text); return { ok: true, file: finfo_(old), replaced: true }; }
+    const blob = q.text != null ? Utilities.newBlob(q.text, q.mime || 'text/plain', q.name) : Utilities.newBlob(Utilities.base64Decode(q.data), q.mime || 'application/octet-stream', q.name);
+    const f = folder.createFile(blob);
+    if (old) old.setTrashed(true);
+    return { ok: true, file: finfo_(f) };
+  }
+  if (q.action === 'get') {
+    const folder = walk_(q, false); const f = folder && fileIn_(folder, q.name);
+    if (!f) return { ok: false, error: 'not found' };
+    return { ok: true, file: finfo_(f), data: Utilities.base64Encode(f.getBlob().getBytes()) };
+  }
+  if (q.action === 'ls') {
+    const folder = walk_(q, false); if (!folder) return { ok: true, items: [] };
+    const items = []; const fs = folder.getFiles(); while (fs.hasNext()) items.push(finfo_(fs.next()));
+    const ds = folder.getFolders(); while (ds.hasNext()) { const d = ds.next(); items.push({ id: d.getId(), name: d.getName(), url: d.getUrl(), dir: true }); }
+    return { ok: true, items: items };
+  }
+  if (q.action === 'getById') {
+    const f = DriveApp.getFileById(q.id);
+    return { ok: true, name: f.getName(), mime: f.getMimeType(), url: f.getUrl(), size: f.getSize(), data: Utilities.base64Encode(f.getBlob().getBytes()) };
+  }
+  return null;
+}
+
 function doGet() { return out_({ ok: true, service: 'nora-drive', root: root_().getUrl() }); }

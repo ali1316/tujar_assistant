@@ -130,3 +130,22 @@ export const datasetGet = id => q('SELECT * FROM datasets WHERE id=$1', 'SELECT 
 export const datasetsForDoc = docId => q('SELECT * FROM datasets WHERE doc_id=$1 ORDER BY id', 'SELECT * FROM datasets WHERE doc_id=? ORDER BY id', [docId]).then(r => r.map(dsRow));
 export const datasetsRecent = (n = 30) => q('SELECT * FROM datasets ORDER BY id DESC LIMIT $1', 'SELECT * FROM datasets ORDER BY id DESC LIMIT ?', [n]).then(r => r.map(dsRow));
 export const datasetsLatest = () => q('SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id', 'SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id').then(r => r.map(dsRow));
+
+// ===== قفل استشاري (Postgres) لمنع مهمتين تعالجان المستند نفسه — داخل نفس قاعدة البيانات الحالية =====
+const localLocks = new Set();
+export async function withLock(key, fn) {
+  if (localLocks.has(key)) return { locked: false };
+  localLocks.add(key);
+  let client = null;
+  try {
+    if (pool) {
+      client = await pool.connect();
+      const r = await client.query('SELECT pg_try_advisory_lock(hashtext($1)) AS ok', [key]);
+      if (!r.rows[0].ok) return { locked: false };
+    }
+    return { locked: true, value: await fn() };
+  } finally {
+    localLocks.delete(key);
+    if (client) { await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]).catch(() => {}); client.release(); }
+  }
+}

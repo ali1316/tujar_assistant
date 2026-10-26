@@ -39,7 +39,7 @@ export const dashboardTools = {
       },
     },
     write: true,
-    run: async ({ title, subtitle = '', kicker, designed_by, headline, headline_flag, kpis = [], charts = [], tables = [], insights = [], actions = [] }) => {
+    run: async ({ title, subtitle = '', kicker, designed_by, headline, headline_flag, kpis = [], charts = [], tables = [], insights = [], actions = [], provenance, interactive }) => {
       try {
         const txt = (v, n) => typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : undefined;
         const spec = {
@@ -54,6 +54,8 @@ export const dashboardTools = {
           }),
           insights: insights.slice(0, 5),
           actions: (Array.isArray(actions) ? actions : []).filter(a => a && txt(a.action, 300)).slice(0, 6).map(a => ({ action: txt(a.action, 300), impact: txt(a.impact, 160), why: txt(a.why, 240) })),
+          ...(provenance && typeof provenance === 'object' ? { provenance } : {}),
+          ...(interactive && typeof interactive === 'object' && Array.isArray(interactive.rows) ? { interactive: { ...interactive, rows: interactive.rows.slice(0, 5000) } } : {}),
           generated_at: new Date().toISOString(),
         };
         const id = await dashAdd(title, spec);
