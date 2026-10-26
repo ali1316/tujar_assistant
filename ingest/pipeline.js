@@ -17,6 +17,9 @@ const emit = (job) => listeners.forEach(fn => { try { fn(job); } catch {} });
 
 export async function getIndex() { return (await kvGet(IDX)) || { schema: SCHEMA_VERSION, documents: {} }; }
 async function saveIndex(ix) { await kvSet(IDX, ix); }
+// كل تعديل على الفهرس يمر بطابور واحد: رفع ملفين في نفس اللحظة كان يضيّع واحد منهم (قراءة-تعديل-كتابة متداخلة)
+let indexQueue = Promise.resolve();
+const serial = fn => { const r = indexQueue.then(fn); indexQueue = r.catch(() => {}); return r; };
 export async function getJob(id) { return kvGet(JOB(id)); }
 async function saveJob(j) { j.updated_at = new Date().toISOString(); await kvSet(JOB(j.attempt_id), j); emit(publicJob(j)); }
 export const publicJob = j => j && ({
@@ -26,7 +29,8 @@ export const publicJob = j => j && ({
 });
 
 // ===== الاستقبال =====
-export async function receive({ buffer, fileName, mime = 'application/pdf', uploadedBy = 'fawaz', sourceRef = null, reprocessOf = null }) {
+export function receive(args) { return serial(() => receiveNow(args)); }
+async function receiveNow({ buffer, fileName, mime = 'application/pdf', uploadedBy = 'fawaz', sourceRef = null, reprocessOf = null }) {
   if (!/pdf/i.test(mime) && !/\.pdf$/i.test(fileName)) throw new Error('المسار يقبل PDF فقط');
   const hash = sha256(buffer);
   const ix = await getIndex();
@@ -98,7 +102,8 @@ export async function resumePending() {
 }
 
 async function setStage(job, stage) { job.stage = stage; job.history.push({ stage, at: new Date().toISOString() }); await saveJob(job); await syncIndex(job); }
-async function syncIndex(job, extra = {}) {
+function syncIndex(job, extra = {}) { return serial(() => syncIndexNow(job, extra)); }
+async function syncIndexNow(job, extra) {
   const ix = await getIndex(); const d = ix.documents[job.document_id]; const v = d?.versions.find(x => x.n === job.version);
   if (!v) return; Object.assign(v, { status: job.stage, ...extra }); await saveIndex(ix); return ix;
 }
@@ -181,12 +186,10 @@ async function run(att) {
     await kvSet(DATA(vid), cacheData({ meta, org, val, quality }));
     // manifest المستند يشير للإصدار الجاهز فقط — آخر خطوة
     if (status !== 'failed') {
-      const ix = await getIndex(); const d = ix.documents[job.document_id];
-      const prev = d.current_version;
-      d.current_version = job.version; d.file_name = job.file_name;
+      const prev = (await getIndex()).documents[job.document_id].current_version;
+      const d = await serial(async () => { const ix = await getIndex(); const dd = ix.documents[job.document_id]; dd.current_version = job.version; dd.file_name = job.file_name; await saveIndex(ix); return dd; });
       await st.putJSON(`${job.document_id}/manifest.json`, { schema: SCHEMA_VERSION, document_id: job.document_id, file_name: job.file_name, current_version: job.version, current_version_id: vid,
         previous_version: prev, versions: d.versions.map(x => ({ n: x.n, version_id: x.version_id, sha256: x.sha256, status: x.n === job.version ? status : x.status, uploaded_at: x.uploaded_at })), updated_at: new Date().toISOString() });
-      await saveIndex(ix);
     }
     job.links = { folder: meta.drive.folder, review_xlsx: written['review.xlsx']?.url, quality_report: written['quality_report.md']?.url, document_md: written['document.md']?.url, original: (await getIndex()).documents[job.document_id].versions.find(x => x.n === job.version)?.original?.url || null };
     job.finished_at = new Date().toISOString();
