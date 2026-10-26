@@ -95,6 +95,41 @@
   body.tbl-cards table{border-collapse:separate;border-spacing:0 8px} body.tbl-cards td{background:color-mix(in srgb,var(--ink) 5%,transparent);border:none}
   body.tbl-cards td:first-child{border-radius:0 10px 10px 0} body.tbl-cards td:last-child{border-radius:10px 0 0 10px} body.tbl-cards th{border:none}
   .ui-flash{animation:uiflash 1s ease-out} @keyframes uiflash{0%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 0 transparent}}
+  /* ===== تحسينات الواجهة وإمكانية الوصول (طبقة العرض فقط) ===== */
+  .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :where(button,select,a[href],input,summary,[tabindex]):focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:8px}
+  .composer input:focus-visible{outline:0}
+  .composer:focus-within{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 55%,transparent),0 10px 30px #0006}
+  .composer{gap:8px}
+  .ic{width:44px;height:44px}
+  .chipbtn,.chipsel{min-height:44px;padding-inline:10px} .chipsel.engine{padding:5px 10px}
+  #crumb{background:none;border:0;cursor:pointer;min-height:44px;padding:0 10px;font-family:inherit;border-radius:8px} #crumb:hover{background:#ffffff0d}
+  /* السجل: لوحة فوق الشريط، والشريط يبقى ظاهر وقابل للكتابة */
+  body.log-open #dock{top:auto;bottom:0;background:var(--bg)}
+  #drawer{max-height:min(55vh,calc(100dvh - 230px))}
+  .dr-head{flex-wrap:wrap} .dr-head select{min-height:44px} .dr-head button{min-height:44px;min-width:44px;display:inline-grid;place-items:center}
+  #log:focus-visible{outline-offset:-2px}
+  .dr-foot{padding:6px 14px 10px;color:var(--mute);font-size:12px;opacity:.7;border-top:1px solid var(--line)} .dr-foot:empty{display:none}
+  .m.tool{align-self:stretch;max-width:100%;background:transparent;border:1px solid var(--line);color:var(--ink);font-size:13px;padding:6px 10px}
+  .m.tool .row{display:flex;align-items:center;gap:8px} .m.tool svg{width:16px;height:16px;flex:none}
+  .m.tool.ok svg{color:var(--ok)} .m.tool.run svg{color:var(--acc)} .m.tool.err svg{color:var(--bad)} .m.tool.run .lbl{color:var(--mute)}
+  .m.tool details{margin-top:0} .m.tool summary{cursor:pointer;color:var(--mute);font-size:12px;min-height:24px;display:inline-flex;align-items:center;padding-inline-start:24px}
+  .tag{white-space:nowrap} .composer input{min-height:44px}
+  .m.tool pre{margin:4px 0 0;padding:8px;background:#0b1d31;border-radius:8px;font-size:11.5px;white-space:pre-wrap;word-break:break-word;max-height:180px;overflow:auto;color:var(--mute);text-align:left}
+  .m.t{font-family:inherit}
+  /* الجداول: تمرير داخل البطاقة بدل ما تطلع برا الشاشة */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  .pct{font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums;min-width:3.2em;text-align:start}
+  .card.sec{min-width:0}
+  @media(max-width:600px){
+    #projects thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+    #projects,#projects tbody{display:block} #projects tr{display:grid;grid-template-columns:1fr auto;gap:6px 12px;padding:12px 0;border-bottom:1px solid var(--line)}
+    #projects td{border:0;padding:0} #projects td.c-id,#projects td.c-dept{display:none}
+    #projects td.c-name{grid-column:1/-1;font-weight:700;font-size:15px}
+    #projects td.c-prog{grid-column:1/-1} #projects td.c-owner{color:var(--mute);font-size:13px}
+    #tickets th.c-id,#tickets td.c-id,#tasks th.c-id,#tasks td.c-id{display:none}
+  }
+  #status .retry{margin-inline-start:8px;background:transparent;border:1px solid var(--acc);color:var(--acc);border-radius:99px;min-height:32px;padding:2px 12px;cursor:pointer;font-size:12px}
 </style>
 <style id="nora-css"></style>
 </head>
@@ -103,7 +138,7 @@
   <img class="logo" src="/brand/fsc-logo-dark.svg" alt="اتحاد الغرف التجارية السعودية">
   <span class="sep"></span>
   <h1>لوحة مشاريع التحول الرقمي</h1>
-  <span id="crumb"></span>
+  <button type="button" id="crumb" aria-label="رجوع للشاشة الأساسية"></button>
   <div class="nora-chip" id="chip"><i></i><b>نورة</b><span>المساعدة الذكية</span></div>
 </header>
 <div id="gate"><form id="gf"><h2 style="text-align:center;color:var(--ink)">🔒 رمز الدخول</h2><input id="code" type="password" placeholder="اكتب الرمز"><button>دخول</button><small id="gerr" style="color:var(--bad)"></small></form></div>
@@ -117,9 +152,9 @@
       <iframe id="fdFrame" title="لوحة الملف"></iframe>
     </div>
     <div class="kpis" id="kpis" data-v="overview" hidden></div>
-    <div class="card sec" data-v="overview projects" hidden><h2>المشاريع</h2><table id="projects"></table></div>
-    <div class="card sec" data-v="overview tickets" hidden><h2>التذاكر</h2><table id="tickets"></table></div>
-    <div class="card sec" data-v="tasks" hidden><h2>مهامي</h2><table id="tasks"></table></div>
+    <div class="card sec" data-v="overview projects" hidden><h2 id="h-projects">المشاريع</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-projects"><table id="projects"></table></div></div>
+    <div class="card sec" data-v="overview tickets" hidden><h2 id="h-tickets">التذاكر</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-tickets"><table id="tickets"></table></div></div>
+    <div class="card sec" data-v="tasks" hidden><h2 id="h-tasks">مهامي</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-tasks"><table id="tasks"></table></div></div>
     <div class="card docs sec" data-v="files" hidden><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
     <div class="card docs sec" data-v="dashboards" hidden><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
     <div class="card docs sec" data-v="memory" hidden><h2>ذاكرة نورة</h2><ul id="mems"><li><small>فاضية. قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li></ul></div>
@@ -127,22 +162,24 @@
   </section>
   <section id="view" hidden></section>
 </main>
-<div id="dock">
-  <div id="drawer" hidden>
-    <div class="dr-head"><b>سجل المحادثة</b><small id="usage" title="توكنز هذي الجلسة"></small><span>صوتها</span><select id="voice" class="chipsel"></select><button id="preview" type="button">▶ اسمعها</button><button id="drClose" type="button">✕</button></div>
-    <div id="log"></div>
+<div id="sr" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="dock" role="region" aria-label="المحادثة مع نورة">
+  <div id="drawer" hidden role="dialog" aria-modal="false" aria-labelledby="drTitle">
+    <div class="dr-head"><b id="drTitle">سجل المحادثة</b><label for="voice">صوتها</label><select id="voice" class="chipsel"></select><button id="preview" type="button" aria-label="اسمع الصوت">▶ اسمعها</button><button id="drClose" type="button" aria-label="إغلاق السجل"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="log" role="log" aria-label="رسائل المحادثة" tabindex="0"></div>
+    <div class="dr-foot"><small id="usage"></small></div>
   </div>
   <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
   <form id="f" class="composer">
-    <button type="button" class="ic" id="attach" title="إرفاق ملف">+</button>
-    <input id="txt" placeholder="اسأل نورة…" autocomplete="off">
-    <select id="engine" class="chipsel engine" title="المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option></select>
-    <button type="button" class="chipbtn" id="logBtn" title="سجل المحادثة">السجل</button>
-    <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
-    <button class="ic send" id="send" title="إرسال" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+    <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <input id="txt" placeholder="اسأل نورة…" autocomplete="off" aria-label="اكتب سؤالك لنورة">
+    <select id="engine" class="chipsel engine" title="المساعد" aria-label="اختيار المساعد"><option value="gemini">نورة</option><option value="eleven">فواز</option></select>
+    <button type="button" class="chipbtn" id="logBtn" aria-expanded="false" aria-controls="drawer">السجل</button>
+    <button type="button" class="ic mic" id="mic" title="تكلّم مع نورة" aria-label="تكلّم مع نورة بالصوت" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></button>
+    <button class="ic send" id="send" title="إرسال" aria-label="إرسال" hidden><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
   </form>
-  <div id="status">اضغط زر الصوت وكلّم نورة، أو اكتب سؤالك</div>
-  <input type="file" id="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
+  <div id="status"><span id="stTxt">اضغط زر الصوت وكلّم نورة، أو اكتب سؤالك</span><button type="button" class="retry" id="retry" hidden>إعادة المحاولة</button></div>
+  <input type="file" id="file" hidden aria-label="اختيار ملف للرفع" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
 </div>
 <script type="module">
 import { GeminiLiveAgent } from './gemini-live-agent.js';
@@ -177,20 +214,21 @@ async function loadDashboard(flash) {
     ['المشاريع', num(d.projects.length)], ['الميزانية (ر.س)', sar(s.total_budget)],
     ['المصروف (ر.س)', sar(s.total_spent)], ['تذاكر مفتوحة', num(s.open_tickets)],
   ].map(([k, v]) => `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join('');
-  $('#projects').innerHTML = '<tr><th>#</th><th>المشروع</th><th>الإدارة</th><th>الحالة</th><th>الإنجاز</th><th>المسؤول</th></tr>' +
-    d.projects.map(p => `<tr><td class="num">${num(p.id)}</td><td>${p.name}</td><td>${p.department}</td><td><span class="tag ${p.status}">${p.status}</span></td>
-      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="flex:1"><i style="width:${p.progress}%"></i></div><small class="num" style="color:var(--mute)">${num(p.progress)}٪</small></div></td><td>${p.owner}</td></tr>`).join('');
-  $('#tickets').innerHTML = '<tr><th>#</th><th>العنوان</th><th>المشروع</th><th>الأولوية</th><th>الحالة</th></tr>' +
-    d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td class="num">${num(t.id)}</td><td>${t.title}</td><td>${t.project_name}</td>
-      <td><span class="tag ${t.priority}">${t.priority}</span></td><td><span class="tag ${t.status}">${t.status}</span></td></tr>`).join('');
+  const TH = cols => `<thead><tr>${cols.map(([c, t]) => `<th scope="col" class="${c}">${t}</th>`).join('')}</tr></thead>`;
+  $('#projects').innerHTML = '<caption class="sr-only">جدول المشاريع: الحالة ونسبة الإنجاز والمسؤول</caption>' + TH([['c-id', '#'], ['c-name', 'المشروع'], ['c-dept', 'الإدارة'], ['c-status', 'الحالة'], ['c-prog', 'الإنجاز'], ['c-owner', 'المسؤول']]) + '<tbody>' +
+    d.projects.map(p => `<tr><td class="num c-id">${num(p.id)}</td><td class="c-name">${esc(p.name)}</td><td class="c-dept">${esc(p.department)}</td><td class="c-status"><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td>
+      <td class="c-prog"><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${+p.progress || 0}" aria-label="نسبة إنجاز ${esc(p.name)}"><i style="width:${+p.progress || 0}%"></i></div><span class="num pct" aria-hidden="true">${num(p.progress)}٪</span></div></td><td class="c-owner">${esc(p.owner)}</td></tr>`).join('') + '</tbody>';
+  $('#tickets').innerHTML = '<caption class="sr-only">جدول التذاكر: المشروع والأولوية والحالة</caption>' + TH([['c-id', '#'], ['', 'العنوان'], ['', 'المشروع'], ['', 'الأولوية'], ['', 'الحالة']]) + '<tbody>' +
+    d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td class="num c-id">${num(t.id)}</td><td>${esc(t.title)}</td><td>${esc(t.project_name)}</td>
+      <td><span class="tag ${esc(t.priority)}">${esc(t.priority)}</span></td><td><span class="tag ${esc(t.status)}">${esc(t.status)}</span></td></tr>`).join('') + '</tbody>';
   if (d.dashboards?.length) $('#dashes').innerHTML = d.dashboards.map(x =>
     `<li><a href="/d/${x.id}" target="_blank" style="color:var(--acc)">#${x.id} ${esc(x.title)}</a><small>${String(x.created_at).slice(0, 16).replace('T', ' ')}</small></li>`).join('');
   if (d.memories?.length) $('#mems').innerHTML = d.memories.map(m =>
     `<li><span><small>[${m.category}]</small> ${esc(m.content)}</span><button class="memdel" data-id="${m.id}" title="انسيها" style="background:none;border:none;color:var(--mute);cursor:pointer">✕</button></li>`).join('');
   else $('#mems').innerHTML = '<li><small>فاضية. قل لها مثلاً: «تذكّري إني أحب التقارير مختصرة بالنقاط»</small></li>';
   const T = d.tasks || [];
-  $('#tasks').innerHTML = T.length ? '<tr><th>#</th><th>المهمة</th><th>الأولوية</th><th>الموعد</th><th>الحالة</th></tr>' + T.map(t =>
-    `<tr style="${t.status === 'منجزة' || t.status === 'ملغاة' ? 'opacity:.5' : ''}"><td class="num">${num(t.id)}</td><td>${esc(t.title)}${t.notes ? `<br><small style="color:var(--mute)">${esc(t.notes)}</small>` : ''}</td><td><span class="tag ${t.priority}">${t.priority}</span></td><td class="num">${t.due_date || '—'}</td><td><span class="tag ${t.status === 'منجزة' ? 'مكتمل' : ''}">${t.status}</span></td></tr>`).join('')
+  $('#tasks').innerHTML = T.length ? '<caption class="sr-only">جدول مهامي</caption>' + TH([['c-id', '#'], ['', 'المهمة'], ['', 'الأولوية'], ['', 'الموعد'], ['', 'الحالة']]) + T.map(t =>
+    `<tr style="${t.status === 'منجزة' || t.status === 'ملغاة' ? 'opacity:.5' : ''}"><td class="num c-id">${num(t.id)}</td><td>${esc(t.title)}${t.notes ? `<br><small style="color:var(--mute)">${esc(t.notes)}</small>` : ''}</td><td><span class="tag ${t.priority}">${t.priority}</span></td><td class="num">${t.due_date || '—'}</td><td><span class="tag ${t.status === 'منجزة' ? 'مكتمل' : ''}">${t.status}</span></td></tr>`).join('')
     : '<tr><td><small style="color:var(--mute)">ما فيه مهام. قل: «سجّل لي مهمة…»</small></td></tr>';
   if (d.dev_requests?.length) $('#devreq').innerHTML = d.dev_requests.map(r =>
     `<li><span>#${r.id} ${esc(r.title)}${r.dev_note ? `<br><small style="color:var(--sand)">✦ Claude: ${esc(r.dev_note)}</small>` : ''}</span><small>${esc(r.status)} · ${(r.updated_at || r.created_at).slice(0, 16)}</small></li>`).join('');
@@ -198,6 +236,85 @@ async function loadDashboard(flash) {
     `<li><span>📄 ${x.drive_url ? `<a href="${x.drive_url}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(x.name)}</a>` : esc(x.name)}${x.category ? ` <span class="tag">${esc(x.category)}</span>` : ''}</span><small>#${x.id}${x.drive_url ? ' · في Drive ✓' : ''}</small></li>`).join('');
 }
 gate();
+
+// ===== حالة الاتصال: رسائل عربية واضحة، والأكواد التقنية للكونسول فقط =====
+const who = () => $('#chip b')?.textContent || 'نورة';
+function announce(msg) { const r = $('#sr'); if (!r || !msg) return; r.textContent = ''; setTimeout(() => { r.textContent = msg; }, 60); }
+function friendlyStatus(t) {
+  t = String(t ?? '');
+  const close = t.match(/^انقطع الاتصال \((\d+)\)/);
+  if (close) { console.info('[nora] websocket closed', close[1]); return +close[1] === 1000 || +close[1] === 1005 ? { text: `${who()} جاهزة، تتصل أول ما تطلب`, live: true } : { text: `انقطع الاتصال بـ${who()}`, retry: true, live: true }; }
+  if (t === 'متصل (نص فقط)') return { text: 'متصل كتابةً، اضغط المايك للصوت', live: true };
+  if (t === 'متوقف') return { text: `${who()} جاهزة، تتصل أول ما تطلب` };
+  if (t === 'جاري الاتصال…') return { text: t, live: true };
+  if (/^⚠️ الجلسة بتنتهي/.test(t)) { console.info('[nora]', t); return { text: 'الجلسة بتتجدد بعد شوي' }; }
+  if (/^❌ /.test(t)) { console.error('[nora]', t.slice(2)); return { text: `تعذّر الاتصال بـ${who()}. تأكد من الإنترنت وجرّب مرة ثانية`, retry: true, live: true }; }
+  if (/^🎙️/.test(t)) return { text: t.replace(/^🎙️\s*/, ''), live: true };
+  return { text: t.replace(/^⚠️\s*/, '') };
+}
+function setStatus(t) {
+  const f = friendlyStatus(t);
+  $('#stTxt').textContent = f.text; $('#retry').hidden = !f.retry;
+  if (f.live) announce(f.text);
+}
+
+// سجل الأدوات: سطر عربي مختصر مع أيقونة، والتفاصيل التقنية (JSON) مخفية داخل «تفاصيل تقنية»
+const ICON = {
+  run: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="4 3"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>',
+  err: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.5"/></svg>',
+};
+// اسم الملف: نعزل «26.pdf» باتجاه يسار-يمين عشان ما ينقلب إلى «pdf.26»
+const short = (x, n = 60) => { x = String(x ?? '').trim(); x = x.length > n ? x.slice(0, n - 1) + '…' : x; return x.replace(/([\d._-]*\.[A-Za-z0-9]{2,5})$/, '\u2066$1\u2069'); };
+const TOOL_AR = {
+  show_screen: [a => `أعرض ${VIEW_LABEL[a.view] || 'القسم'}`, (a, r) => r.error ? null : `عرضت ${VIEW_LABEL[a.view] || r.shown_on_screen || 'القسم'}`],
+  close_visuals: ['أرجع للشاشة الأساسية', 'رجعت للشاشة الأساسية'],
+  find_knowledge: ['أدوّر في مكتبة المعرفة', (a, r) => `جبت ملف: ${short(r.on_screen_source || r.results?.[0]?.title || a.question)}`],
+  search_documents: ['أبحث في الملفات', (a, r) => `بحثت في الملفات${a.query || a.question ? `: ${short(a.query || a.question, 40)}` : ''}`],
+  read_document: ['أقرأ الملف', (a, r) => `قرأت ملف: ${short(r.name || r.title || a.name || a.id, 50)}`],
+  list_documents: ['أجيب قائمة الملفات', 'جبت قائمة الملفات'], find_files: ['أدوّر على الملف', 'جبت الملفات المطابقة'],
+  data_chart: [a => `أرسم: ${short(a.title, 50)}`, (a, r) => `رسمت: ${short(r.title || a.title, 50)}`],
+  query_data: [a => `أحسب: ${short(a.about || a.measure || 'البيانات', 40)}`, (a, r) => `حسبت: ${short(a.about || a.measure || 'البيانات', 40)}`],
+  show_chart: [a => `أعرض: ${short(a.title, 50)}`, (a, r) => `عرضت: ${short(a.title, 50)}`], render_visual: [a => `أعرض: ${short(a.title, 50)}`, (a, r) => `عرضت: ${short(a.title, 50)}`],
+  show_overview: ['أعرض نظرة عامة', 'عرضت نظرة عامة على المشاريع'], show_project_visual: ['أعرض تفاصيل المشروع', 'عرضت تفاصيل المشروع'],
+  remember: ['أحفظ المعلومة', 'حفظتها في الذاكرة'], forget: ['أنسى المعلومة', 'نسيت المعلومة'], recall: ['أرجع للذاكرة', 'رجعت للذاكرة'], list_memories: ['أرجع للذاكرة', 'جبت الذاكرة'],
+  create_ticket: ['أسجّل تذكرة', 'سجّلت تذكرة جديدة'], update_ticket_status: ['أحدّث التذكرة', 'حدّثت حالة التذكرة'], list_tickets: ['أجيب التذاكر', 'جبت التذاكر'],
+  add_task: ['أضيف مهمة', 'أضفت مهمة'], update_task: ['أحدّث المهمة', 'حدّثت المهمة'], list_tasks: ['أجيب المهام', 'جبت المهام'],
+  search_projects: ['أدوّر في المشاريع', 'جبت المشاريع'], get_project_details: ['أجيب تفاصيل المشروع', 'جبت تفاصيل المشروع'], get_dashboard_summary: ['أجيب ملخص اللوحة', 'جبت ملخص اللوحة'], stats: ['أحسب الإحصائيات', 'جبت الإحصائيات'],
+  build_dashboard: ['أبني داشبورد', 'بنيت الداشبورد'], open_dashboard: ['أفتح الداشبورد', 'فتحت الداشبورد'], list_dashboards: ['أجيب الداشبوردات', 'جبت الداشبوردات'],
+  ask_claude: ['أرسل المهمة لـ Claude', 'أرسلت المهمة لـ Claude'], ask_gpt: ['أرسل المهمة لـ GPT', 'أرسلت المهمة لـ GPT'], check_job: ['أشيّك على المهمة', 'شيّكت على المهمة'],
+  request_dev_change: ['أسجّل طلب تطوير', 'سجّلت طلب التطوير'], list_dev_requests: ['أجيب طلبات التطوير', 'جبت طلبات التطوير'],
+  look_at_screen: ['أشوف الشاشة', 'شفت الشاشة'], get_ui_state: ['أشوف إعدادات الواجهة', 'شفت إعدادات الواجهة'], get_token_usage: ['أحسب الاستهلاك', 'جبت استهلاك التوكنز'],
+  open_app: [a => `أفتح ${short(a.app || a.name || 'التطبيق', 30)}`, (a, r) => `فتحت ${short(a.app || a.name || 'التطبيق', 30)}`],
+};
+for (const k of ['set_theme', 'set_colors', 'set_font', 'set_text_size', 'set_table_style', 'set_number_style', 'set_corners', 'apply_custom_css', 'reset_ui', 'undo_ui', 'show_fonts']) TOOL_AR[k] = ['أعدّل شكل الواجهة', k === 'reset_ui' ? 'رجّعت شكل الواجهة الأصلي' : k === 'undo_ui' ? 'تراجعت عن آخر تعديل' : k === 'show_fonts' ? 'عرضت الخطوط' : 'عدّلت شكل الواجهة'];
+const lbl = (v, a, r) => (typeof v === 'function' ? v(a || {}, r || {}) : v);
+const toolRows = new Map();
+function toolRow(fc) {
+  const d = document.createElement('div'); d.className = 'm tool run';
+  d.innerHTML = `<div class="row">${ICON.run}<span class="lbl"></span></div><details><summary>تفاصيل تقنية</summary><pre dir="ltr"></pre></details>`;
+  const m = TOOL_AR[fc.name];
+  d.querySelector('.lbl').textContent = (m && lbl(m[0], fc.args)) || 'أنفّذ طلبك';
+  d.querySelector('pre').textContent = `${fc.name}(${JSON.stringify(fc.args || {}, null, 1)})`;
+  $('#log').append(d); $('#log').scrollTop = 1e9; trimLog();
+  toolRows.set(fc.id || fc.name, d);
+  return d;
+}
+function toolDone(fc, r) {
+  const key = fc.id || fc.name; const d = toolRows.get(key) || toolRow(fc); toolRows.delete(key);
+  const err = r && (r.error || r.ok === false);
+  const m = TOOL_AR[fc.name];
+  d.className = 'm tool ' + (err ? 'err' : 'ok');
+  d.querySelector('svg').outerHTML = err ? ICON.err : ICON.ok;
+  d.querySelector('.lbl').textContent = err ? `ما قدرت أكمل: ${short(r.error || 'خطأ غير معروف', 70)}` : ((m && lbl(m[1], fc.args, r)) || 'نفّذت طلبك');
+  d.querySelector('pre').textContent += `\n→ ${JSON.stringify(r, null, 1)?.slice(0, 3000) ?? ''}`;
+}
+function errorRow(e) {
+  console.error('[nora] error', e);
+  const d = toolRow({ name: 'error', args: {} }); toolRows.delete('error');
+  d.className = 'm tool err'; d.querySelector('svg').outerHTML = ICON.err; d.querySelector('.lbl').textContent = 'صار خطأ أثناء التنفيذ';
+  d.querySelector('pre').textContent = JSON.stringify(e, null, 1) || String(e);
+}
 
 // فقاعات المحادثة: نجمع أجزاء الترانسكربت في نفس الفقاعة لين ينتهي الدور
 let cur = { u: null, a: null };
@@ -221,9 +338,16 @@ function caption(kind, text) {
   c.querySelector(kind === 'u' ? '.cu' : '.ca').textContent = text; c.hidden = false; c.scrollTop = 1e9;
 }
 function captionDone() { const c = $('#caption'); c.dataset.done = 1; clearTimeout(capTimer); capTimer = setTimeout(() => { c.hidden = true; c.querySelector('.cu').textContent = ''; c.querySelector('.ca').textContent = ''; }, 14000); }
-const openLog = open => { $('#drawer').hidden = !open; if (open) { $('#caption').hidden = true; $('#log').scrollTop = 1e9; } };
+// السجل لوحة فوق الشريط: الشريط يبقى ظاهر، Esc أو الضغط برا يقفلها، والتركيز يرجع لزر «السجل»
+const openLog = (open, refocus = false) => {
+  $('#drawer').hidden = !open; $('#logBtn').setAttribute('aria-expanded', String(open)); document.body.classList.toggle('log-open', open);
+  if (open) { $('#caption').hidden = true; $('#log').scrollTop = 1e9; }
+  else if (refocus) $('#logBtn').focus();
+};
 $('#logBtn').onclick = () => openLog($('#drawer').hidden);
-$('#drClose').onclick = () => openLog(false);
+$('#drClose').onclick = () => openLog(false, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#drawer').hidden) { e.preventDefault(); openLog(false, true); } });
+document.addEventListener('pointerdown', e => { if (!$('#drawer').hidden && !e.target.closest('#drawer, #logBtn, #f, #status')) openLog(false); });
 $('#caption').onclick = () => openLog(true);
 $('#txt').addEventListener('input', () => { $('#send').hidden = !$('#txt').value.trim(); });
 function note(text) { $('#log').append(Object.assign(document.createElement('div'), { className: 'm t', textContent: text })); $('#log').scrollTop = 1e9; trimLog(); }
@@ -237,6 +361,7 @@ function renderView() {
   $('#empty').hidden = !!VIEW;
   document.body.classList.toggle('blank', !VIEW && $('#view').hidden);
   $('#crumb').textContent = VIEW ? '‹ ' + VIEW_LABEL[VIEW] : '';
+  if (VIEW !== renderView.last) { if (VIEW) announce(`تم عرض ${VIEW_LABEL[VIEW]}`); else if (renderView.last) announce('رجعت للشاشة الأساسية'); renderView.last = VIEW; }
 }
 window.showView = v => {
   if (!VIEW_LABEL[v]) return { error: 'قسم غير معروف' };
@@ -249,7 +374,7 @@ const hud = createHUD({
   api: async (url, body) => (await api(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})).json(),
   mount: {
     el: $('#view'),
-    show: title => { $('#home').hidden = true; $('#view').hidden = false; document.body.classList.remove('blank'); $('#crumb').textContent = '‹ ' + title; scrollTo({ top: 0, behavior: 'smooth' }); },
+    show: title => { $('#home').hidden = true; $('#view').hidden = false; document.body.classList.remove('blank'); $('#crumb').textContent = '‹ ' + title; announce(`تم عرض ${title}`); scrollTo({ top: 0, behavior: 'smooth' }); },
     home: () => { $('#view').hidden = true; $('#home').hidden = false; VIEW = null; renderView(); },
   },
 });
@@ -344,6 +469,7 @@ function dashWaiting(name) {
 }
 $('#fdHide').onclick = () => { VIEW = null; renderView(); };
 $('header.top h1').onclick = () => { hud.closeAll(); VIEW = null; renderView(); };
+$('#crumb').onclick = () => { hud.closeAll(); VIEW = null; renderView(); };
 addEventListener('message', e => { if (e.origin === location.origin && e.data?.noraDashHeight) $('#fdFrame').style.height = Math.min(Math.max(e.data.noraDashHeight, 300), 3000) + 'px'; });
 async function loadCurrentDash() {
   try { const c = await apiJson('/api/current-dash'); if (c?.id) showDash(c.id, c.title, c.doc_name ? 'من ملف: ' + c.doc_name : '', false, false); } catch {}
@@ -429,14 +555,14 @@ const agentOpts = {
   headers: H,
   clientTools: { ...hud.tools, ...ui.tools, ...assistant.tools, ...screenTools, ...screenToolsExtra, show_chart: freshOnly(hud.tools.show_chart) },
   on: {
-    status: t => { $('#status').textContent = t; setTimeout(() => $('#chip').classList.toggle('on', !!agent.connected), 0); },
-    closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); $('#chip').classList.remove('on'); },
+    status: t => { setStatus(t); setTimeout(() => $('#chip').classList.toggle('on', !!agent.connected), 0); },
+    closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); $('#mic').setAttribute('aria-pressed', 'false'); $('#chip').classList.remove('on'); },
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
     modelText: t => { pend.a += t; bubble('a', t); cur.u = null; hud.highlight(pend.a.slice(-220)); },
     turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
-    toolCall: fc => note((fc.name.startsWith('show_') || fc.name === 'render_visual') ? `عرض: ${fc.args?.title || VIEW_LABEL[fc.args?.view] || fc.name.replace('show_', '')}` : `🔧 ${fc.name}(${JSON.stringify(fc.args || {})})`),
-    toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; note(`✅ ${JSON.stringify(r).slice(0, 160)}`); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
-    error: e => note('❌ ' + JSON.stringify(e)),
+    toolCall: fc => toolRow(fc),
+    toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; toolDone(fc, r); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
+    error: e => errorRow(e),
     usage: u => trackUsage(u),
     level: v => $('#mic').style.boxShadow = `0 0 0 ${Math.round(v * 30)}px #e0705f33`,
   },
@@ -446,7 +572,7 @@ let USAGE = { input: 0, output: 0, total: 0 }, usagePend = null, usageTimer;
 function trackUsage(u) {
   for (const k of ['input', 'output', 'total']) USAGE[k] += u[k] || 0;
   usagePend ||= { input: 0, output: 0, total: 0 }; for (const k of ['input', 'output', 'total']) usagePend[k] += u[k] || 0;
-  $('#usage').textContent = `التوكنز: ${num(USAGE.total)}`;
+  $('#usage').textContent = `استهلاك هذي الجلسة: ${num(USAGE.total)} توكن`;
   clearTimeout(usageTimer); usageTimer = setTimeout(() => { const d = usagePend; usagePend = null; apiJson('/api/usage', { chatId: agent.chatId, engine: ENGINE, ...d }).catch(() => {}); }, 1500);
 }
 let ENGINE = 'gemini'; try { ENGINE = localStorage.getItem('noraEngine') || 'gemini'; } catch {}
@@ -475,7 +601,7 @@ async function fillVoices() {
   if (ENGINE === 'eleven') {
     try {
       const r = await apiJson('/api/eleven/voices');
-      if (!r.ready) { $('#voice').innerHTML = '<option value="">المحرك غير مفعّل</option>'; $('#status').textContent = '⚠️ صوت فواز يحتاج تفعيل المفتاح في السيرفر'; return; }
+      if (!r.ready) { $('#voice').innerHTML = '<option value="">المحرك غير مفعّل</option>'; setStatus('⚠️ صوت فواز يحتاج تفعيل المفتاح في السيرفر'); return; }
       ELEVEN_VOICES = r.voices || [];
       if (!EVOICE) EVOICE = r.default || ELEVEN_VOICES[0]?.id || '';
       $('#voice').innerHTML = ELEVEN_VOICES.map(v => `<option value="${v.id}">${esc(v.name.split(' - ')[0])}${v.lang ? ' · ' + v.lang : ''}${v.gender === 'female' ? ' ♀' : v.gender === 'male' ? ' ♂' : ''}</option>`).join('');
@@ -488,12 +614,12 @@ async function fillVoices() {
 }
 $('#engine').value = ENGINE;
 $('#engine').onchange = async () => {
-  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); }
+  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); $('#mic').setAttribute('aria-pressed', 'false'); }
   ENGINE = $('#engine').value; try { localStorage.setItem('noraEngine', ENGINE); } catch {}
   agent = makeAgent(ENGINE);
   applyPersona();
   note(`⚙️ المساعد صار: ${ENGINE === 'eleven' ? 'فواز' : 'نورة'}`);
-  $('#status').textContent = `${ENGINE === 'eleven' ? 'فواز' : 'نورة'} جاهز${ENGINE === 'eleven' ? '' : 'ة'}، اضغط زر الصوت أو اكتب`;
+  setStatus(`${ENGINE === 'eleven' ? 'فواز' : 'نورة'} جاهز${ENGINE === 'eleven' ? '' : 'ة'}، اضغط زر الصوت أو اكتب`);
   await fillVoices();
 };
 fillVoices();
@@ -501,7 +627,7 @@ $('#voice').onchange = async () => {
   VOICE = $('#voice').value;
   try { if (ENGINE === 'eleven') { EVOICE = VOICE; localStorage.setItem('noraVoiceEleven', VOICE); } else { GVOICE = VOICE; localStorage.setItem('noraVoice', VOICE); } } catch {}
   note(`🎙️ صوت نورة صار: ${$('#voice').selectedOptions[0]?.textContent || VOICE}`);
-  if (running) { endChat(); agent.stop(); try { await agent.start({ voice: VOICE }); } catch (e) { $('#status').textContent = '❌ ' + e.message; running = false; $('#mic').classList.remove('on'); } }
+  if (running) { endChat(); agent.stop(); try { await agent.start({ voice: VOICE }); } catch (e) { setStatus('❌ ' + e.message); running = false; $('#mic').classList.remove('on'); $('#mic').setAttribute('aria-pressed', 'false'); } }
 };
 // معاينة الصوت: جملة قصيرة عبر Gemini TTS بنفس الصوت
 $('#preview').onclick = async () => {
@@ -521,13 +647,17 @@ $('#preview').onclick = async () => {
   $('#preview').disabled = false;
 };
 $('#mic').onclick = async () => {
-  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); if (pendingReload) location.reload(); return; }
-  try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); }
-  catch (e) { $('#status').textContent = '❌ ' + e.message; }
+  if (running) { endChat(); agent.stop(); running = false; $('#mic').classList.remove('on'); $('#mic').setAttribute('aria-pressed', 'false'); if (pendingReload) location.reload(); return; }
+  try { await agent.start({ mode: MODE, voice: VOICE }); running = true; $('#mic').classList.add('on'); $('#mic').setAttribute('aria-pressed', 'true'); }
+  catch (e) { setStatus('❌ ' + e.message); }
+};
+$('#retry').onclick = async () => {
+  setStatus('جاري الاتصال…');
+  try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); }
 };
 $('#f').onsubmit = async e => {
   e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return;
-  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { $('#status').textContent = '❌ ' + err.message; return; } }
+  if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch (err) { setStatus('❌ ' + err.message); return; } }
   agent.sendText(t); $('#txt').value = ''; $('#send').hidden = true;
 };
 
@@ -569,18 +699,18 @@ function connectLive() {
   const es = window.__live = new EventSource(`/api/events?code=${encodeURIComponent(CODE)}`);
   es.addEventListener('hello', e => {
     const { boot } = JSON.parse(e.data);
-    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; $('#status').textContent = 'فيه تحديث جديد، ينطبق بعد ما تخلص المحادثة'; } else location.reload(); }
+    if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; setStatus('فيه تحديث جديد، ينطبق بعد ما تخلص المحادثة'); } else location.reload(); }
     BOOT ||= boot;
   });
   es.addEventListener('data', () => { clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });
   es.addEventListener('job', async e => {
     const j = JSON.parse(e.data);
     const who = j.kind === 'gpt' ? 'GPT' : 'Claude';
-    if (j.status === 'قيد التنفيذ') { $('#status').textContent = `${who} شغال: ${j.step?.text || '…'}`; return; }
+    if (j.status === 'قيد التنفيذ') { setStatus(`${who} شغال: ${j.step?.text || '…'}`); return; }
     note(`${who} خلّص المهمة #${j.id} (${j.status})`);
     // النتيجة تطلع على الشاشة بنفس وقت ما نورة تقولها
     if (j.result) hud.showNote({ eyebrow: `نتيجة ${who}`, title: `مهمة #${j.id}`, subtitle: j.status, text: j.result });
-    $('#status').textContent = `${who} خلّص المهمة #${j.id}`;
+    setStatus(`${who} خلّص المهمة #${j.id}`);
     const msg = `[تنبيه النظام] ${who} خلّص المهمة رقم ${j.id} (${j.status}). النتيجة: ${String(j.result || '').slice(0, 1500)}\nقولي لفواز النتيجة باختصار بصوتك.`;
     if (!running || !agent.connected) { try { await agent.start({ mic: false, mode: MODE, voice: VOICE }); running = true; } catch { return; } }
     agent.sendText(msg, { silent: true });
@@ -598,6 +728,16 @@ const FIXTURES = {
   line: () => screenToolsExtra.data_chart({ title: 'الطلبات شهرياً', chart_type: 'line', group_by: 'تاريخ الطلب', date_unit: 'month', about: 'الطلبات' }),
   note: () => screenToolsExtra.find_knowledge({ question: 'وش النطاق السعري المقترح للمسار السريع' }),
   note2: () => screenToolsExtra.find_knowledge({ question: 'كيف ينبّه الموظف لما يجيه طلب مستعجل؟' }),
+};
+// عيّنة سجل لاختبار الواجهة (نفس كود السجل الحقيقي)
+window.__noraLogDemo = () => {
+  bubble('u', 'اعرضي لي المشاريع', false);
+  const f1 = { id: 'd1', name: 'show_screen', args: { view: 'overview' } }; toolRow(f1); toolDone(f1, { shown_on_screen: 'لوحة المشاريع' });
+  bubble('a', 'تفضّل، هذي المشاريع قدامك.', false);
+  const f2 = { id: 'd2', name: 'close_visuals', args: {} }; toolRow(f2); toolDone(f2, { back_to_main_screen: true });
+  const f3 = { id: 'd3', name: 'find_knowledge', args: { question: 'الخطة الاستراتيجية' } }; toolRow(f3); toolDone(f3, { results: [{ id: 'doc:8', title: 'الخطة الاستراتيجية والمهام 26.pdf' }], on_screen_source: 'الخطة الاستراتيجية والمهام 26.pdf' });
+  const f4 = { id: 'd4', name: 'data_chart', args: { title: 'توزيع الأعمال الجارية' } }; toolRow(f4); toolDone(f4, { error: 'ما لقيت جدول بهذا الاسم' });
+  cur = { u: null, a: null };
 };
 const FIX = new URLSearchParams(location.search).get('fixture');
 if (FIX && FIXTURES[FIX]) Promise.resolve().then(FIXTURES[FIX]).then(r => { window.__fxResult = r; }).catch(e => console.error('fixture', e)).finally(() => { document.documentElement.dataset.fixture = 'ready'; });

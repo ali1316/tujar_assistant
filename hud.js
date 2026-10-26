@@ -14,7 +14,7 @@ const CSS = `
 .hud .eyebrow::before{content:"";display:inline-block;width:6px;height:6px;background:var(--c);border-radius:1px;margin-inline-end:8px;vertical-align:middle}
 .hud h3{margin:6px 0 0;font-size:clamp(18px,4.8vw,24px);line-height:1.35;font-weight:700;color:#fff;text-wrap:balance}
 .hud .sub{color:var(--mt);font-size:13px;margin-top:4px}
-.hud .x{background:transparent;border:1px solid #2b4a6c;color:var(--c);border-radius:8px;padding:6px 12px;min-height:36px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
+.hud .x{background:transparent;border:1px solid #2b4a6c;color:var(--c);border-radius:8px;padding:6px 14px;min-height:44px;cursor:pointer;font:inherit;font-size:13px;flex:none;white-space:nowrap}
 .hud .x:hover{background:rgba(209,166,92,.12)}
 .hud .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .hud .cell{border:1px solid var(--ln);background:#0b1d31;border-radius:10px;padding:14px;min-width:0;opacity:0;animation:hud-cell .45s ease-out both}
@@ -95,7 +95,7 @@ export function createHUD({ api, mount }) {
     [...panels].forEach(p => close(p, true));
     const el = document.createElement('section');
     el.className = 'hud';
-    el.innerHTML = `<header><div><div class="eyebrow"></div><h3></h3><div class="sub"></div></div><button class="x" type="button">رجوع للرئيسية</button></header><div class="body"></div>`;
+    el.innerHTML = `<header><div><div class="eyebrow"></div><h3></h3><div class="sub"></div></div><button class="x" type="button" aria-label="رجوع للشاشة الأساسية">رجوع للرئيسية</button></header><div class="body"></div>`;
     el.querySelector('.eyebrow').textContent = EYEBROW[eyebrow] || eyebrow;
     el.querySelector('h3').textContent = title;
     el.querySelector('.sub').textContent = sub || '';
