@@ -68,6 +68,8 @@ const para = await Q.tools.pdf_find_value.run({ query: 'المستخدمين ا�
 ok('قيمة داخل فقرة', para.matches?.some(m => m.value === truth.active_users), JSON.stringify(para.matches?.[0]?.raw));
 const foot = await Q.tools.pdf_find_value.run({ query: 'الربع الثاني البالغ' });
 ok('قيمة داخل حاشية', foot.matches?.some(m => m.value === truth.prev_quarter && m.source_type === 'footnote'));
+const footOnly = await Q.tools.pdf_find_value.run({ query: 'الرقم في الحاشية' });
+ok('البحث في الحواشي فقط عند ذكر «الحاشية»', footOnly.matches?.length && footOnly.matches.every(m => m.source_type === 'footnote'), footOnly.matches?.map(m => m.source_type).join(','));
 const cell = await Q.tools.pdf_find_value.run({ query: 'غرفة جدة عدد الخدمات' });
 ok('قيمة داخل جدول', cell.matches?.some(m => m.value === 1137 && m.source_type === 'table'));
 const sum = await Q.tools.pdf_metric.run({ dataset: data.datasets[0].id, measure: 'عدد الخدمات', agg: 'sum' });
@@ -133,6 +135,12 @@ ok('إعادة المعالجة تنشئ إصداراً جديداً وتبقي 
   ok('أعمدة مرقّمة باللوحة «(1)/(2)» تُفك بأسمائها الأصلية', v5.unstacked?.panels === 2 && v5.columns.map(c => c.name).join('|') === names.join('|') && v5.rows.length === 4 && v5.row_kinds[1] === 'detail', v5.columns.map(c => c.name).join('|'));
   const years = unstackRepeated({ columns: ['البند', '2025', '2026'].map(name => ({ name })), header_rows: [], rows: [['أ', '1', '2']], row_kinds: ['detail'] });
   ok('أعمدة سنوات لا تُعامل كلوحات', !years.unstacked && years.columns.length === 3);
+}
+
+// 13) الوحدة: المطبوعة فقط، بدون شرح المحرك (حالة حقيقية من v6)
+{
+  const { literalUnit } = await import('../ingest/extract.js');
+  ok('الوحدة تُحفظ حرفياً وتُحذف الشروح', literalUnit('ريال') === 'ريال' && literalUnit('بالآلاف') === 'بالآلاف' && literalUnit('عدد / فرد / معاملة (غير محدد صراحة في الجدول)') === '' && literalUnit('') === '');
 }
 
 // 10) استدعاء رؤية معلّق لا يوقف المهمة: مهلة ثم خطأ واضح
