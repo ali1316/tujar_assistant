@@ -185,3 +185,14 @@ test('فواز speaks with his cloned voice through v4 Turbo', async () => {
   assert.ok(E.ttsRequest({ text: 'هلا', voice: E.voiceFor('fawaz') }).url.includes('/si9mYqRfqKHdK2kDRssy/'));
   assert.match(personaBlock('fawaz'), /فواز/); assert.match(personaBlock('fawaz'), /مذكر/);
 });
+test('pdf_dashboard result is shown on the main screen (was built but never displayed)', async () => {
+  const shown = []; globalThis.window = { showDash: async (id, title) => { shown.push([id, title]); return { shown_on_screen: title }; } };
+  const { createAssistant } = await import('../assistant.js');
+  const calls = []; const api = async (url, body) => { calls.push(url); return { ok: true, id: 41, value: 753974 }; };
+  const a = createAssistant({ api, note: () => {} });
+  const r = await a.tools.pdf_dashboard({ dataset: 'pdf-x@v1#ds02', title: 'مبالغ الاشتراكات' });
+  assert.deepEqual(calls, ['/api/tools/pdf_dashboard']);
+  assert.deepEqual(shown, [[41, 'مبالغ الاشتراكات']]);
+  assert.equal(r.shown_on_screen, 'مبالغ الاشتراكات'); assert.equal(r.value, 753974);
+  delete globalThis.window;
+});
