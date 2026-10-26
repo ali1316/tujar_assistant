@@ -1,5 +1,6 @@
 // ذاكرة المحادثات: كل كلمة بين فواز ونورة تنحفظ، ونورة تقرأ آخرها مع بداية كل جلسة،
 // ومراجعة تلقائية (Gemini Flash) تلخّص الجلسة وتستخرج التفضيلات والتعليمات وتحفظها في الذاكرة الدائمة.
+import { stripToolTags } from './text-guard.js';
 import { chatStart, chatAppend, chatTurns, chatRecentTurns, chatSessions, chatPending, chatSetDigest, chatGet, chatSearchText, memAll } from './store.js';
 import { memoryTools, embed, cos, CATEGORIES } from './memory.js';
 
@@ -76,7 +77,7 @@ const when = d => { try { return new Date(d.endsWith?.('Z') || d instanceof Date
 export async function historyBlock() {
   const sessions = (await chatSessions(6)).filter(s => s.summary);
   const recent = await chatRecentTurns(40);
-  let raw = recent.map(t => `${t.role === 'user' ? 'فواز (سابقاً)' : 'نورة (سابقاً)'}: ${t.text.replace(/⟨نفّذت ([a-z_]+)[^⟩]*⟩/g, '[استخدمت $1]')}`).join('\n');
+  let raw = recent.map(t => `${t.role === 'user' ? 'فواز (سابقاً)' : 'نورة (سابقاً)'}: ${stripToolTags(t.text)}`).join('\n');
   if (raw.length > 6000) raw = '…' + raw.slice(-6000);
   const now = new Date().toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh', dateStyle: 'full', timeStyle: 'short' });
   return `\n\n## الوقت الحالي\n${now} (توقيت الرياض)` +
@@ -101,7 +102,7 @@ export const historyTools = {
         .sort((a, b) => b.score - a.score).slice(0, 4).filter(s => s.score > 0.3);
       const words = query.split(/\s+/).filter(w => w.length > 2).slice(0, 4);
       const lines = [];
-      for (const w of words) for (const t of await chatSearchText(w, 5)) if (lines.length < 12 && !lines.some(l => l.text === t.text)) lines.push({ session: t.session_id, who: t.role === 'user' ? 'فواز' : 'نورة', text: t.text.slice(0, 300), date: when(t.created_at) });
+      for (const w of words) for (const t of await chatSearchText(w, 5)) if (lines.length < 12 && !lines.some(l => l.text === t.text)) lines.push({ session: t.session_id, who: t.role === 'user' ? 'فواز' : 'نورة', text: stripToolTags(t.text).slice(0, 300), date: when(t.created_at) });
       return { sessions: sessions.map(({ score, ...s }) => ({ ...s, score: +score.toFixed(2) })), lines };
     },
   },

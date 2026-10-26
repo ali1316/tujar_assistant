@@ -247,6 +247,16 @@
   /* الشاشة الفاضية: الترحيب وشريط الكتابة ينزلون بمقدار تداخلهم مع شريط الرحلة فقط */
   body.blank #empty,body.blank #dock{translate:0 var(--jr-push,0px);transition:translate .3s ease}
   @media(max-width:700px){.jr.mini .jr-tt b{display:none}}
+  /* وضع محمي: الحفظ الدائم متوقف */
+  #persistBar { position: sticky; top: var(--hdr-h, 64px); z-index: 30; background: #7f1d1d; color: #fff; padding: 10px 16px; font-size: 14px; text-align: center; }
+  #persistBar[hidden] { display: none; }
+  /* انتظار الاختصارات: الزر مشغول + بطاقة «جاري تجهيز…» مكان النتيجة */
+  .qa-btn[aria-busy="true"]{opacity:.7;cursor:progress}
+  .qa-btn[aria-busy="true"] svg{animation:qaSpin 1s linear infinite}
+  @keyframes qaSpin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.qa-btn[aria-busy="true"] svg{animation:none}}
+  #qaSkel{margin:18px auto 0;max-width:560px;padding:14px 18px;border-radius:14px;border:1px dashed color-mix(in srgb,var(--acc) 60%,transparent);color:var(--ink);font-size:15px;text-align:center}
+  #qaSkel[hidden]{display:none} #qaSkel button{margin-inline-start:10px;min-height:44px;padding:0 16px;border-radius:99px;border:1px solid var(--acc);background:none;color:var(--ink);font:inherit;cursor:pointer}
 </style>
 <style id="nora-css"></style>
 </head>
@@ -262,6 +272,7 @@
   <span class="sep sep2" aria-hidden="true"></span>
   <div class="nora-chip" id="chip"><i></i><b>نورة</b><span>· جاهزة للمساعدة</span></div>
 </header>
+<div id="persistBar" role="alert" hidden></div>
 <div class="bg-art" aria-hidden="true">
   <img class="wm wm-fsc" src="/brand/fsc-logo-white.svg" alt="">
   <img class="wm wm-tj" src="/brand/tujar-logo-white.png" alt="">
@@ -283,7 +294,8 @@
         <button type="button" class="qa-btn" data-say="اعرضي لي المشاريع"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 20V12M12 20V5M18 20v-9"/></svg>اعرض المشاريع</button>
         <button type="button" class="qa-btn" data-act="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>حلّل ملفاً</button>
         <button type="button" class="qa-btn" data-say="اعرضي لي الداشبوردات"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>افتح لوحة</button>
-      </div></div>
+      </div>
+      <div id="qaSkel" role="status" aria-live="polite" hidden></div></div>
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
@@ -328,6 +340,7 @@ import { createHUD } from './hud.js';
 import { sayScript } from './speech.js';
 import { createUIControl } from './ui-control.js';
 import { createAssistant } from './assistant.js';
+import { stripToolTags, claimsScreen, SCREEN_TOOL } from './text-guard.js';
 const $ = s => document.querySelector(s);
 const sar = n => new Intl.NumberFormat(window.NORA_NUMERALS === 'latin' ? 'ar-SA-u-nu-latn' : 'ar-SA').format(n ?? 0);
 const num = n => window.NORA_NUMERALS === 'latin' ? String(n) : sar(n);
@@ -392,10 +405,13 @@ function friendlyStatus(t) {
   if (/^🎙️/.test(t)) return { text: t.replace(/^🎙️\s*/, ''), live: true };
   return { text: t.replace(/^⚠️\s*/, '') };
 }
+let qaTimer = null, qaBtn = null; // حالة انتظار الاختصارات (معرّفة هنا لأن setStatus يستخدمها من بداية التشغيل)
 function setStatus(t) {
   const f = friendlyStatus(t);
   $('#stTxt').textContent = f.text; $('#retry').hidden = !f.retry;
   if (f.live) announce(f.text);
+  // اختصار ينتظر والاتصال فشل → نوقف الانتظار ونعرض الخطأ الحقيقي (مو «ما وصل رد»)
+  if (qaBtn && /^❌/.test(String(t))) { qaBusy(null, false, f.text); qaBtn = null; }
 }
 
 // سجل الأدوات: سطر عربي مختصر مع أيقونة، والتفاصيل التقنية (JSON) مخفية داخل «تفاصيل تقنية»
@@ -493,7 +509,8 @@ const openLog = (open, refocus = false) => {
 };
 $('#logBtn').onclick = () => openLog($('#drawer').hidden);
 $('#drClose').onclick = () => openLog(false, true);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#drawer').hidden) { e.preventDefault(); openLog(false, true); } });
+// Esc والسجل مفتوح يقفل السجل بس — لا يوصل لمستمع الشاشة (كان يقفل المعروض معه). capture عشان يسبق مستمع hud
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#drawer').hidden) { e.preventDefault(); e.stopImmediatePropagation(); openLog(false, true); } }, true);
 document.addEventListener('pointerdown', e => { if (!$('#drawer').hidden && !e.target.closest('#drawer, #logBtn, #f, #status')) openLog(false); });
 $('#caption').onclick = () => openLog(true);
 $('#txt').addEventListener('input', () => { $('#send').setAttribute('aria-disabled', String(!$('#txt').value.trim())); });
@@ -549,6 +566,13 @@ const freshOnly = fn => args => turnTools.some(t => DATA_TOOLS.test(t))
   ? fn(args)
   : { error: 'مرفوض: الأرقام لازم تنجلب من الأدوات الحين (data_chart لبيانات الملف، أو أدوات المشاريع/التذاكر)، مو من ذاكرة المحادثة. اجلبيها أول، بعدين اعرضي — ولو السؤال عن ملف استخدمي data_chart مباشرة لأنه يرسم بنفسه.' };
 function guardTurn(nora) {
+  // قال «قدامك/على الشاشة» وما اشتغلت أي أداة عرض → ننبه فواز ونطلب التنفيذ مرة وحدة
+  if (claimsScreen(stripToolTags(nora)) && !turnTools.some(t => SCREEN_TOOL.test(t)) && !nudged && agent.connected) {
+    nudged = true;
+    note('⚠️ قال إنها معروضة لكن ما انعرض شي — طلبت منه ينفّذ العرض فعلاً');
+    agent.sendText('[تنبيه النظام] قلت إن الشي معروض لكن ما استدعيت أداة عرض. استدعِ الأداة الحين بدون كلام زيادة.', { silent: true });
+    return;
+  }
   const wantsDash = /داش\s?بورد|dashboard|لوحة بيانات/i.test(lastUser);
   const claimed = /تم|بنيت|سويت|سوّيت|انبنى|جاهز/.test(nora);
   if (wantsDash && claimed && !turnTools.includes('build_dashboard') && !nudged && agent.connected) {
@@ -724,7 +748,7 @@ const screenTools = {
   },
 };
 
-window.__nora = { screenTools, ui, agent: () => agent, connected: () => !!agent?.connected };
+window.__nora = { screenTools, ui, hud, status: t => setStatus(t), agent: () => agent, connected: () => !!agent?.connected };
 // محركين للمقارنة: Gemini Live أو ElevenLabs Realtime — نفس نورة ونفس الأدوات والشاشة والذاكرة
 const agentOpts = {
   headers: H,
@@ -733,8 +757,8 @@ const agentOpts = {
     status: t => { setStatus(t); setTimeout(() => $('#chip').classList.toggle('on', !!agent.connected), 0); },
     closed: () => { endChat(); running = false; $('#mic').classList.remove('on'); $('#mic').setAttribute('aria-pressed', 'false'); $('#chip').classList.remove('on'); },
     userText: (t, typed) => { if (pend.a.trim()) saveTurns(); if (!pend.u) { turnTools = []; nudged = false; lastUser = ''; } lastUser += t; pend.u += (typed && pend.u ? '\n' : '') + t; if (typed) { cur.u = null; } bubble('u', t); cur.a = null; },
-    modelText: t => { pend.a += t; bubble('a', t); cur.u = null; hud.highlight(pend.a.slice(-220)); },
-    turnComplete: () => { guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
+    modelText: raw => { const t = stripToolTags(raw, { trim: false }); if (!t) return; pend.a += t; bubble('a', t); cur.u = null; hud.highlight(pend.a.slice(-220)); },
+    turnComplete: () => { if (qaBtn) { qaBusy(null, false); qaBtn = null; } guardTurn(pend.a); saveTurns(); cur = { u: null, a: null }; captionDone(); },
     toolCall: fc => toolRow(fc),
     toolResult: (fc, r) => { turnTools.push(fc.name); pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `; toolDone(fc, r); if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) loadDashboard(r.ticket_id || fc.args?.ticket_id); },
     error: e => errorRow(e),
@@ -765,11 +789,16 @@ let EVOICE = ''; try { EVOICE = localStorage.getItem('noraVoiceEleven') || ''; }
 let ELEVEN_VOICES = [];
 let VOICE = ENGINE === 'eleven' ? EVOICE : GVOICE;
 // الاسم يتبع المحرك: Gemini = نورة، ElevenLabs = فواز (بصوته)
+// مصدر واحد للاسم والتذكير/التأنيث: كل نص في الواجهة (وأسماء قارئ الشاشة) يُشتق منه
+const PERSONA = { gemini: { name: 'نورة', fem: true }, eleven: { name: 'فواز', fem: false } };
 function applyPersona() {
-  const eleven = ENGINE === 'eleven';
+  const eleven = ENGINE === 'eleven', P = PERSONA[ENGINE] || PERSONA.gemini, f = (m, w) => P.fem ? w : m;
   document.body.classList.toggle('eng-eleven', eleven);
-  $('#chip b').textContent = eleven ? 'فواز' : 'نورة';
-  $('#txt').placeholder = eleven ? 'اسأل فواز…' : 'اسأل نورة…';
+  $('#chip b').textContent = P.name; $('#chip span').textContent = `· ${f('جاهز', 'جاهزة')} للمساعدة`;
+  $('#txt').placeholder = `اسأل ${P.name}…`; $('#txt').setAttribute('aria-label', `اكتب سؤالك لـ${P.name}`);
+  $('#mic').title = `تكلّم مع ${P.name}`; $('#mic').setAttribute('aria-label', `تكلّم مع ${P.name} بالصوت`);
+  for (const o of $('#engine').options) o.textContent = `المساعد: ${PERSONA[o.value]?.name || o.value}`;
+  document.querySelectorAll('.qa-btn[data-say]').forEach(b => { b.dataset.say = b.dataset.say.replace(/^اعرض(ي)? لي/, f('اعرض لي', 'اعرضي لي')); });
 }
 applyPersona();
 async function fillVoices() {
@@ -827,8 +856,22 @@ $('#mic').onclick = async () => {
   catch (e) { setStatus('❌ ' + e.message); }
 };
 // اختصارات الشاشة الأولى: ترسل الطلب لنورة (عشان تتكلم وتعرض بنفس اللحظة)، و«حلّل ملفاً» يفتح اختيار الملف
+// حالة الانتظار: الزر مشغول وبطاقة «جاري تجهيز…» لين تنعرض النتيجة، أو رسالة بعد مهلة مع إعادة المحاولة
+function qaBusy(btn, on, msg) {
+  clearTimeout(qaTimer); const sk = $('#qaSkel');
+  document.querySelectorAll('.qa-btn').forEach(x => { x.removeAttribute('aria-busy'); x.disabled = false; });
+  if (!on) { sk.hidden = !msg; if (msg) { sk.textContent = msg + ' '; const r = document.createElement('button'); r.type = 'button'; r.textContent = 'حاول مرة ثانية'; r.onclick = () => qaBtn && qaBtn.click(); sk.append(r); } return; }
+  qaBtn = btn; btn.setAttribute('aria-busy', 'true'); btn.disabled = true;
+  sk.textContent = `جاري تجهيز ${btn.textContent.trim().replace(/^(اعرض|افتح)\s*/, '')}…`; sk.hidden = false;
+  qaTimer = setTimeout(() => qaBusy(null, false, 'ما وصل رد — حاول مرة ثانية'), window.__qaTimeout || 30000);
+}
+// أي محتوى انعرض (رسم في #view أو قسم يشيل حالة «blank») = النتيجة وصلت
+const qaDone = () => { if (qaBtn && (!$('#view').hidden || !document.body.classList.contains('blank'))) { qaBusy(null, false); qaBtn = null; } };
+new MutationObserver(qaDone).observe($('#view'), { attributes: true, attributeFilter: ['hidden'] });
+new MutationObserver(qaDone).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 document.querySelectorAll('.qa-btn').forEach(b => b.onclick = () => {
   if (b.dataset.act === 'file') return $('#file').click();
+  qaBusy(b, true);
   $('#txt').value = b.dataset.say; $('#f').requestSubmit();
 });
 $('#retry').onclick = async () => {
@@ -1051,15 +1094,20 @@ document.addEventListener('drop', e => { e.preventDefault(); document.body.class
 
 // ===== قناة لحظية مع السيرفر: البيانات تتحدث فوراً، وشغل Claude بالخلفية يوصل لنورة، والنسخة الجديدة تنطبق تلقائياً =====
 let BOOT = null, pendingReload = false, liveTimer;
+// الوضع المحمي: لو السيرفر أوقف الحفظ الدائم نبين السبب بوضوح
+async function checkPersist() {
+  const p = (await apiJson('/api/ping').catch(() => null))?.persist; const bar = $('#persistBar');
+  bar.hidden = !p?.protected; if (p?.protected) bar.textContent = `وضع محمي: الحفظ الدائم متوقف — ${p.reason}`;
+}
 function connectLive() {
   if (window.__live) return;
   const es = window.__live = new EventSource(`/api/events?code=${encodeURIComponent(CODE)}`);
   es.addEventListener('hello', e => {
     const { boot } = JSON.parse(e.data);
     if (BOOT && boot !== BOOT) { if (running) { pendingReload = true; setStatus('فيه تحديث جديد، ينطبق بعد ما تخلص المحادثة'); } else location.reload(); }
-    BOOT ||= boot;
+    BOOT ||= boot; checkPersist();
   });
-  es.addEventListener('data', () => { clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });
+  es.addEventListener('data', e => { try { if (JSON.parse(e.data).what === 'persist') checkPersist(); } catch {} clearTimeout(liveTimer); liveTimer = setTimeout(() => loadDashboard().catch(() => {}), 200); });
   es.addEventListener('upload', e => { try { onUploadEvent(JSON.parse(e.data)); } catch {} });
   es.addEventListener('job', async e => {
     const j = JSON.parse(e.data);

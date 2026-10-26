@@ -66,6 +66,7 @@ export function parseWorkbook(buffer, name) {
 }
 
 // ===== 2) تحليل الأعمدة (Profiling) =====
+const ID_NAME = /^(م|#|id|no\.?|رقم|الرقم|رقم تسلسلي|الرقم التسلسلي|تسلسل|التسلسل|كود|الكود|code|رقم السجل|serial)$/i;
 export function profile(columns, rows) {
   const cols = columns.map((name, i) => {
     const vals = rows.map(r => r[i]).filter(v => v != null && String(v).trim() !== '' && !isNA(v)); // «—/غير منطبق» = مفقود، مو نص
@@ -77,7 +78,9 @@ export function profile(columns, rows) {
       const s = nums.reduce((a, b) => a + b, 0);
       Object.assign(p, { sum: +s.toFixed(2), avg: +(s / nums.length).toFixed(2), min: Math.min(...nums), max: Math.max(...nums), distinct: new Set(nums).size });
       p.avgLike = /مدة|تقييم|نسبة|معدل|متوسط|عمر|درجة|%|٪|rate|score|avg/i.test(name) || p.max <= 10;
-      p.role = /رقم|كود|code|id|^#|تسلسل|هاتف|جوال|سجل/i.test(name) || (p.distinct === nums.length && Number.isInteger(p.min) && p.max - p.min + 1 === nums.length) ? 'id' : 'measure';
+      // معرّف = اسم ترقيم صريح، أو هاتف/هوية، أو تسلسل 1..n طويل (≥10). «عدد الموظفين»/«Paid Amount» تبقى مقاييس
+      const seq = p.distinct === nums.length && Number.isInteger(p.min) && p.max - p.min + 1 === nums.length && nums.length >= 10;
+      p.role = ID_NAME.test(String(name).trim()) || /هاتف|جوال|هوية|phone|mobile/i.test(name) || seq ? 'id' : 'measure';
     } else if (type === 'date') {
       const sorted = [...dates].sort(); Object.assign(p, { min: sorted[0], max: sorted.at(-1), role: 'time' });
     } else {
@@ -107,25 +110,30 @@ export async function ingestDocument(doc, buffer) {
 }
 
 // ===== 3) محرك الاستعلام =====
-const colIdx = (ds, name) => {
+// مطابقة الأعمدة: تامة ← بعد التطبيع ← بدون «ال» ← كل الكلمات؛ والجزئية فقط لاسم ≥3 أحرف يغطي ≥60% من المطلوب.
+// عمود الترقيم/المعرّف ما يصير مقياساً أبداً (حالة حقيقية: «قيمة العقود» جمعت عمود «م»).
+const nzc = x => String(x).toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[_\-]+/g, ' ').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\u064B-\u0652\u0640]/g, '').replace(/\s+/g, ' ').trim();
+const stripc = x => nzc(x).split(' ').map(w => w.length > 4 && w.startsWith('ال') ? w.slice(2) : w).join(' ');
+export function colIdx(ds, name, { measure = false } = {}) {
   if (name == null || name === '') return -1;
-  let i = ds.columns.indexOf(name);
-  if (i < 0) {
-    // مطابقة متسامحة: _ بدل المسافة، وحدات بين قوسين، همزات/تاء مربوطة، «ال» التعريف
-    const nz = x => String(x).toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[_\-]+/g, ' ').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\u064B-\u0652\u0640]/g, '').replace(/\s+/g, ' ').trim();
-    const strip = x => nz(x).split(' ').map(w => w.length > 4 && w.startsWith('ال') ? w.slice(2) : w).join(' ');
-    const n = nz(name), ns = strip(name);
-    i = ds.columns.findIndex(c => nz(c) === n);
-    if (i < 0) i = ds.columns.findIndex(c => strip(c) === ns);
-    if (i < 0) i = ds.columns.findIndex(c => nz(c).includes(n) || n.includes(nz(c)) || strip(c).includes(ns));
-    if (i < 0) { const ws = ns.split(' ').filter(w => w.length > 1); i = ds.columns.findIndex(c => { const cw = strip(c) + ' ' + nz(c); return ws.length && ws.every(w => cw.includes(w)); }); }
+  const ok = i => i >= 0 && !(measure && ds.profile?.columns?.[i]?.role === 'id');
+  const pick = pred => { const i = ds.columns.findIndex((c, j) => ok(j) && pred(c)); return i; };
+  const n = nzc(name), ns = stripc(name);
+  const steps = [c => c === name, c => nzc(c) === n, c => stripc(c) === ns,
+    c => { const a = stripc(c), b = ns; if (Math.min(a.length, b.length) < 3) return false; return (a.includes(b) || b.includes(a)) && Math.min(a.length, b.length) / Math.max(a.length, b.length) >= 0.6; },
+    c => { const ws = ns.split(' ').filter(w => w.length > 2); const cw = stripc(c) + ' ' + nzc(c); return ws.length > 0 && ws.every(w => cw.includes(w)); }];
+  for (const [k, st] of steps.entries()) {
+    // تطابق صريح مع عمود معرّف وهو مطلوب كمقياس → نرفض بوضوح بدل ما نروح لعمود ثاني
+    if (measure && k < 3) { const j = ds.columns.findIndex(st); if (j >= 0 && !ok(j)) throw new Error(`العمود «${ds.columns[j]}» ترقيم/معرّف وما ينجمع كمقياس. المتاح: ${ds.columns.filter((_, x) => ok(x)).join('، ')}`); }
+    const i = pick(st); if (i >= 0) return i;
   }
-  return i;
-};
+  return -1;
+}
+const notFound = (ds, name) => new Error(`العمود «${name}» غير موجود. المتاح: ${ds.columns.join('، ')}`);
 const cellNum = (r, i) => toNum(r[i]);
 function applyFilters(ds, rows, filters = []) {
   return rows.filter(r => filters.every(f => {
-    const i = colIdx(ds, f.column); if (i < 0) return true;
+    const i = colIdx(ds, f.column); if (i < 0) throw notFound(ds, f.column);
     const v = r[i], n = toNum(v), fv = f.value, fn = toNum(fv), s = String(v ?? '').trim();
     switch (f.op || '=') {
       case '=': return fn != null && n != null ? n === fn : s === String(fv).trim();
@@ -156,11 +164,12 @@ function agg(values, fn) {
 // group_by + measure(+agg) + series_by اختياري → صفوف مجمّعة
 export function runQuery(ds, { group_by, measure, agg: fn = measure ? 'sum' : 'count', series_by, filters, sort = 'desc', top, date_unit } = {}) {
   let rows = applyFilters(ds, ds.rows, filters);
-  const gi = colIdx(ds, group_by); let mi = colIdx(ds, measure); const si = colIdx(ds, series_by); 
-  if (measure && mi < 0) throw new Error(`ما لقيت العمود «${measure}». الأعمدة: ${ds.columns.join('، ')}`);
+  const gi = colIdx(ds, group_by); let mi = colIdx(ds, measure, { measure: true }); const si = colIdx(ds, series_by);
+  if (measure && mi < 0) throw notFound(ds, measure);
+  if (series_by && si < 0) throw notFound(ds, series_by);
   // عمود نصي ما ينجمع (يطلع أصفار) → نعدّ الصفوف بدله
   if (mi >= 0 && ['sum', 'avg', 'min', 'max'].includes(fn) && ds.profile?.columns[mi]?.type !== 'number') { mi = -1; fn = 'count'; }
-  if (group_by && gi < 0) throw new Error(`ما لقيت العمود «${group_by}». الأعمدة: ${ds.columns.join('، ')}`);
+  if (group_by && gi < 0) throw notFound(ds, group_by);
   const isDate = gi >= 0 && ds.profile?.columns[gi]?.type === 'date';
   const key = r => gi < 0 ? 'الإجمالي' : isDate ? bucket(toDate(r[gi]), date_unit || 'month') : String(r[gi] ?? 'غير محدد').trim() || 'غير محدد';
   const val = r => mi < 0 ? 1 : cellNum(r, mi);

@@ -9,7 +9,8 @@ import { initStore, kvGet, kvSet, backend } from './store.js';
 import { memoryTools, memoryBlock, initMemory, listForUI } from './memory.js';
 import { dashboardTools, dashGet, dashList } from './dashboards.js';
 import { memDelete } from './store.js';
-import { restore as restoreSqlite, snapshotSoon } from './persist.js';
+import { pgFallback } from './store.js';
+import { restore as restoreSqlite, snapshotSoon, snapshot, persistState, protect, pendingSnapshot } from './persist.js';
 import { dashboardFromDocument, getCurrentDash, setCurrentDash } from './file-dash.js';
 import { designerName } from './designer.js';
 import { sseRoute, BOOT_ID, uploadStep } from './events.js';
@@ -318,7 +319,7 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 
 // الواجهة (ملفات محددة فقط)
-for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'speech.js', 'ui-control.js', 'assistant.js', 'eleven-agent.js'])
+for (const f of ['index.html', 'gemini-live-agent.js', 'pcm-recorder.js', 'hud.js', 'speech.js', 'ui-control.js', 'assistant.js', 'eleven-agent.js', 'text-guard.js'])
   app.get(f === 'index.html' ? '/' : `/${f}`, (req, res) => res.sendFile(f, { root: '.', headers: { 'Cache-Control': 'no-cache' } })); // دايماً أحدث نسخة بعد كل تحديث
 // مكتبات الرسم والخط من السيرفر نفسه (بدل CDN): الشارت ما يتعطل لو الـ CDN بطّأ أو انحجب، وأسرع بعد أول تحميل
 const VENDOR = {
@@ -346,7 +347,7 @@ app.use('/api', (req, res, next) => {
     return res.status(401).type('html').send('<!doctype html><meta charset="utf-8"><body dir="rtl" style="font-family:system-ui;padding:40px;background:#0f1720;color:#e8e2d6"><h2>هذا رابط داخلي للسيرفر</h2><p>روابط <code>/api</code> تستخدمها واجهة نورة من الداخل ومحمية برمز الدخول. افتح الصفحة الرئيسية:</p><p><a style="color:#d1a65c" href="/">نورة ←</a></p></body>');
   res.status(401).json({ error: 'رمز الدخول غلط' });
 });
-app.get('/api/ping', (req, res) => res.json({ ok: true, boot: BOOT_ID, agent: agentStatus() }));
+app.get('/api/ping', (req, res) => res.json({ ok: true, boot: BOOT_ID, agent: agentStatus(), persist: persistState }));
 sseRoute(app);
 app.get('/api/agent/jobs', (req, res) => res.json({ status: agentStatus(), jobs: db.prepare('SELECT id, kind, status, request, result, created_at, updated_at FROM agent_jobs ORDER BY id DESC LIMIT 20').all() }));
 
@@ -620,8 +621,12 @@ app.get('/api/dashboard', async (req, res) => {
 initMemory(ai);
 initHistory(ai);
 initStore()
-  .then(restoreSqlite)
+  .then(() => { if (process.env.DATABASE_URL && pgFallback) protect(`Postgres ما اشتغل: ${pgFallback}`); })
+  .then(() => restoreSqlite())
   .then(() => initIngest(ai))
   .catch(e => console.error('[store] init failed:', e.message))
   .finally(() => { ensureIndex().catch(e => console.warn('[rag] boot index failed:', e.message)); })
   .finally(() => app.listen(PORT, () => console.log(`✅ http://localhost:${PORT}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${backend}, designer: ${designerName()}, agent: ${JSON.stringify(agentStatus())})`)));
+
+// إيقاف Render (نشر جديد): آخر لقطة قبل الخروج — إلا في الوضع المحمي
+process.on('SIGTERM', async () => { try { if (pendingSnapshot()) await snapshot(); } catch (e) { console.error('[persist] final snapshot failed:', e.message); } process.exit(0); });

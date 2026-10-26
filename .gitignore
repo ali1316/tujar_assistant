@@ -3,3 +3,4 @@ node_modules
 *.db*
 reply.wav
 ingest-data/
+.superpowers/

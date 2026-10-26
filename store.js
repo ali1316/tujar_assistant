@@ -5,6 +5,7 @@ import { db } from './db.js';
 
 const URL = process.env.DATABASE_URL;
 export let backend = URL ? 'postgres' : 'sqlite';
+export let pgFallback = ''; // سبب فشل Postgres عند التشغيل (لو صار)
 let pool;
 
 export async function initStore() {
@@ -23,7 +24,7 @@ export async function initStore() {
       CREATE TABLE IF NOT EXISTS datasets (id SERIAL PRIMARY KEY, doc_id INT, doc_name TEXT, sheet TEXT NOT NULL, columns JSONB NOT NULL, rows JSONB NOT NULL, profile JSONB, created_at TIMESTAMPTZ DEFAULT now());`);
   } catch (e) {
     console.error('[store] postgres failed, falling back to sqlite:', e.message);
-    pool = null; backend = 'sqlite';
+    pool = null; backend = 'sqlite'; pgFallback = e.message;
   }
   if (!pool) {
     db.exec(`
