@@ -444,7 +444,20 @@ async function loadHistory() {
     const { turns } = await apiJson('/api/chat/recent?limit=16');
     if (!turns?.length || $('#log').children.length > 1) return;
     note('— آخر محادثة —');
-    turns.forEach(t => { const d = Object.assign(document.createElement('div'), { className: 'm ' + (t.role === 'user' ? 'u' : 'a') + ' old', textContent: t.text }); $('#log').append(d); });
+    // الردود المحفوظة فيها ملاحظات «⟨نفّذت أداة: …⟩» للذاكرة؛ نعرضها كسطور أدوات عربية والتفاصيل مطوية
+    const ANN = /⟨نفّذت ([\w]+): ([\s\S]*?) → ([\s\S]*?)⟩/g;
+    turns.forEach(t => {
+      const text = String(t.text || '');
+      if (t.role !== 'user') for (const m of text.matchAll(ANN)) {
+        let args = {}; try { args = JSON.parse(m[2]); } catch {}
+        const hid = 'h' + Math.random(); const d = toolRow({ id: hid, name: m[1], args }); toolRows.delete(hid);
+        const tm = TOOL_AR[m[1]]; d.className = 'm tool ok old'; d.querySelector('svg').outerHTML = ICON.ok;
+        d.querySelector('.lbl').textContent = (tm && lbl(tm[1], args, {})) || 'نفّذت طلب';
+        d.querySelector('pre').textContent = `${m[1]}(${m[2]})\n→ ${m[3]}`;
+      }
+      const clean = text.replace(ANN, '').replace(/\s{2,}/g, ' ').trim();
+      if (clean) $('#log').append(Object.assign(document.createElement('div'), { className: 'm ' + (t.role === 'user' ? 'u' : 'a') + ' old', textContent: clean }));
+    });
     note('— نورة تتذكر هذا الكلام —');
   } catch {}
 }
