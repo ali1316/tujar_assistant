@@ -632,10 +632,12 @@ function handleAskNora(query) {
   if (txtInput) {
     txtInput.value = query;
     txtInput.focus();
-    // إرسال السؤال أو الضغط على زر الإرسال
-    const sendBtn = document.getElementById('send');
-    if (sendBtn) {
-      setTimeout(() => sendBtn.click(), 100);
+    const form = document.getElementById('f');
+    if (form) {
+      setTimeout(() => form.requestSubmit(), 100);
+    } else {
+      const sendBtn = document.getElementById('send');
+      if (sendBtn) setTimeout(() => sendBtn.click(), 100);
     }
   }
 }
@@ -652,9 +654,12 @@ function handleFetchReport(projectName, riskTitle) {
   if (txtInput) {
     txtInput.value = query;
     txtInput.focus();
-    const sendBtn = document.getElementById('send');
-    if (sendBtn) {
-      setTimeout(() => sendBtn.click(), 100);
+    const form = document.getElementById('f');
+    if (form) {
+      setTimeout(() => form.requestSubmit(), 100);
+    } else {
+      const sendBtn = document.getElementById('send');
+      if (sendBtn) setTimeout(() => sendBtn.click(), 100);
     }
   }
 }

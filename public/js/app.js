@@ -23,6 +23,7 @@ export const apiJson = async (u, b) => (await api(u, b ? { method: 'POST', heade
 window.api = api;
 window.apiJson = apiJson;
 window.H = H;
+window.loadDashboard = loadDashboard;
 
 // Dashboard Loader
 export async function loadDashboard(flash) {

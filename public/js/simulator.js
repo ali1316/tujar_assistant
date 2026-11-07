@@ -613,6 +613,14 @@ export async function renderSimulatorCockpit({
           `;
         }
 
+        // Refresh dashboard and risk radar dynamically in the UI
+        if (typeof window.loadDashboard === 'function') {
+          window.loadDashboard();
+        }
+        if (window.__radar?.refresh) {
+          window.__radar.refresh();
+        }
+
         // Voice announcement via speech if Nora or audio is active
         if (window.__nora?.status) {
           window.__nora.status('✅ تم اعتماد الخطة التنفيذية وتحديث الموازنة والمواعيد');
