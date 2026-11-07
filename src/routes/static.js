@@ -1,6 +1,12 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
+import path from 'node:path';
 
 const router = Router();
+
+// Static assets from public/ (css and js)
+router.use('/css', express.static(path.resolve('public/css'), { maxAge: 0 }));
+router.use('/js', express.static(path.resolve('public/js'), { maxAge: 0 }));
+router.use(express.static(path.resolve('public'), { maxAge: 0 }));
 
 const UI_FILES = [
   'index.html',

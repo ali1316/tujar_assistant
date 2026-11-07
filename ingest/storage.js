@@ -1,8 +1,8 @@
 // StorageAdapter: المعالجة والاستعلام لا يعرفون أين تُحفظ الملفات.
-// اليوم: DriveStorage (عبر جسر Apps Script الحالي، باسم فواز، بدون مشاركة عامة) أو LocalStorage للتطوير والاختبار.
-// لاحقاً: DbStorage بنفس الواجهة (انظر docs/ingest/MIGRATION.md).
+// يدعم Google Drive (Apps Script)، التخزين السحابي S3/R2/Supabase، والتخزين المحلي.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { getStorage } from '../src/storage/storage-adapter.js';
 
 export const ROOT_NAME = () => process.env.INGEST_ROOT_NAME || 'نورة — مصادر PDF';
 
@@ -64,11 +64,19 @@ export class DriveStorage extends StorageAdapter {
   async getById(id) { const j = await this.call({ action: 'getById', id }); if (!j.ok) throw new Error(j.error || 'not found'); return { name: j.name, mime: j.mime, data: Buffer.from(j.data, 'base64'), url: j.url }; }
 }
 
-let cur = null;
+let explicitStorage = null;
+
 export function storage() {
-  if (cur) return cur;
-  if (process.env.INGEST_STORAGE === 'local' || !process.env.DRIVE_SCRIPT_URL) cur = new LocalStorage(process.env.INGEST_LOCAL_DIR || path.resolve('ingest-data'));
-  else cur = new DriveStorage(process.env.DRIVE_SCRIPT_URL);
-  return cur;
+  if (explicitStorage) return explicitStorage;
+  // If DRIVE_SCRIPT_URL is provided and STORAGE_TYPE is not 's3', use Google Drive webhook
+  const useDrive = process.env.STORAGE_TYPE !== 's3' && process.env.DRIVE_SCRIPT_URL && process.env.INGEST_STORAGE !== 'local';
+  if (useDrive) {
+    return new DriveStorage(process.env.DRIVE_SCRIPT_URL);
+  }
+  // When STORAGE_TYPE=s3 or when DRIVE_SCRIPT_URL is not set, use getStorage()
+  return getStorage({
+    baseDir: process.env.INGEST_LOCAL_DIR || process.env.STORAGE_LOCAL_DIR,
+  });
 }
-export function setStorage(s) { cur = s; }
+
+export function setStorage(s) { explicitStorage = s; }

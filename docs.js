@@ -63,11 +63,11 @@ export async function saveDocument(name, type, size, text) {
 
 export async function indexDocument(id, text) {
   const ins = db.prepare('INSERT INTO doc_chunks (norm, doc_id, idx, content) VALUES (?,?,?,?)');
-  await db.transaction(async () => {
-    await db.prepare('DELETE FROM doc_chunks WHERE doc_id=?').run(id);
+  await db.transaction(() => {
+    db.prepare('DELETE FROM doc_chunks WHERE doc_id=?').run(id);
     for (let i = 0, k = 0; i < text.length; i += CHUNK - 200, k++) {
       const c = text.slice(i, i + CHUNK);
-      await ins.run(normalize(c), id, k, c);
+      ins.run(normalize(c), id, k, c);
     }
   });
 }

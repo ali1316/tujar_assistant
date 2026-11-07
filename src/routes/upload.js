@@ -11,6 +11,7 @@ import { ensureIndex, invalidateIndex } from '../../retrieval.js';
 import { archiveToDrive } from '../../drive.js';
 import { uploadStep } from '../../events.js';
 import { dashboardFromDocument } from '../../file-dash.js';
+import { generateAutoDK } from '../ingest/auto-dk.js';
 
 const router = Router();
 export const upload = multer({
@@ -74,6 +75,45 @@ export async function handleFileUpload(req, res) {
     step('tables', datasets.stats || { sheets: 0, rows: 0, columns: 0, measures: 0 });
     console.log(`[upload] ${name} → doc #${doc.id} (${doc.chars} chars, ${datasets.length} tables)`);
 
+    // مسار Auto-DK المستقل: استخلاص الجداول وتوليد السياق الدلالي تلقائياً لمكتبة المعرفة
+    const runAutoDK = async () => {
+      try {
+        step('autodk_start', { name });
+        const bundle = await generateAutoDK({
+          buffer: req.file.buffer,
+          fileName: name,
+          mimeType: req.file.mimetype,
+          text,
+        });
+        const kResult = await importBundle(bundle);
+        step('autodk_done', { id: bundle.id, status: kResult?.status });
+        console.log(`[upload] Auto-DK bundle imported: ${bundle.id} (${kResult?.status})`);
+        return { bundle, result: kResult };
+      } catch (err) {
+        console.warn(`[upload] Auto-DK failed for ${name}:`, err.message);
+        step('autodk_error', { error: err.message });
+        return null;
+      }
+    };
+
+    const isLarge = req.file.size > 2 * 1024 * 1024;
+    let autoDK = null;
+
+    if (isLarge) {
+      // ملفات كبيرة: تشغيل غير معطّل في الخلفية
+      runAutoDK().catch(err => console.warn('[upload] Auto-DK background error:', err.message));
+    } else {
+      // ملفات عادية: انتظار مع مهلة لتضمين النتيجة في الاستجابة
+      try {
+        autoDK = await Promise.race([
+          runAutoDK(),
+          new Promise(resolve => setTimeout(() => resolve(null), 3000)),
+        ]);
+      } catch (err) {
+        console.warn('[upload] Auto-DK wait error:', err.message);
+      }
+    }
+
     // أرشفة في Google Drive بالتصنيف الصح (بالخلفية)
     archiveToDrive(doc, req.file.buffer, req.file.mimetype)
       .then(r => step('archived', { category: r?.category || null, drive: r?.drive !== false }))
@@ -82,11 +122,20 @@ export async function handleFileUpload(req, res) {
         step('archived', { error: e.message.slice(0, 120) });
       });
 
-    res.json({ ...doc, datasets, stats: datasets.stats || null, ingest });
+    res.json({
+      ...doc,
+      datasets,
+      stats: datasets.stats || null,
+      ingest,
+      ...(autoDK?.result ? { knowledge: autoDK.result, auto_dk: autoDK.result } : {}),
+    });
   } catch (e) {
     // PDF بدون طبقة نص (ممسوح): المسار القديم يفشل، لكن مسار الاستقبال التفصيلي شغّال بالرؤية — نرجّع حالته بدل فشل كاذب
     if (ingest && !ingest.error) {
       step('read', { chars: 0, note: e.message });
+      generateAutoDK({ buffer: req.file.buffer, fileName: name, mimeType: req.file.mimetype, text: '' })
+        .then(b => importBundle(b))
+        .catch(err => console.warn('[upload] Auto-DK background error for scanned PDF:', err.message));
       return res.json({ id: null, name, chars: 0, datasets: [], stats: null, ingest, legacy_error: e.message });
     }
     res.status(400).json({ error: e.message, ingest });

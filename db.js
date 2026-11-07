@@ -263,22 +263,31 @@ export const db = {
     };
   },
 
-  async transaction(fn) {
+  transaction(fn) {
     if (backend === 'postgres' && pool) {
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const res = await fn(client);
-        await client.query('COMMIT');
-        return res;
-      } catch (e) {
-        await client.query('ROLLBACK').catch(() => {});
-        throw e;
-      } finally {
-        client.release();
-      }
+      const p = (async () => {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const res = await fn(client);
+          await client.query('COMMIT');
+          return res;
+        } catch (e) {
+          await client.query('ROLLBACK').catch(() => {});
+          throw e;
+        } finally {
+          client.release();
+        }
+      })();
+      const wrapper = () => p;
+      wrapper.then = p.then.bind(p);
+      wrapper.catch = p.catch.bind(p);
+      return wrapper;
     }
-    return getSqlite().transaction(fn)();
+    const tx = getSqlite().transaction(fn);
+    const wrapper = (...args) => tx(...args);
+    wrapper.then = (res, rej) => { try { res(tx()); } catch (e) { rej(e); } };
+    return wrapper;
   },
 
   pragma(str, opt) {
