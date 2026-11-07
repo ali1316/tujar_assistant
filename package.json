@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "lint": "node --check server.js db.js store.js agent.js docs.js file-dash.js dashboards.js datasets.js history.js memory.js personas.js persist.js retrieval.js text-guard.js ui-control.js",
     "test": "node --test test/*.test.mjs && node test/ui.check.mjs",
+    "test:unit": "node --test test/*.test.mjs",
     "start": "node server.js",
     "test:design": "node test/design-check.mjs"
   },

@@ -6,7 +6,7 @@ import { db } from './db.js';
 import { normalize } from './docs.js';
 import { embed, embedMany, cos } from './memory.js';
 import { kList } from './knowledge.js';
-import { snapshotSoon } from './persist.js';
+
 
 for (const c of ['summary', 'sha256']) if (!db.prepare('PRAGMA table_info(documents)').all().some(x => x.name === c)) db.exec(`ALTER TABLE documents ADD COLUMN ${c} TEXT`);
 db.exec(`
@@ -103,15 +103,15 @@ export function ensureIndex() {
       })();
       added += s.chunks.length;
     }
-    if (added) { vecCache = null; snapshotSoon(); }
+    if (added) { vecCache = null; }
     // مصادر فهرسناها وقت تعطّل الـ embeddings: نكمل متجهاتها
     const missing = Date.now() - lastMissingTry > 600e3 ? db.prepare('SELECT id, title, section, text FROM rag_chunks WHERE vec IS NULL LIMIT 400').all() : [];
     if (missing.length) {
       lastMissingTry = Date.now();
       const vecs = await embedMany(missing.map(c => `${c.title} | ${c.section || ''}\n${c.text}`.slice(0, 6000)));
-      if (vecs?.some(Boolean)) { const up = db.prepare('UPDATE rag_chunks SET vec=? WHERE id=?'); db.transaction(() => missing.forEach((c, i) => vecs[i] && up.run(JSON.stringify(vecs[i].map(v => +v.toFixed(5))), c.id)))(); vecCache = null; snapshotSoon(); }
+      if (vecs?.some(Boolean)) { const up = db.prepare('UPDATE rag_chunks SET vec=? WHERE id=?'); db.transaction(() => missing.forEach((c, i) => vecs[i] && up.run(JSON.stringify(vecs[i].map(v => +v.toFixed(5))), c.id)))(); vecCache = null; }
     }
-    const n = db.prepare('SELECT COUNT(*) c, SUM(vec IS NOT NULL) v FROM rag_chunks').get();
+    const n = db.prepare('SELECT COUNT(*) c, SUM(CASE WHEN vec IS NOT NULL THEN 1 ELSE 0 END) v FROM rag_chunks').get();
     console.log(`[rag] index ready: ${n.c} chunks (${n.v} with vectors), +${added} in ${Date.now() - t0}ms`);
     if (n.c && n.v < n.c) dirty = true; // نكمل المتجهات الناقصة في المرة الجاية (بعد 10 دقائق)
     lastStatus = n; return n;
@@ -145,7 +145,7 @@ export async function hybridSearch(q, { k = 5, prefix = null, useVectors = true 
     for (const r of db.prepare('SELECT chunk_id id, bm25(rag_fts) b FROM rag_fts WHERE rag_fts MATCH ? ORDER BY b LIMIT 40').all(match)) cand.set(r.id, { cos: 0 });
   }
   let qv = null;
-  const st = lastStatus || db.prepare('SELECT COUNT(*) c, SUM(vec IS NOT NULL) v FROM rag_chunks').get();
+  const st = lastStatus || db.prepare('SELECT COUNT(*) c, SUM(CASE WHEN vec IS NOT NULL THEN 1 ELSE 0 END) v FROM rag_chunks').get();
   if (useVectors && st.c && st.v / st.c >= 0.9) {
     qv = await embed(String(q));
     if (qv) {

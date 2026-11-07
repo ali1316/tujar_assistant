@@ -36,41 +36,44 @@ test('real query still sums the right column', () => {
   assert.equal(JSON.stringify(r).includes('125'), true);
 });
 
-// ===== Task 2: الاسترجاع الآمن والوضع المحمي =====
+// ===== Task 2: التخزين المباشر وإلغاء persist.js =====
 const Pz = await import('../persist.js');
-const { db } = await import('../db.js');
-db.exec('CREATE TABLE IF NOT EXISTS agent_jobs (id INTEGER PRIMARY KEY, status TEXT)'); // يُنشأ عادةً في agent.js
+const { db, toPgSql } = await import('../db.js');
+db.exec('CREATE TABLE IF NOT EXISTS agent_jobs (id INTEGER PRIMARY KEY, status TEXT)');
 const count = t => db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n;
-const snap = () => Object.fromEntries(Pz.TABLES.map(t => [t, db.prepare(`SELECT * FROM ${t}`).all()]));
-const reset = () => { Pz.persistState.protected = false; Pz.persistState.reason = ''; };
 
-test('malformed snapshot → protected, nothing applied', async () => {
-  reset(); const before = count('projects');
-  const good = snap(); good.projects = [];
-  const get = async k => k === 'sqlite:tickets' ? {} : good[k.slice(7)];
-  await Pz.restore({ get, wait: () => 0, enabled: true });
-  assert.equal(Pz.persistState.protected, true);
-  assert.equal(count('projects'), before);
-});
-test('get throws 3 times → protected after 3 attempts', async () => {
-  reset(); let calls = 0;
-  await Pz.restore({ get: async () => { calls++; throw new Error('pg down'); }, wait: () => 0, enabled: true });
-  assert.equal(Pz.persistState.protected, true);
-  assert.match(Pz.persistState.reason, /pg down/);
-  assert.equal(calls, 3);
-});
-test('valid snapshots apply atomically', async () => {
-  reset(); const data = snap(); const n = data.projects.length; data.projects = data.projects.slice(0, 1);
-  await Pz.restore({ get: async k => data[k.slice(7)], wait: () => 0, enabled: true, set: async () => {} });
+test('persist.js is decommissioned (safe stubs, no KV dumping)', async () => {
   assert.equal(Pz.persistState.protected, false);
-  assert.equal(count('projects'), Math.min(1, n));
+  assert.equal(Pz.persistState.ready, true);
+  assert.equal(Pz.pendingSnapshot(), false);
+  await Pz.restore();
+  await Pz.snapshot();
+  assert.equal(Pz.persistState.protected, false);
 });
-test('snapshot is a no-op while protected', async () => {
-  reset(); Pz.persistState.protected = true; let wrote = 0;
-  await Pz.snapshot({ set: async () => { wrote++; }, enabled: true });
-  assert.equal(wrote, 0);
-  reset(); await Pz.snapshot({ set: async () => { wrote++; }, enabled: true });
-  assert.equal(wrote, Pz.TABLES.length);
+
+test('toPgSql translates SQLite ? placeholders and functions', () => {
+  const sql = toPgSql("SELECT * FROM tasks WHERE status = ? AND due_date <= datetime('now')");
+  assert.match(sql, /\$1/);
+  assert.match(sql, /now\(\)/);
+  assert.ok(!sql.includes('?'));
+});
+
+test('first-class storage executes native queries directly without KV dumps', async () => {
+  const before = count('projects');
+  assert.ok(before >= 0);
+  const r = await db.prepare("INSERT INTO dev_requests (title, details) VALUES (?, ?)").run('test req', 'details');
+  assert.ok(r.changes > 0 || r.lastInsertRowid);
+  const rows = await db.prepare("SELECT * FROM dev_requests WHERE title = ?").all('test req');
+  assert.ok(rows.length > 0);
+});
+
+test('db client interface supports all, get, run, and query', async () => {
+  const allRows = await db.all('SELECT * FROM projects');
+  assert.ok(Array.isArray(allRows));
+  const oneRow = await db.get('SELECT * FROM projects LIMIT 1');
+  assert.ok(oneRow && oneRow.id);
+  const qRes = await db.query('SELECT COUNT(*) c FROM projects');
+  assert.ok(qRes.rows.length > 0);
 });
 
 // ===== Task 3: رفع عدة PDF في نفس الوقت =====
@@ -114,6 +117,8 @@ test('history archive has no tool tags', async () => {
 });
 
 // ===== المراجعة النهائية: إصلاحات =====
+const reset = () => { Pz.persistState.protected = false; Pz.persistState.reason = ''; Pz.persistState.ready = true; };
+
 test('snapshot does nothing before a successful restore (SIGTERM during boot)', async () => {
   reset(); Pz.persistState.ready = false; let wrote = 0;
   await Pz.snapshot({ set: async () => { wrote++; }, enabled: true });

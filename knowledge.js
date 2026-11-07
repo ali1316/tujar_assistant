@@ -3,7 +3,7 @@
 // الجداول تتحوّل لنفس جداول الشارتات (data_chart/query_data) عشان الرسم يبقى فوري.
 import { kvGet, kvSet, datasetAdd, datasetsRecent } from './store.js';
 import { parseWorkbook, profile } from './datasets.js';
-import { snapshotSoon } from './persist.js';
+
 import { db } from './db.js';
 import { ensureIndex, hybridSearch, cite, invalidateIndex, confidence } from './retrieval.js';
 
@@ -11,7 +11,7 @@ const KEY = 'knowledge';
 let cache = null;
 export const resetKnowledgeCache = () => { cache = null; };
 export async function kList() { if (!cache) cache = (await kvGet(KEY)) || { entries: [] }; return cache.entries; }
-async function save(entries) { cache = { entries }; await kvSet(KEY, cache); snapshotSoon(); }
+async function save(entries) { cache = { entries }; await kvSet(KEY, cache); }
 
 const nz = x => String(x ?? '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[_\-()]+/g, ' ').replace(/\s+/g, ' ').trim();
 const STOP = new Set('في من على الى عن مع او و ثم لا ما هذا هذه كل كم وش ايش عطيني وريني ابي ابغى اعرضي اعرض قولي حسب عن الملف'.split(' '));
@@ -85,16 +85,16 @@ export const knowledgeTools = {
         if (hits.length) {
           const list = await kList(), groups = new Map();
           for (const h of hits) { if (!groups.has(h.src)) groups.set(h.src, []); groups.get(h.src).push(h); }
-          const results = [...groups].slice(0, 2).map(([src, hs]) => {
+          const results = await Promise.all([...groups].slice(0, 2).map(async ([src, hs]) => {
             const e = list.find(x => `kn:${x.id}` === src);
-            const doc = e ? null : db.prepare('SELECT id, name, summary FROM documents WHERE id=?').get(+src.split(':')[1]);
+            const doc = e ? null : await db.prepare('SELECT id, name, summary FROM documents WHERE id=?').get(+src.split(':')[1]);
             return {
               id: e?.id || src, title: e?.title || doc?.name || hs[0].title, status: e?.status || 'ملف مرفوع', purpose: e?.purpose || '', summary: e?.summary || doc?.summary || '',
               ...(e?.dataset_ids?.length ? { dataset_ids: e.dataset_ids, columns: e.columns } : {}),
               sections: hs.filter(h => h.section !== 'دليل الملف').slice(0, 2).map(h => ({ section: h.section, text: h.text.slice(0, 1800), cite: `[${h.n}] ${cite(h)}` })),
               quality_pending: e?.quality_pending || [], source_file: e?.source_file || doc?.name || '',
             };
-          });
+          }));
           const cf = confidence(hits);
           const low = cf.level !== 'high' ? { confidence: 'low', answer_found: false, note: 'أقرب المقاطع ما تطابق السؤال بثقة كافية. قولي لفواز بوضوح إن الجواب مو موجود في ملفاته (واذكري أقرب ملف لو يفيد)، ولا تخمّنين ولا تجيبين رقم من برّا الملفات.' } : { confidence: 'high' };
           return { ...low, results, citations: hits.map(h => ({ n: h.n, source: cite(h) })) };
