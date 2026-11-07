@@ -510,14 +510,45 @@ $('#f')?.addEventListener('submit', async e => {
     try {
       await agent.start({ mic: false, mode: modeFor(), voice: VOICE });
       running = true;
-    } catch (err) {
-      setStatus('❌ ' + err.message);
+      agent.sendText(t);
+      if (txt) txt.value = '';
+      $('#send')?.setAttribute('aria-disabled', 'true');
       return;
+    } catch (err) {
+      console.log('[app] Live WebSocket unavailable, using REST Chat:', err.message);
     }
+  } else {
+    agent.sendText(t);
+    if (txt) txt.value = '';
+    $('#send')?.setAttribute('aria-disabled', 'true');
+    return;
   }
-  agent.sendText(t);
+
+  // REST Chat fallback via FreeLLMAPI / Gemini
+  const log = $('#log');
+  if (log) {
+    const uEl = Object.assign(document.createElement('div'), { className: 'm u', textContent: t });
+    log.append(uEl);
+    log.scrollTop = 1e9;
+  }
+  openLog(true);
+  setStatus('⏳ نورة تفكر…');
   if (txt) txt.value = '';
   $('#send')?.setAttribute('aria-disabled', 'true');
+
+  try {
+    const res = await apiJson('/api/chat/message', { text: t, sessionId: agent?.chatId || null });
+    if (res?.reply && log) {
+      const aEl = Object.assign(document.createElement('div'), { className: 'm a', textContent: res.reply });
+      log.append(aEl);
+      log.scrollTop = 1e9;
+      setStatus('اكتب طلبك أو اضغط للتحدث.');
+    } else if (res?.error) {
+      setStatus('❌ ' + res.error);
+    }
+  } catch (e2) {
+    setStatus('❌ ' + e2.message);
+  }
 });
 
 // Quick Action Buttons

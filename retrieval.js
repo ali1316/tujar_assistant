@@ -8,13 +8,17 @@ import { embed, embedMany, cos } from './memory.js';
 import { kList } from './knowledge.js';
 
 
-for (const c of ['summary', 'sha256']) if (!db.prepare('PRAGMA table_info(documents)').all().some(x => x.name === c)) db.exec(`ALTER TABLE documents ADD COLUMN ${c} TEXT`);
-db.exec(`
+if (!process.env.DATABASE_URL) {
+  try {
+    for (const c of ['summary', 'sha256']) if (!db.prepare('PRAGMA table_info(documents)').all().some(x => x.name === c)) db.exec(`ALTER TABLE documents ADD COLUMN ${c} TEXT`);
+    db.exec(`
 CREATE TABLE IF NOT EXISTS rag_chunks (id INTEGER PRIMARY KEY, src TEXT NOT NULL, src_hash TEXT NOT NULL, title TEXT, section TEXT,
   page TEXT, line_from INTEGER, line_to INTEGER, text TEXT NOT NULL, vec TEXT);
 CREATE INDEX IF NOT EXISTS rag_src ON rag_chunks(src);
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_fts USING fts5(norm, chunk_id UNINDEXED, tokenize = 'unicode61 remove_diacritics 2');
 `);
+  } catch {}
+}
 
 export const W_COS = 0.65, W_COV = 0.35; // أوزان SurfSense (ADR 0031)؛ تُقاس بمجموعة الأسئلة العربية
 const TARGET = 900, MIN = 220;
@@ -60,7 +64,8 @@ export function registerSource(fn) { extraSources.push(fn); }
 async function sources() {
   const out = [];
   for (const fn of extraSources) { try { out.push(...(await fn())); } catch (e) { console.warn('[rag] extra source failed:', e.message); } }
-  for (const d of db.prepare('SELECT id, name, content, summary FROM documents').all()) {
+  const docRows = await db.all('SELECT id, name, content, summary FROM documents').catch(() => []);
+  for (const d of docRows) {
     const chunks = chunkText(d.content).map(c => ({ ...c, section: c.text.split('\n')[0].slice(0, 70) }));
     if (d.summary) chunks.unshift({ text: `${d.name}\n${d.summary}`, section: 'دليل الملف', page: null, line_from: null, line_to: null, guide: true });
     out.push({ src: `doc:${d.id}`, title: d.name, hash: sha(d.name + d.content + (d.summary || '')), chunks });
@@ -85,33 +90,42 @@ export function ensureIndex() {
     dirty = false;
     const t0 = Date.now(); let added = 0;
     const srcs = await sources();
-    const have = new Map(db.prepare('SELECT src, MIN(src_hash) h FROM rag_chunks GROUP BY src').all().map(r => [r.src, r.h]));
+    const haveRows = await db.all('SELECT src, MIN(src_hash) h FROM rag_chunks GROUP BY src').catch(() => []);
+    const have = new Map(haveRows.map(r => [r.src, r.h]));
     const live = new Set(srcs.map(s => s.src));
-    const del = db.prepare('DELETE FROM rag_chunks WHERE src=?'), delF = db.prepare('DELETE FROM rag_fts WHERE chunk_id IN (SELECT id FROM rag_chunks WHERE src=?)');
-    for (const src of have.keys()) if (!live.has(src)) { delF.run(src); del.run(src); }
+    for (const src of have.keys()) if (!live.has(src)) {
+      try { await db.run('DELETE FROM rag_fts WHERE chunk_id IN (SELECT id FROM rag_chunks WHERE src=?)', [src]); } catch {}
+      await db.run('DELETE FROM rag_chunks WHERE src=?', [src]).catch(() => {});
+    }
     for (const s of srcs) {
       if (have.get(s.src) === s.hash) continue;
       const vecs = await embedMany(s.chunks.map(c => `${s.title} | ${c.section || ''}\n${c.text}`.slice(0, 6000)));
-      const ins = db.prepare('INSERT INTO rag_chunks (src, src_hash, title, section, page, line_from, line_to, text, vec) VALUES (?,?,?,?,?,?,?,?,?)');
-      const insF = db.prepare('INSERT INTO rag_fts (norm, chunk_id) VALUES (?,?)');
-      db.transaction(() => {
-        delF.run(s.src); del.run(s.src);
-        s.chunks.forEach((c, i) => {
-          const id = ins.run(s.src, s.hash, s.title, c.section || null, c.page, c.line_from, c.line_to, c.text, vecs?.[i] ? JSON.stringify(vecs[i].map(v => +v.toFixed(5))) : null).lastInsertRowid;
-          insF.run(normalize(`${s.title} ${c.section || ''} ${c.text}`), id);
-        });
-      })();
+      try { await db.run('DELETE FROM rag_fts WHERE chunk_id IN (SELECT id FROM rag_chunks WHERE src=?)', [s.src]); } catch {}
+      await db.run('DELETE FROM rag_chunks WHERE src=?', [s.src]).catch(() => {});
+      for (let i = 0; i < s.chunks.length; i++) {
+        const c = s.chunks[i];
+        const res = await db.run(
+          'INSERT INTO rag_chunks (src, src_hash, title, section, page, line_from, line_to, text, vec) VALUES (?,?,?,?,?,?,?,?,?)',
+          [s.src, s.hash, s.title, c.section || null, c.page, c.line_from, c.line_to, c.text, vecs?.[i] ? JSON.stringify(vecs[i].map(v => +v.toFixed(5))) : null]
+        );
+        try { await db.run('INSERT INTO rag_fts (norm, chunk_id) VALUES (?,?)', [normalize(`${s.title} ${c.section || ''} ${c.text}`), res?.lastInsertRowid]); } catch {}
+      }
       added += s.chunks.length;
     }
     if (added) { vecCache = null; }
     // مصادر فهرسناها وقت تعطّل الـ embeddings: نكمل متجهاتها
-    const missing = Date.now() - lastMissingTry > 600e3 ? db.prepare('SELECT id, title, section, text FROM rag_chunks WHERE vec IS NULL LIMIT 400').all() : [];
+    const missing = Date.now() - lastMissingTry > 600e3 ? (await db.all('SELECT id, title, section, text FROM rag_chunks WHERE vec IS NULL LIMIT 400').catch(() => [])) : [];
     if (missing.length) {
       lastMissingTry = Date.now();
       const vecs = await embedMany(missing.map(c => `${c.title} | ${c.section || ''}\n${c.text}`.slice(0, 6000)));
-      if (vecs?.some(Boolean)) { const up = db.prepare('UPDATE rag_chunks SET vec=? WHERE id=?'); db.transaction(() => missing.forEach((c, i) => vecs[i] && up.run(JSON.stringify(vecs[i].map(v => +v.toFixed(5))), c.id)))(); vecCache = null; }
+      if (vecs?.some(Boolean)) {
+        for (let i = 0; i < missing.length; i++) {
+          if (vecs[i]) await db.run('UPDATE rag_chunks SET vec=? WHERE id=?', [JSON.stringify(vecs[i].map(v => +v.toFixed(5))), missing[i].id]).catch(() => {});
+        }
+        vecCache = null;
+      }
     }
-    const n = db.prepare('SELECT COUNT(*) c, SUM(CASE WHEN vec IS NOT NULL THEN 1 ELSE 0 END) v FROM rag_chunks').get();
+    const n = (await db.get('SELECT COUNT(*) c, SUM(CASE WHEN vec IS NOT NULL THEN 1 ELSE 0 END) v FROM rag_chunks')) || { c: 0, v: 0 };
     console.log(`[rag] index ready: ${n.c} chunks (${n.v} with vectors), +${added} in ${Date.now() - t0}ms`);
     if (n.c && n.v < n.c) dirty = true; // نكمل المتجهات الناقصة في المرة الجاية (بعد 10 دقائق)
     lastStatus = n; return n;
