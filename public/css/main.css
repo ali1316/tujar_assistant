@@ -209,22 +209,44 @@ main > section[hidden] {
   outline-offset: -10px;
 }
 
-/* First Screen (Empty state - ChatGPT style) */
+/* Executive Command Hero Header */
 #empty {
-  position: fixed;
-  inset-inline: 0;
-  top: calc(25vh + 40px);
-  text-align: center;
-  padding: 0 16px;
-  z-index: 1;
+  position: static;
+  text-align: right;
+  padding: 22px 24px;
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, rgba(14, 34, 56, 0.75) 0%, rgba(8, 23, 38, 0.85) 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius, 14px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 2;
+}
+
+.hero-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.hero-titles {
+  flex: 1;
+  min-width: 280px;
 }
 
 #empty h2 {
-  font-size: clamp(28px, 3.4vw, 46px);
+  font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 700;
-  margin: 0 0 14px;
+  margin: 0 0 6px;
   letter-spacing: 0;
   color: var(--ink);
+  line-height: 1.3;
 }
 
 #empty h2 .gold {
@@ -232,29 +254,59 @@ main > section[hidden] {
 }
 
 #empty p {
-  font-size: clamp(15px, 1.4vw, 19px);
-  color: color-mix(in srgb, var(--ink) 78%, transparent);
+  font-size: clamp(14px, 1.1vw, 16px);
+  color: color-mix(in srgb, var(--ink) 75%, transparent);
   margin: 0;
 }
 
+#empty .briefing-wrap {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+#empty .qa {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+  justify-content: flex-start;
+}
+
+/* Assistant Dock: Permanently anchored to bottom */
+#dock {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(8, 23, 38, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  padding: 8px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 body.blank #dock {
-  bottom: auto;
-  top: calc(25vh + 290px);
-  background: none;
-  border-top: 0;
+  bottom: 0;
+  top: auto;
+  background: rgba(8, 23, 38, 0.94);
+  border-top: 1px solid var(--line);
 }
 
 body.blank #dock > * {
   width: min(1000px, 100%);
 }
 
-body.blank main {
-  padding-bottom: 40px;
+main {
+  padding-bottom: 120px !important;
 }
 
-body.blank.log-open #dock {
-  top: auto;
-  bottom: 0;
+body.blank main {
+  padding-bottom: 120px !important;
 }
 
 /* Watermark & Decorative Background Lines */
@@ -505,16 +557,18 @@ body.blank #empty, body.blank #dock {
     height: 40px;
   }
   #empty {
-    top: calc(16vh + 20px);
+    top: auto;
+    padding: 16px;
   }
   #empty h2 {
-    font-size: 26px;
+    font-size: 20px;
   }
   #empty p {
-    font-size: 14px;
+    font-size: 13px;
   }
   body.blank #dock {
-    top: calc(16vh + 270px);
+    top: auto;
+    bottom: 0;
   }
   .tagline {
     bottom: 12px;
@@ -523,10 +577,11 @@ body.blank #empty, body.blank #dock {
 
 @media (max-height: 700px) and (min-width: 601px) {
   #empty {
-    top: calc(18vh + 30px);
+    top: auto;
   }
   body.blank #dock {
-    top: calc(18vh + 280px);
+    top: auto;
+    bottom: 0;
   }
   .tagline {
     display: none !important;

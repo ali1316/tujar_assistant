@@ -141,12 +141,8 @@ export async function startExecutiveBriefing() {
     const data = await res.json();
     const { text, cues = [], audioUrl } = data;
 
-    // 2. Reveal overview dashboard if currently on empty welcome screen
-    const emptyEl = document.querySelector('#empty');
-    if (emptyEl && !emptyEl.hidden) {
-      document.querySelectorAll('[data-v*="overview"]').forEach(el => el.removeAttribute('hidden'));
-      emptyEl.hidden = true;
-    }
+    // 2. Ensure overview dashboard is visible
+    document.querySelectorAll('[data-v*="overview"]').forEach(el => el.removeAttribute('hidden'));
     if (typeof window.showScreen === 'function') {
       window.showScreen('overview');
     }

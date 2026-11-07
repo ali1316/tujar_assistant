@@ -9,6 +9,10 @@ import { db } from '../db.js';
 // ============================================================================
 // 1. Projection Calculations & Mathematical Model
 // ============================================================================
+test.beforeEach(async () => {
+  await db.run('UPDATE projects SET budget = ?, due_date = ?, status = ? WHERE id = ?', [1200000, '2026-12-31', 'قيد التنفيذ', 1]);
+});
+
 test('simulateScenario correctly models capital injection (budgetDelta > 0)', async () => {
   const result = await simulateScenario({ projectId: 1, budgetDelta: 300000 });
 

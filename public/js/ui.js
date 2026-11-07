@@ -92,7 +92,7 @@ export function qaBusy(btn, on, msg) {
 
 export const qaDone = () => {
   const v = $('#view');
-  if (qaBtn && (v && !v.hidden || !document.body.classList.contains('blank'))) {
+  if (qaBtn && v && !v.hidden) {
     qaBusy(null, false);
     qaBtn = null;
   }
@@ -303,7 +303,7 @@ export const openLog = (open, refocus = false) => {
 };
 
 // Views & Screen State
-export let VIEW = null;
+export let VIEW = 'overview';
 export let CUR_DASH = null;
 export let DASH_CTX = null;
 export let INGEST_LAST = null;
@@ -315,25 +315,25 @@ export function setIngestLast(val) {
 export function renderView() {
   $$('#home [data-v]').forEach(el => el.hidden = !VIEW || !el.dataset.v.split(' ').includes(VIEW));
   const empty = $('#empty');
-  if (empty) empty.hidden = !!VIEW;
+  if (empty) empty.hidden = (VIEW && VIEW !== 'overview');
   const viewEl = $('#view');
-  document.body.classList.toggle('blank', !VIEW && (viewEl ? viewEl.hidden : true));
+  document.body.classList.toggle('blank', false);
   const crumb = $('#crumb');
-  if (crumb) crumb.textContent = VIEW ? '‹ ' + VIEW_LABEL[VIEW] : '';
+  if (crumb) crumb.textContent = (VIEW && VIEW !== 'overview') ? '‹ ' + (VIEW_LABEL[VIEW] || '') : '';
   if (VIEW !== renderView.last) {
-    if (VIEW) announce(`تم عرض ${VIEW_LABEL[VIEW]}`);
+    if (VIEW) announce(`تم عرض ${VIEW_LABEL[VIEW] || VIEW}`);
     else if (renderView.last) announce('رجعت للشاشة الأساسية');
     renderView.last = VIEW;
   }
 }
 
 export function showView(v) {
-  if (v === 'home' || !v) {
+  if (v === 'home' || !v || v === 'overview') {
     hud.closeAll();
-    VIEW = null;
+    VIEW = 'overview';
     renderView();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    return { back_to_main_screen: true };
+    return { shown_on_screen: VIEW_LABEL.overview };
   }
   if (!VIEW_LABEL[v]) return { error: 'قسم غير معروف' };
   if (v === 'file_dashboard' && !CUR_DASH) return { error: 'ما فيه لوحة ملف — يرفع ملف أول' };
@@ -404,7 +404,7 @@ export const hud = createHUD({
       const home = $('#home');
       if (viewEl) viewEl.hidden = true;
       if (home) home.hidden = false;
-      VIEW = null;
+      VIEW = 'overview';
       renderView();
     },
   },

@@ -41,11 +41,17 @@
 <div id="journeys" aria-live="polite"></div>
 <main>
   <section id="home">
-    <div id="empty"><h2 id="hello"><span class="gold">هلا فواز،</span> وش ننجز اليوم؟</h2><p>مشاريعك، ملفاتك، ومؤشراتك… في مساحة واحدة.</p>
-      <div class="briefing-wrap">
-        <button type="button" class="briefing-btn" id="executiveBriefingBtn" aria-label="استمع للموجز الصباحي بصوت نورة">
-          <span class="b-icon">🎙️</span> <span class="b-label">استمع للموجز الصباحي</span>
-        </button>
+    <div id="empty" class="executive-hero">
+      <div class="hero-top-row">
+        <div class="hero-titles">
+          <h2 id="hello"><span class="gold">هلا فواز،</span> مرحباً بك في لوحة المشاريع التنفيذية</h2>
+          <p>متابعة فورية لمؤشرات الأداء، المحفظة الاستثمارية، وتوقعات الإنجاز الذكية.</p>
+        </div>
+        <div class="briefing-wrap">
+          <button type="button" class="briefing-btn" id="executiveBriefingBtn" aria-label="استمع للموجز الصباحي بصوت نورة">
+            <span class="b-icon">🎙️</span> <span class="b-label">استمع للموجز الصباحي</span>
+          </button>
+        </div>
       </div>
       <div class="qa" role="group" aria-label="اختصارات سريعة">
         <button type="button" class="qa-btn" data-say="اعرضي لي المشاريع"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 20V12M12 20V5M18 20v-9"/></svg>اعرض المشاريع</button>
@@ -53,16 +59,17 @@
         <button type="button" class="qa-btn" data-say="اعرضي لي الداشبوردات"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>افتح لوحة</button>
         <button type="button" class="qa-btn" id="qaSim" data-act="simulator" title="محاكاة القرارات التنفيذية"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><path d="M18 18l3 3"/></svg>محاكاة القرارات</button>
       </div>
-      <div id="qaSkel" role="status" aria-live="polite" hidden></div></div>
+      <div id="qaSkel" role="status" aria-live="polite" hidden></div>
+    </div>
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
       <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
         <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
       <div id="fdWait" class="fd-wait" hidden><b>نورة تحلل الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
       <iframe id="fdFrame" title="لوحة الملف"></iframe>
     </div>
-    <div class="kpis" id="kpis" data-v="overview" hidden></div>
-    <div class="card sec" data-v="overview projects" hidden><h2 id="h-projects">المشاريع</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-projects"><table id="projects"></table></div></div>
-    <div class="card sec" data-v="overview tickets" hidden><h2 id="h-tickets">التذاكر</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-tickets"><table id="tickets"></table></div></div>
+    <div class="kpis" id="kpis" data-v="overview"></div>
+    <div class="card sec" data-v="overview projects"><h2 id="h-projects">المشاريع</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-projects"><table id="projects"></table></div></div>
+    <div class="card sec" data-v="overview tickets"><h2 id="h-tickets">التذاكر</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-tickets"><table id="tickets"></table></div></div>
     <div class="card sec" data-v="tasks" hidden><h2 id="h-tasks">مهامي</h2><div class="tbl-wrap" tabindex="0" role="region" aria-labelledby="h-tasks"><table id="tasks"></table></div></div>
     <div class="card docs sec" data-v="files" hidden><h2>الملفات المرفوعة · اسحب ملف هنا أو اضغط +</h2><ul id="docs"><li><small>ما فيه ملفات للحين</small></li></ul></div>
     <div class="card docs sec" data-v="dashboards" hidden><h2>داشبوردات نورة</h2><ul id="dashes"><li><small>ما فيه داشبوردات للحين</small></li></ul></div>
