@@ -193,7 +193,7 @@ async function dashboardFromText(d) {
 }
 
 export async function dashboardFromDocument(docId) {
-  const d = db.prepare('SELECT id, name, content FROM documents WHERE id=?').get(docId);
+  const d = await db.prepare('SELECT id, name, content FROM documents WHERE id=?').get(docId);
   if (!d) return { error: 'الملف غير موجود' };
   const sets = await datasetsForDoc(d.id).catch(() => []);
   const r = sets.length ? await dashboardFromData(d, sets) : await dashboardFromText(d);

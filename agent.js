@@ -4,7 +4,7 @@
 // ونفس الفكرة لـ GPT (ask_gpt) لو حاب تسأله.
 import { db } from './db.js';
 import { bus } from './events.js';
-import { snapshotSoon } from './persist.js';
+
 
 db.exec(`CREATE TABLE IF NOT EXISTS agent_jobs (
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, request TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'قيد التنفيذ',
@@ -15,13 +15,13 @@ const A_KEY = () => process.env.ANTHROPIC_API_KEY;
 export const agentStatus = () => ({ claude: !!A_KEY(), gpt: !!process.env.OPENAI_API_KEY });
 
 let TOOLS = {};
-export function initAgent(tools) { TOOLS = tools; db.prepare("UPDATE agent_jobs SET status='توقفت (إعادة تشغيل)' WHERE status='قيد التنفيذ'").run(); }
+export async function initAgent(tools) { TOOLS = tools; await db.prepare("UPDATE agent_jobs SET status='توقفت (إعادة تشغيل)' WHERE status='قيد التنفيذ'").run(); }
 
 // ===== حفظ المهام وبثها للشاشة =====
-function save(job) {
-  db.prepare("UPDATE agent_jobs SET status=?, result=?, steps=?, updated_at=datetime('now') WHERE id=?").run(job.status, job.result || null, JSON.stringify(job.steps.slice(-40)), job.id);
+async function save(job) {
+  await db.prepare("UPDATE agent_jobs SET status=?, result=?, steps=?, updated_at=datetime('now') WHERE id=?").run(job.status, job.result || null, JSON.stringify(job.steps.slice(-40)), job.id);
   bus.emit('job', { id: job.id, kind: job.kind, status: job.status, result: job.result, step: job.steps.at(-1) });
-  snapshotSoon();
+
 }
 const step = (job, text) => { job.steps.push({ at: new Date().toISOString(), text: String(text).slice(0, 400) }); save(job); };
 
@@ -94,14 +94,15 @@ async function runGpt(job) {
   return j.output_text || (j.output || []).flatMap(o => o.content || []).map(c => c.text || '').join('').trim();
 }
 
-export function startJob(kind, request) {
-  const id = db.prepare('INSERT INTO agent_jobs (kind, request) VALUES (?,?)').run(kind, request).lastInsertRowid;
+export async function startJob(kind, request) {
+  const r = await db.prepare('INSERT INTO agent_jobs (kind, request) VALUES (?,?)').run(kind, request);
+  const id = r.lastInsertRowid || r.id;
   const job = { id, kind, request, status: 'قيد التنفيذ', steps: [] };
-  save(job);
+  await save(job);
   (async () => {
     try { job.result = kind === 'gpt' ? await runGpt(job) : await runClaude(job); job.status = 'تم'; }
     catch (e) { job.result = 'تعذّر التنفيذ: ' + e.message; job.status = 'فشل'; console.error('[agent]', e.message); }
-    save(job);
+    await save(job);
   })();
   return id;
 }
@@ -115,19 +116,19 @@ export const agentTools = {
       parameters: { type: 'OBJECT', properties: { request: { type: 'STRING' } }, required: ['request'] },
     },
     write: true,
-    run: ({ request }) => {
+    run: async ({ request }) => {
       if (!A_KEY()) return { error: 'Claude غير مربوط للحين (ينقصه ANTHROPIC_API_KEY في Render)' };
-      return { ok: true, job_id: startJob('task', request), status: 'قيد التنفيذ' };
+      return { ok: true, job_id: await startJob('task', request), status: 'قيد التنفيذ' };
     },
   },
   ask_gpt: {
     declaration: { name: 'ask_gpt', description: 'يسأل GPT (OpenAI) لما يطلب فواز رأي أو جواب من GPT بالاسم. ترجع رقم مهمة، والنظام يبلغك بالجواب.', parameters: { type: 'OBJECT', properties: { question: { type: 'STRING' } }, required: ['question'] } },
-    run: ({ question }) => process.env.OPENAI_API_KEY ? { ok: true, job_id: startJob('gpt', question) } : { error: 'GPT غير مربوط (ينقصه OPENAI_API_KEY في Render)' },
+    run: async ({ question }) => process.env.OPENAI_API_KEY ? { ok: true, job_id: await startJob('gpt', question) } : { error: 'GPT غير مربوط (ينقصه OPENAI_API_KEY في Render)' },
   },
   check_job: {
     declaration: { name: 'check_job', description: 'حالة مهمة عند Claude/GPT برقمها (أو آخر المهام لو بدون رقم): الحالة، آخر خطوة، والنتيجة.', parameters: { type: 'OBJECT', properties: { id: { type: 'INTEGER' } } } },
-    run: ({ id } = {}) => {
-      const rows = id ? db.prepare('SELECT * FROM agent_jobs WHERE id=?').all(id) : db.prepare('SELECT * FROM agent_jobs ORDER BY id DESC LIMIT 5').all();
+    run: async ({ id } = {}) => {
+      const rows = id ? await db.prepare('SELECT * FROM agent_jobs WHERE id=?').all(id) : await db.prepare('SELECT * FROM agent_jobs ORDER BY id DESC LIMIT 5').all();
       return { connected: agentStatus(), jobs: rows.map(r => ({ id: r.id, kind: r.kind, status: r.status, request: r.request.slice(0, 200), last_step: JSON.parse(r.steps || '[]').at(-1)?.text, result: r.result })) };
     },
   },

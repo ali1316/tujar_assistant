@@ -1,146 +1,270 @@
-// تخزين دائم: Postgres لو فيه DATABASE_URL (Render)، وإلا SQLite محلي
-// يحفظ: ذاكرة نورة، الداشبوردات المولّدة، إعدادات الواجهة
-import pg from 'pg';
-import { db } from './db.js';
+// store.js - First-class persistent storage using PostgreSQL (with SQLite fallback)
+// Entities: memories, dashboards, kv, chat_sessions, chat_turns, datasets
+import { db, initDb, getPool, backend as dbBackend, pgFallback as dbPgFallback } from './db.js';
 
-const URL = process.env.DATABASE_URL;
-export let backend = URL ? 'postgres' : 'sqlite';
-export let pgFallback = ''; // سبب فشل Postgres عند التشغيل (لو صار)
-let pool;
+export let backend = dbBackend;
+export let pgFallback = dbPgFallback;
 
 export async function initStore() {
-  if (URL) try {
-    pool = new pg.Pool({ connectionString: URL, ssl: /render\.com|sslmode=require/.test(URL) ? { rejectUnauthorized: false } : undefined, max: 5 });
-    pool.on('error', e => console.warn('[store] idle pg client error:', e.message)); // انقطاع اتصال خامل لا يطيّح السيرفر
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS memories (id SERIAL PRIMARY KEY, content TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'fact',
-        embedding JSONB, hits INT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now());
-      CREATE TABLE IF NOT EXISTS dashboards (id SERIAL PRIMARY KEY, title TEXT NOT NULL, spec JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now());
-      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now());
-      CREATE TABLE IF NOT EXISTS chat_sessions (id SERIAL PRIMARY KEY, started_at TIMESTAMPTZ DEFAULT now(), last_at TIMESTAMPTZ DEFAULT now(),
-        summary TEXT, embedding JSONB, turns INT NOT NULL DEFAULT 0, digested_turns INT NOT NULL DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS chat_turns (id SERIAL PRIMARY KEY, session_id INT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now());
-      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);
-      CREATE TABLE IF NOT EXISTS datasets (id SERIAL PRIMARY KEY, doc_id INT, doc_name TEXT, sheet TEXT NOT NULL, columns JSONB NOT NULL, rows JSONB NOT NULL, profile JSONB, created_at TIMESTAMPTZ DEFAULT now());`);
-  } catch (e) {
-    console.error('[store] postgres failed, falling back to sqlite:', e.message);
-    pool = null; backend = 'sqlite'; pgFallback = e.message;
-  }
-  if (!pool) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY, content TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'fact',
-        embedding TEXT, hits INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
-      CREATE TABLE IF NOT EXISTS dashboards (id INTEGER PRIMARY KEY, title TEXT NOT NULL, spec TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
-      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')));
-      CREATE TABLE IF NOT EXISTS chat_sessions (id INTEGER PRIMARY KEY, started_at TEXT DEFAULT (datetime('now')), last_at TEXT DEFAULT (datetime('now')),
-        summary TEXT, embedding TEXT, turns INTEGER NOT NULL DEFAULT 0, digested_turns INTEGER NOT NULL DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS chat_turns (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
-      CREATE INDEX IF NOT EXISTS chat_turns_session ON chat_turns(session_id, id);
-      CREATE TABLE IF NOT EXISTS datasets (id INTEGER PRIMARY KEY, doc_id INTEGER, doc_name TEXT, sheet TEXT NOT NULL, columns TEXT NOT NULL, rows TEXT NOT NULL, profile TEXT, created_at TEXT DEFAULT (datetime('now')));`);
-  }
+  await initDb();
+  backend = (await import('./db.js')).backend;
+  pgFallback = (await import('./db.js')).pgFallback;
   console.log(`[store] ${backend}`);
 }
 
-const parse = v => (typeof v === 'string' ? JSON.parse(v) : v);
+const parse = v => {
+  if (v == null) return null;
+  if (typeof v === 'object') return v;
+  try { return JSON.parse(v); } catch { return v; }
+};
 
 // ===== KV =====
 export async function kvGet(key) {
-  if (pool) { const r = await pool.query('SELECT value FROM kv WHERE key=$1', [key]); return r.rows[0]?.value ?? null; }
-  const r = db.prepare('SELECT value FROM kv WHERE key=?').get(key); return r ? parse(r.value) : null;
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('SELECT value FROM kv WHERE key=$1', [key]);
+    return r.rows[0]?.value ?? null;
+  }
+  const r = await db.prepare('SELECT value FROM kv WHERE key=?').get(key);
+  return r ? parse(r.value) : null;
 }
+
 export async function kvSet(key, value) {
-  if (pool) return pool.query('INSERT INTO kv (key, value, updated_at) VALUES ($1,$2,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()', [key, JSON.stringify(value)]);
-  db.prepare("INSERT INTO kv (key, value, updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at").run(key, JSON.stringify(value));
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    return pool.query(
+      'INSERT INTO kv (key, value, updated_at) VALUES ($1,$2,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()',
+      [key, JSON.stringify(value)]
+    );
+  }
+  return db.prepare(
+    "INSERT INTO kv (key, value, updated_at) VALUES (?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at"
+  ).run(key, JSON.stringify(value));
 }
 
 // ===== الذاكرة =====
-const memRow = r => ({ ...r, embedding: r.embedding ? parse(r.embedding) : null });
+const memRow = r => (r ? { ...r, embedding: r.embedding ? parse(r.embedding) : null } : null);
+
 export async function memAll() {
-  if (pool) return (await pool.query('SELECT * FROM memories ORDER BY updated_at DESC')).rows.map(memRow);
-  return db.prepare('SELECT * FROM memories ORDER BY updated_at DESC').all().map(memRow);
+  const rows = await db.prepare('SELECT * FROM memories ORDER BY updated_at DESC').all();
+  return rows.map(memRow);
 }
+
 export async function memAdd({ content, category, embedding }) {
+  const pool = getPool();
   const e = embedding ? JSON.stringify(embedding) : null;
-  if (pool) return (await pool.query('INSERT INTO memories (content, category, embedding) VALUES ($1,$2,$3) RETURNING id', [content, category, e])).rows[0].id;
-  return db.prepare('INSERT INTO memories (content, category, embedding) VALUES (?,?,?)').run(content, category, e).lastInsertRowid;
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query(
+      'INSERT INTO memories (content, category, embedding) VALUES ($1,$2,$3) RETURNING id',
+      [content, category, e]
+    );
+    return r.rows[0].id;
+  }
+  const r = await db.prepare('INSERT INTO memories (content, category, embedding) VALUES (?,?,?)').run(content, category, e);
+  return r.lastInsertRowid;
 }
+
 export async function memUpdate(id, { content, category, embedding }) {
+  const pool = getPool();
   const e = embedding ? JSON.stringify(embedding) : null;
-  if (pool) return pool.query('UPDATE memories SET content=$2, category=$3, embedding=$4, updated_at=now() WHERE id=$1', [id, content, category, e]);
-  db.prepare("UPDATE memories SET content=?, category=?, embedding=?, updated_at=datetime('now') WHERE id=?").run(content, category, e, id);
+  if (backend === 'postgres' && pool) {
+    return pool.query(
+      'UPDATE memories SET content=$2, category=$3, embedding=$4, updated_at=now() WHERE id=$1',
+      [id, content, category, e]
+    );
+  }
+  return db.prepare(
+    "UPDATE memories SET content=?, category=?, embedding=?, updated_at=datetime('now') WHERE id=?"
+  ).run(content, category, e, id);
 }
+
 export async function memHit(ids) {
-  if (!ids.length) return;
-  if (pool) return pool.query('UPDATE memories SET hits=hits+1 WHERE id = ANY($1)', [ids]);
-  const s = db.prepare('UPDATE memories SET hits=hits+1 WHERE id=?'); ids.forEach(i => s.run(i));
+  if (!ids || !ids.length) return;
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    return pool.query('UPDATE memories SET hits=hits+1 WHERE id = ANY($1)', [ids]);
+  }
+  for (const i of ids) {
+    await db.prepare('UPDATE memories SET hits=hits+1 WHERE id=?').run(i);
+  }
 }
+
 export async function memDelete(id) {
-  if (pool) return (await pool.query('DELETE FROM memories WHERE id=$1', [id])).rowCount;
-  return db.prepare('DELETE FROM memories WHERE id=?').run(id).changes;
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('DELETE FROM memories WHERE id=$1', [id]);
+    return r.rowCount;
+  }
+  const r = await db.prepare('DELETE FROM memories WHERE id=?').run(id);
+  return r.changes;
 }
 
 // ===== الداشبوردات =====
 export async function dashAdd(title, spec) {
-  if (pool) return (await pool.query('INSERT INTO dashboards (title, spec) VALUES ($1,$2) RETURNING id', [title, JSON.stringify(spec)])).rows[0].id;
-  return db.prepare('INSERT INTO dashboards (title, spec) VALUES (?,?)').run(title, JSON.stringify(spec)).lastInsertRowid;
+  const pool = getPool();
+  const specStr = JSON.stringify(spec);
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query(
+      'INSERT INTO dashboards (title, spec) VALUES ($1,$2) RETURNING id',
+      [title, specStr]
+    );
+    return r.rows[0].id;
+  }
+  const r = await db.prepare('INSERT INTO dashboards (title, spec) VALUES (?,?)').run(title, specStr);
+  return r.lastInsertRowid;
 }
+
 export async function dashGet(id) {
-  const r = pool ? (await pool.query('SELECT * FROM dashboards WHERE id=$1', [id])).rows[0] : db.prepare('SELECT * FROM dashboards WHERE id=?').get(id);
+  const r = await db.prepare('SELECT * FROM dashboards WHERE id=?').get(id);
   return r ? { ...r, spec: parse(r.spec) } : null;
 }
+
 export async function dashList() {
-  if (pool) return (await pool.query('SELECT id, title, created_at FROM dashboards ORDER BY id DESC LIMIT 30')).rows;
   return db.prepare('SELECT id, title, created_at FROM dashboards ORDER BY id DESC LIMIT 30').all();
 }
 
 // ===== سجل المحادثات =====
-const q = async (pgSql, liteSql, args = []) => pool ? (await pool.query(pgSql, args)).rows : db.prepare(liteSql).all(...args);
-const run = async (pgSql, liteSql, args = []) => pool ? pool.query(pgSql, args) : db.prepare(liteSql).run(...args);
-
 export async function chatStart() {
-  if (pool) return (await pool.query('INSERT INTO chat_sessions DEFAULT VALUES RETURNING id')).rows[0].id;
-  return db.prepare('INSERT INTO chat_sessions DEFAULT VALUES').run().lastInsertRowid;
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('INSERT INTO chat_sessions DEFAULT VALUES RETURNING id');
+    return r.rows[0].id;
+  }
+  const r = await db.prepare('INSERT INTO chat_sessions DEFAULT VALUES').run();
+  return r.lastInsertRowid;
 }
-export async function chatAppend(sessionId, turns) {
-  for (const t of turns) await run('INSERT INTO chat_turns (session_id, role, text) VALUES ($1,$2,$3)', 'INSERT INTO chat_turns (session_id, role, text) VALUES (?,?,?)', [sessionId, t.role, t.text]);
-  await run('UPDATE chat_sessions SET turns=turns+$1, last_at=now() WHERE id=$2', "UPDATE chat_sessions SET turns=turns+?, last_at=datetime('now') WHERE id=?", [turns.length, sessionId]);
-}
-export const chatTurns = (sessionId, afterIndex = 0) =>
-  q('SELECT role, text, created_at FROM chat_turns WHERE session_id=$1 ORDER BY id OFFSET $2', 'SELECT role, text, created_at FROM chat_turns WHERE session_id=? ORDER BY id LIMIT -1 OFFSET ?', [sessionId, afterIndex]);
-export const chatRecentTurns = (limit = 30) =>
-  q('SELECT * FROM (SELECT id, session_id, role, text, created_at FROM chat_turns ORDER BY id DESC LIMIT $1) t ORDER BY id', 'SELECT * FROM (SELECT id, session_id, role, text, created_at FROM chat_turns ORDER BY id DESC LIMIT ?) ORDER BY id', [limit]);
-export const chatSessions = (limit = 50) =>
-  q('SELECT * FROM chat_sessions WHERE turns>0 ORDER BY id DESC LIMIT $1', 'SELECT * FROM chat_sessions WHERE turns>0 ORDER BY id DESC LIMIT ?', [limit]).then(r => r.map(s => ({ ...s, embedding: s.embedding ? parse(s.embedding) : null })));
-export const chatPending = () =>
-  q('SELECT id FROM chat_sessions WHERE turns > digested_turns ORDER BY id', 'SELECT id FROM chat_sessions WHERE turns > digested_turns ORDER BY id');
-export async function chatSetDigest(id, { summary, embedding, digested }) {
-  await run('UPDATE chat_sessions SET summary=$1, embedding=$2, digested_turns=$3 WHERE id=$4', 'UPDATE chat_sessions SET summary=?, embedding=?, digested_turns=? WHERE id=?',
-    [summary, embedding ? JSON.stringify(embedding) : null, digested, id]);
-}
-export const chatGet = id => q('SELECT * FROM chat_sessions WHERE id=$1', 'SELECT * FROM chat_sessions WHERE id=?', [id]).then(r => r[0] || null);
-export const chatSearchText = (word, limit = 8) =>
-  q('SELECT session_id, role, text, created_at FROM chat_turns WHERE text ILIKE $1 ORDER BY id DESC LIMIT $2', 'SELECT session_id, role, text, created_at FROM chat_turns WHERE text LIKE ? ORDER BY id DESC LIMIT ?', [`%${word}%`, limit]);
 
-// ===== البيانات المنظّمة من ملفات Excel/CSV (جاهزة للشارتات الفورية) =====
+export async function chatAppend(sessionId, turns) {
+  for (const t of turns) {
+    await db.prepare('INSERT INTO chat_turns (session_id, role, text) VALUES (?,?,?)').run(sessionId, t.role, t.text);
+  }
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    await pool.query('UPDATE chat_sessions SET turns=turns+$1, last_at=now() WHERE id=$2', [turns.length, sessionId]);
+  } else {
+    await db.prepare("UPDATE chat_sessions SET turns=turns+?, last_at=datetime('now') WHERE id=?").run(turns.length, sessionId);
+  }
+}
+
+export async function chatTurns(sessionId, afterIndex = 0) {
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query(
+      'SELECT role, text, created_at FROM chat_turns WHERE session_id=$1 ORDER BY id OFFSET $2',
+      [sessionId, afterIndex]
+    );
+    return r.rows;
+  }
+  return db.prepare(
+    'SELECT role, text, created_at FROM chat_turns WHERE session_id=? ORDER BY id LIMIT -1 OFFSET ?'
+  ).all(sessionId, afterIndex);
+}
+
+export async function chatRecentTurns(limit = 30) {
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query(
+      'SELECT * FROM (SELECT id, session_id, role, text, created_at FROM chat_turns ORDER BY id DESC LIMIT $1) t ORDER BY id',
+      [limit]
+    );
+    return r.rows;
+  }
+  return db.prepare(
+    'SELECT * FROM (SELECT id, session_id, role, text, created_at FROM chat_turns ORDER BY id DESC LIMIT ?) ORDER BY id'
+  ).all(limit);
+}
+
+export async function chatSessions(limit = 50) {
+  const pool = getPool();
+  const rows = backend === 'postgres' && pool
+    ? (await pool.query('SELECT * FROM chat_sessions WHERE turns>0 ORDER BY id DESC LIMIT $1', [limit])).rows
+    : await db.prepare('SELECT * FROM chat_sessions WHERE turns>0 ORDER BY id DESC LIMIT ?').all(limit);
+  return rows.map(s => ({ ...s, embedding: s.embedding ? parse(s.embedding) : null }));
+}
+
+export async function chatPending() {
+  return db.prepare('SELECT id FROM chat_sessions WHERE turns > digested_turns ORDER BY id').all();
+}
+
+export async function chatSetDigest(id, { summary, embedding, digested }) {
+  const pool = getPool();
+  const e = embedding ? JSON.stringify(embedding) : null;
+  if (backend === 'postgres' && pool) {
+    return pool.query(
+      'UPDATE chat_sessions SET summary=$1, embedding=$2, digested_turns=$3 WHERE id=$4',
+      [summary, e, digested, id]
+    );
+  }
+  return db.prepare(
+    'UPDATE chat_sessions SET summary=?, embedding=?, digested_turns=? WHERE id=?'
+  ).run(summary, e, digested, id);
+}
+
+export async function chatGet(id) {
+  const r = await db.prepare('SELECT * FROM chat_sessions WHERE id=?').get(id);
+  return r || null;
+}
+
+export async function chatSearchText(word, limit = 8) {
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query(
+      'SELECT session_id, role, text, created_at FROM chat_turns WHERE text ILIKE $1 ORDER BY id DESC LIMIT $2',
+      [`%${word}%`, limit]
+    );
+    return r.rows;
+  }
+  return db.prepare(
+    'SELECT session_id, role, text, created_at FROM chat_turns WHERE text LIKE ? ORDER BY id DESC LIMIT ?'
+  ).all(`%${word}%`, limit);
+}
+
+// ===== البيانات المنظّمة من ملفات Excel/CSV =====
 const dsRow = r => r && ({ ...r, columns: parse(r.columns), rows: parse(r.rows), profile: r.profile ? parse(r.profile) : null });
+
 export async function datasetAdd({ doc_id, doc_name, sheet, columns, rows, profile }) {
   const a = [doc_id, doc_name, sheet, JSON.stringify(columns), JSON.stringify(rows), JSON.stringify(profile)];
-  if (pool) return (await pool.query('INSERT INTO datasets (doc_id, doc_name, sheet, columns, rows, profile) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', a)).rows[0].id;
-  return db.prepare('INSERT INTO datasets (doc_id, doc_name, sheet, columns, rows, profile) VALUES (?,?,?,?,?,?)').run(...a).lastInsertRowid;
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query(
+      'INSERT INTO datasets (doc_id, doc_name, sheet, columns, rows, profile) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+      a
+    );
+    return r.rows[0].id;
+  }
+  const r = await db.prepare('INSERT INTO datasets (doc_id, doc_name, sheet, columns, rows, profile) VALUES (?,?,?,?,?,?)').run(...a);
+  return r.lastInsertRowid;
 }
-export const datasetGet = id => q('SELECT * FROM datasets WHERE id=$1', 'SELECT * FROM datasets WHERE id=?', [id]).then(r => dsRow(r[0]));
-export const datasetsForDoc = docId => q('SELECT * FROM datasets WHERE doc_id=$1 ORDER BY id', 'SELECT * FROM datasets WHERE doc_id=? ORDER BY id', [docId]).then(r => r.map(dsRow));
-export const datasetsRecent = (n = 30) => q('SELECT * FROM datasets ORDER BY id DESC LIMIT $1', 'SELECT * FROM datasets ORDER BY id DESC LIMIT ?', [n]).then(r => r.map(dsRow));
-export const datasetsLatest = () => q('SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id', 'SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id').then(r => r.map(dsRow));
 
-// ===== قفل استشاري (Postgres) لمنع مهمتين تعالجان المستند نفسه — داخل نفس قاعدة البيانات الحالية =====
+export async function datasetGet(id) {
+  const r = await db.prepare('SELECT * FROM datasets WHERE id=?').get(id);
+  return dsRow(r);
+}
+
+export async function datasetsForDoc(docId) {
+  const rows = await db.prepare('SELECT * FROM datasets WHERE doc_id=? ORDER BY id').all(docId);
+  return rows.map(dsRow);
+}
+
+export async function datasetsRecent(n = 30) {
+  const rows = await db.prepare('SELECT * FROM datasets ORDER BY id DESC LIMIT ?').all(n);
+  return rows.map(dsRow);
+}
+
+export async function datasetsLatest() {
+  const rows = await db.prepare('SELECT * FROM datasets WHERE doc_id = (SELECT MAX(doc_id) FROM datasets) ORDER BY id').all();
+  return rows.map(dsRow);
+}
+
+// ===== قفل استشاري (Postgres) =====
 const localLocks = new Set();
 export async function withLock(key, fn) {
   if (localLocks.has(key)) return { locked: false };
   localLocks.add(key);
   let client = null;
+  const pool = getPool();
   try {
-    if (pool) {
+    if (backend === 'postgres' && pool) {
       client = await pool.connect();
       const r = await client.query('SELECT pg_try_advisory_lock(hashtext($1)) AS ok', [key]);
       if (!r.rows[0].ok) return { locked: false };
@@ -148,29 +272,50 @@ export async function withLock(key, fn) {
     return { locked: true, value: await fn() };
   } finally {
     localLocks.delete(key);
-    if (client) { await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]).catch(() => {}); client.release(); }
+    if (client) {
+      await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]).catch(() => {});
+      client.release();
+    }
   }
 }
 
-// ===== إدارة: قراءة/مسح جداول التخزين الدائم (للبداية الجديدة فقط) =====
+// ===== إدارة: قراءة/مسح الجداول =====
 export const STORE_TABLES = ['memories', 'dashboards', 'chat_sessions', 'chat_turns', 'datasets'];
+
 export async function storeDump(t) {
   if (!STORE_TABLES.includes(t)) throw new Error('جدول غير معروف');
-  if (pool) return (await pool.query(`SELECT * FROM ${t}`)).rows;
   return db.prepare(`SELECT * FROM ${t}`).all();
 }
+
 export async function storeClear(t) {
   if (!STORE_TABLES.includes(t)) throw new Error('جدول غير معروف');
-  if (pool) return (await pool.query(`DELETE FROM ${t}`)).rowCount;
-  return db.prepare(`DELETE FROM ${t}`).run().changes;
+  const r = await db.prepare(`DELETE FROM ${t}`).run();
+  return r.changes;
 }
+
 export async function kvKeys(prefixes) {
-  const like = prefixes.map(p => p.endsWith('*') ? p.slice(0, -1) + '%' : p);
-  if (pool) return (await pool.query('SELECT key FROM kv WHERE key LIKE ANY($1)', [like])).rows.map(r => r.key);
-  return db.prepare(`SELECT key FROM kv WHERE ${like.map(() => 'key LIKE ?').join(' OR ')}`).all(...like).map(r => r.key);
+  const pool = getPool();
+  const like = prefixes.map(p => (p.endsWith('*') ? p.slice(0, -1) + '%' : p));
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('SELECT key FROM kv WHERE key LIKE ANY($1)', [like]);
+    return r.rows.map(x => x.key);
+  }
+  const where = like.map(() => 'key LIKE ?').join(' OR ');
+  const rows = await db.prepare(`SELECT key FROM kv WHERE ${where}`).all(...like);
+  return rows.map(x => x.key);
 }
+
 export async function kvDelete(keys) {
-  if (!keys.length) return 0;
-  if (pool) return (await pool.query('DELETE FROM kv WHERE key = ANY($1)', [keys])).rowCount;
-  const s = db.prepare('DELETE FROM kv WHERE key=?'); return keys.reduce((a, k) => a + s.run(k).changes, 0);
+  if (!keys || !keys.length) return 0;
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('DELETE FROM kv WHERE key = ANY($1)', [keys]);
+    return r.rowCount;
+  }
+  let total = 0;
+  for (const k of keys) {
+    const r = await db.prepare('DELETE FROM kv WHERE key=?').run(k);
+    total += r.changes;
+  }
+  return total;
 }

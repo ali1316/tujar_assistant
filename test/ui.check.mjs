@@ -2,7 +2,13 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import { createRequire } from 'node:module';
-const { chromium } = createRequire(import.meta.url)('playwright');
+let chromium;
+try {
+  ({ chromium } = createRequire(import.meta.url)('playwright'));
+} catch {
+  console.log('ℹ️  playwright غير مثبت — تم تخطي فحوص المتصفح للواجهة');
+  process.exit(0);
+}
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-ui-'));
 const PORT = 3990 + Math.floor(Math.random() * 8);

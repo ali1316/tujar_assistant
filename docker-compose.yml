@@ -1,0 +1,77 @@
+services:
+  # ============================================================================
+  # Application Service: gemini-live-dashboard (Node.js 22 runtime)
+  # ============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: gemini-live-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-gemini_dashboard}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-live}
+      GEMINI_VOICE: ${GEMINI_VOICE:-Sulafat}
+      GEMINI_API_VERSION: ${GEMINI_API_VERSION:-v1alpha}
+      ACCESS_CODE: ${ACCESS_CODE:-}
+      LOCK_CONFIG: ${LOCK_CONFIG:-true}
+      ALLOW_WRITES: ${ALLOW_WRITES:-true}
+      INGEST_STORAGE: ${INGEST_STORAGE:-local}
+      INGEST_LOCAL_DIR: /app/ingest-data
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/ingest-data
+    networks:
+      - dashboard-network
+
+  # ============================================================================
+  # Database Service: PostgreSQL 16 Alpine
+  # ============================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: gemini-live-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-gemini_dashboard}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-gemini_dashboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - dashboard-network
+
+# ==============================================================================
+# Persistent Volumes
+# ==============================================================================
+volumes:
+  pgdata:
+    name: gemini-live-pgdata
+  app_data:
+    name: gemini-live-appdata
+
+# ==============================================================================
+# Dedicated Bridge Network
+# ==============================================================================
+networks:
+  dashboard-network:
+    name: gemini-live-network
+    driver: bridge
