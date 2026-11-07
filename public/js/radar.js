@@ -28,6 +28,7 @@ function injectRadarStyles() {
       border: 1px solid var(--line, #1d3a5a);
       color: var(--ink, #eef2f7);
       padding: 6px 14px;
+      min-height: 38px;
       border-radius: 99px;
       font-size: 13px;
       font-weight: 600;
@@ -483,6 +484,7 @@ export function openRadarDrawer() {
     requestAnimationFrame(() => {
       drawer.classList.add('open');
       backdrop.classList.add('open');
+      drawer.querySelector('#radarClose')?.focus();
     });
   }
   if (pill) {
@@ -512,6 +514,7 @@ export function closeRadarDrawer() {
   }
   if (pill) {
     pill.setAttribute('aria-expanded', 'false');
+    pill.focus();
   }
 }
 

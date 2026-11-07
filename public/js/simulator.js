@@ -36,7 +36,8 @@ export async function renderSimulatorCockpit({
   if (homeEl) homeEl.hidden = true;
   mountEl.hidden = false;
   document.body.classList.remove('blank');
-  if (crumbEl) crumbEl.textContent = '‹ محاكاة القرارات التنفيذية';
+  if (crumbEl) crumbEl.textContent = '› محاكاة القرارات التنفيذية';
+  window.__simulatorOpen = true;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   // 2. Load projects for selection
@@ -312,6 +313,7 @@ export async function renderSimulatorCockpit({
 
   // Close / Return to Home
   function closeSimulator() {
+    window.__simulatorOpen = false;
     if (activeChart) {
       activeChart.destroy();
       activeChart = null;
@@ -320,7 +322,9 @@ export async function renderSimulatorCockpit({
     if (homeEl) homeEl.hidden = false;
     if (crumbEl) crumbEl.textContent = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.querySelector('#qaSim')?.focus();
   }
+  window.closeSimulatorCockpit = closeSimulator;
   if (closeBtn) closeBtn.onclick = closeSimulator;
 
   // Debounced Simulation Trigger

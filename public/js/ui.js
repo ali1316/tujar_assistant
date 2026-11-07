@@ -319,7 +319,7 @@ export function renderView() {
   const viewEl = $('#view');
   document.body.classList.toggle('blank', false);
   const crumb = $('#crumb');
-  if (crumb) crumb.textContent = (VIEW && VIEW !== 'overview') ? '‹ ' + (VIEW_LABEL[VIEW] || '') : '';
+  if (crumb) crumb.textContent = (VIEW && VIEW !== 'overview') ? '› ' + (VIEW_LABEL[VIEW] || '') : '';
   if (VIEW !== renderView.last) {
     if (VIEW) announce(`تم عرض ${VIEW_LABEL[VIEW] || VIEW}`);
     else if (renderView.last) announce('رجعت للشاشة الأساسية');
@@ -329,6 +329,9 @@ export function renderView() {
 
 export function showView(v) {
   if (v === 'home' || !v || v === 'overview') {
+    if (window.closeSimulatorCockpit && window.__simulatorOpen) {
+      window.closeSimulatorCockpit();
+    }
     hud.closeAll();
     VIEW = 'overview';
     renderView();

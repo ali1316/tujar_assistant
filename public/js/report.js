@@ -202,6 +202,7 @@ export async function openReportModal() {
     // ربط إغلاق النافذة
     const closeModal = () => {
       modal.style.display = 'none';
+      document.getElementById('btnBoardroomReport')?.focus();
     };
     modal.querySelector('#closeModalBtn').addEventListener('click', closeModal);
     modal.addEventListener('click', e => {
@@ -329,6 +330,7 @@ export function initReportButton() {
 
   const btn = document.createElement('button');
   btn.type = 'button';
+  btn.id = 'btnBoardroomReport';
   btn.className = 'report-btn';
   btn.setAttribute('aria-label', 'تصدير تقرير المجلس التنفيذي');
   btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg><span class="report-btn-label">تقرير المجلس</span>`;
@@ -338,7 +340,8 @@ export function initReportButton() {
     border: 1px solid #d1a65c;
     color: #d1a65c;
     border-radius: 99px;
-    padding: 5px 14px;
+    padding: 6px 14px;
+    min-height: 38px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
