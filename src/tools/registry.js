@@ -10,6 +10,11 @@ import { agentTools, initAgent } from '../../agent.js';
 import { ingestTools } from '../../ingest/index.js';
 import { ensureIndex, hybridSearch, cite } from '../../retrieval.js';
 import { usageTools } from './usage.js';
+import { get_executive_briefing } from '../executive/briefing.js';
+import { spotlight_element } from './spotlight.js';
+import { check_risk_radar } from '../executive/radar.js';
+import { generate_executive_report } from '../executive/report.js';
+import { simulate_scenario } from '../executive/simulator.js';
 
 // search_documents: البحث الهجين (معنى + كلمات) بدل الكلمات فقط، مع الاستشهاد بالمصدر. القديم يبقى للقياس.
 export const legacySearchDocs = docTools.search_documents.run;
@@ -47,6 +52,20 @@ export const tools = {
   ...driveTools,
   ...agentTools,
   ...ingestTools,
+  get_executive_briefing,
+  spotlight_element,
+  check_risk_radar,
+  generate_executive_report,
+  simulate_scenario,
+};
+
+
+export {
+  spotlight_element,
+  get_executive_briefing,
+  check_risk_radar,
+  generate_executive_report,
+  simulate_scenario,
 };
 
 initAgent(tools);

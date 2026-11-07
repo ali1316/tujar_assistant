@@ -42,10 +42,16 @@
 <main>
   <section id="home">
     <div id="empty"><h2 id="hello"><span class="gold">هلا فواز،</span> وش ننجز اليوم؟</h2><p>مشاريعك، ملفاتك، ومؤشراتك… في مساحة واحدة.</p>
+      <div class="briefing-wrap">
+        <button type="button" class="briefing-btn" id="executiveBriefingBtn" aria-label="استمع للموجز الصباحي بصوت نورة">
+          <span class="b-icon">🎙️</span> <span class="b-label">استمع للموجز الصباحي</span>
+        </button>
+      </div>
       <div class="qa" role="group" aria-label="اختصارات سريعة">
         <button type="button" class="qa-btn" data-say="اعرضي لي المشاريع"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 20V12M12 20V5M18 20v-9"/></svg>اعرض المشاريع</button>
         <button type="button" class="qa-btn" data-act="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>حلّل ملفاً</button>
         <button type="button" class="qa-btn" data-say="اعرضي لي الداشبوردات"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>افتح لوحة</button>
+        <button type="button" class="qa-btn" id="qaSim" data-act="simulator" title="محاكاة القرارات التنفيذية"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><path d="M18 18l3 3"/></svg>محاكاة القرارات</button>
       </div>
       <div id="qaSkel" role="status" aria-live="polite" hidden></div></div>
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
@@ -86,5 +92,10 @@
   <input type="file" id="file" hidden multiple aria-label="اختيار ملف للرفع" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json">
 </div>
 <script type="module" src="/js/app.js"></script>
+<script type="module" src="/js/briefing.js"></script>
+<script type="module" src="/js/spotlight.js"></script>
+<script type="module" src="/js/radar.js"></script>
+<script type="module" src="/js/report.js"></script>
+<script type="module" src="/js/simulator.js"></script>
 </body>
 </html>

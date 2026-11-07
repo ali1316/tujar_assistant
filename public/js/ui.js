@@ -170,6 +170,11 @@ export const TOOL_AR = {
   get_ui_state: ['أشوف إعدادات الواجهة', 'شفت إعدادات الواجهة'],
   get_token_usage: ['أحسب الاستهلاك', 'جبت استهلاك التوكنز'],
   open_app: [a => `أفتح ${short(a.app || a.name || 'التطبيق', 30)}`, (a, r) => `فتحت ${short(a.app || a.name || 'التطبيق', 30)}`],
+  get_executive_briefing: ['أجهّز الموجز الصباحي التنفيذي', 'عرضت الموجز الصباحي التنفيذي'],
+  spotlight_element: [a => `أوجّه التركيز: ${short(a.label || a.selector || 'عنصر الشاشة', 30)}`, 'سلّطت الضوء على العنصر'],
+  check_risk_radar: ['أفحص رادار المخاطر والميزانية', (a, r) => r?.alerts?.length ? `رصدت ${r.alerts.length} تنبيهات مخاطر` : 'فحصت رادار المخاطر: المؤشرات مستقرة'],
+  generate_executive_report: ['أصدّر التقرير التنفيذي لمجلس الإدارة', 'جهّزت التقرير التنفيذي'],
+  simulate_scenario: ['أشغّل محاكاة السيناريوهات التنفيذية', 'عرضت نتائج محاكاة السيناريو'],
 };
 
 for (const k of ['set_theme', 'set_colors', 'set_font', 'set_text_size', 'set_table_style', 'set_number_style', 'set_corners', 'apply_custom_css', 'reset_ui', 'undo_ui', 'show_fonts']) {

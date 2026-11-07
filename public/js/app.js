@@ -323,7 +323,13 @@ const agentOpts = {
       turnTools.push(fc.name);
       pend.a += ` ⟨نفّذت ${fc.name}: ${JSON.stringify(fc.args || {}).slice(0, 160)} → ${JSON.stringify(r).slice(0, 120)}⟩ `;
       toolDone(fc, r);
-      if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) {
+      if (fc.name === 'simulate_scenario' && window.renderSimulatorCockpit) {
+        window.renderSimulatorCockpit({ projectId: fc.args?.projectId });
+      } else if (fc.name === 'spotlight_element' && window.spotlightElement) {
+        window.spotlightElement(fc.args);
+      } else if (fc.name === 'generate_executive_report' && window.openReportModal) {
+        window.openReportModal();
+      } else if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) {
         loadDashboard(r.ticket_id || fc.args?.ticket_id);
       }
     },
@@ -353,6 +359,24 @@ window.__nora = {
   modeFor: () => modeFor(),
   agent: () => agent,
   connected: () => !!agent?.connected,
+  simulator: {
+    open: (id) => window.openSimulatorCockpit?.(id),
+    render: (opts) => window.renderSimulatorCockpit?.(opts),
+  },
+  spotlight: (opts) => window.spotlightElement?.(opts),
+  briefing: {
+    start: () => window.startExecutiveBriefing?.(),
+    stop: () => window.stopExecutiveBriefing?.(),
+  },
+  radar: {
+    refresh: () => window.__radar?.refresh?.(),
+    open: () => window.__radar?.open?.(),
+    close: () => window.__radar?.close?.(),
+    getRisks: () => window.__radar?.getRisks?.(),
+  },
+  report: {
+    open: () => window.openReportModal?.(),
+  },
 };
 
 let GVOICE = 'Sulafat';
@@ -499,6 +523,10 @@ $('#f')?.addEventListener('submit', async e => {
 $$('.qa-btn').forEach(b => {
   b.onclick = () => {
     if (b.dataset.act === 'file') return $('#file')?.click();
+    if (b.dataset.act === 'simulator') {
+      if (window.openSimulatorCockpit) window.openSimulatorCockpit();
+      return;
+    }
     qaBusy(b, true);
     const txt = $('#txt');
     if (txt) txt.value = b.dataset.say;

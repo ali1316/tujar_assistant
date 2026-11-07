@@ -49,7 +49,12 @@ async function runLiveVerification() {
       '/js/charts.js',
       '/js/ui.js',
       '/js/hud.js',
-      '/js/speech.js'
+      '/js/speech.js',
+      '/js/briefing.js',
+      '/js/spotlight.js',
+      '/js/radar.js',
+      '/js/report.js',
+      '/js/simulator.js'
     ];
     for (const jsPath of jsFiles) {
       const res = await fetch(`${base}${jsPath}`);
@@ -187,6 +192,82 @@ async function runLiveVerification() {
     await storage.delete(testKey);
     assert.equal(await storage.exists(testKey), false);
     console.log('✅ Storage Adapter operations OK');
+
+    // 12. Test Executive WOW Factor Endpoints
+    console.log('Testing Executive WOW Factor Endpoints...');
+    // A. Executive Briefing
+    const briefRes = await fetch(`${base}/api/executive/briefing`);
+    assert.equal(briefRes.status, 200, 'GET /api/executive/briefing failed');
+    const briefData = await briefRes.json();
+    assert.ok(briefData.text, 'Briefing response missing speech text');
+    assert.ok(Array.isArray(briefData.cues), 'Briefing response missing cues array');
+    console.log(`  ✓ Morning Briefing OK (${briefData.cues.length} cues synchronized)`);
+
+    // B. Risk & Discrepancy Radar
+    const radarRes = await fetch(`${base}/api/executive/radar`);
+    assert.equal(radarRes.status, 200, 'GET /api/executive/radar failed');
+    const radarData = await radarRes.json();
+    assert.ok(Array.isArray(radarData.alerts), 'Radar response missing alerts array');
+    assert.ok(radarData.summary, 'Radar response missing summary');
+    console.log(`  ✓ Risk Radar OK (${radarData.alerts.length} alerts detected)`);
+
+    // C. Boardroom Report (WhatsApp text & PDF)
+    const repWaRes = await fetch(`${base}/api/executive/report?format=whatsapp`);
+    assert.equal(repWaRes.status, 200, 'GET /api/executive/report?format=whatsapp failed');
+    const repWa = await repWaRes.json();
+    assert.ok(repWa.text.includes('اتحاد الغرف السعودية'), 'WhatsApp report missing header branding');
+
+    const repPdfRes = await fetch(`${base}/api/executive/report?format=pdf`);
+    assert.equal(repPdfRes.status, 200, 'GET /api/executive/report?format=pdf failed');
+    assert.match(repPdfRes.headers.get('content-type'), /application\/pdf/);
+    const pdfBuf = Buffer.from(await repPdfRes.arrayBuffer());
+    assert.ok(pdfBuf.slice(0, 5).toString().startsWith('%PDF-'), 'PDF does not start with %PDF-');
+    console.log(`  ✓ Boardroom Report OK (PDF ${pdfBuf.length} bytes + WhatsApp brief generated)`);
+
+    // D. Executive Scenario Simulator
+    const execProjRes = await fetch(`${base}/api/executive/projects`);
+    assert.equal(execProjRes.status, 200);
+    const execProjData = await execProjRes.json();
+    assert.ok(Array.isArray(execProjData.projects), 'Missing projects in executive/projects');
+    const simTargetId = execProjData.projects[0].id;
+
+    const simRes = await fetch(`${base}/api/executive/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: simTargetId, budgetDelta: 50000, timelineDeltaDays: -10 })
+    });
+    assert.equal(simRes.status, 200, 'POST /api/executive/simulate failed');
+    const simData = await simRes.json();
+    assert.ok(simData.simulated, 'Missing simulated object');
+    assert.ok(simData.narrative, 'Missing narrative text');
+
+    const applyRes = await fetch(`${base}/api/executive/simulate/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: simTargetId, newBudget: simData.simulated.projectedBudget })
+    });
+    assert.equal(applyRes.status, 200, 'POST /api/executive/simulate/apply failed');
+    const applyData = await applyRes.json();
+    assert.equal(applyData.ok, true);
+    // Restore project 1 to baseline seed so test suite remains idempotent
+    await fetch(`${base}/api/executive/simulate/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: simTargetId, newBudget: 1200000, newDueDate: '2026-12-31', newStatus: 'قيد التنفيذ' })
+    });
+    console.log(`  ✓ Executive Simulator OK (Project #${simTargetId} simulated & applied)`);
+
+    // E. Spotlight Element Tool
+    const spotRes = await fetch(`${base}/api/tools/spotlight_element`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: '#kpis', label: 'المؤشرات المالية' })
+    });
+    assert.equal(spotRes.status, 200);
+    const spotData = await spotRes.json();
+    assert.equal(spotData.ok, true);
+    assert.equal(spotData.action, 'spotlight');
+    console.log('  ✓ Screen Spotlight Choreography Tool OK');
 
     console.log('\n======================================================');
     console.log('🎉 ALL LIVE RUNTIME ENDPOINTS & SYSTEMS OPERATING FLAWLESSLY!');

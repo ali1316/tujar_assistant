@@ -1574,3 +1574,217 @@ body.eng-eleven #caption .ca::before {
   opacity: 0;
   animation: hud-cell .45s ease-out both;
 }
+
+
+/* --- Morning Briefing Styles --- */
+------
+   Executive Morning Audio Briefing (الموجز التنفيذي الصباحي)
+   -------------------------------------------------------------------------- */
+.briefing-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 16px 0 20px;
+}
+
+.briefing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #d1a65c 0%, #b8860b 100%);
+  color: #081726;
+  border: 1px solid #e8d3a8;
+  border-radius: 999px;
+  padding: 12px 26px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(209, 166, 92, 0.35), 0 0 0 1px rgba(232, 211, 168, 0.25);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  user-select: none;
+}
+
+.briefing-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 24px rgba(209, 166, 92, 0.5), 0 0 12px rgba(209, 166, 92, 0.35);
+  background: linear-gradient(135deg, #dfb46a 0%, #c49214 100%);
+}
+
+.briefing-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.briefing-btn.loading {
+  opacity: 0.85;
+  cursor: wait;
+}
+
+.briefing-btn.playing {
+  background: linear-gradient(135deg, #16392e 0%, #1e5241 100%);
+  color: #59c48f;
+  border-color: #59c48f;
+  box-shadow: 0 4px 20px rgba(89, 196, 143, 0.45);
+  animation: pulse-briefing 2s infinite;
+}
+
+@keyframes pulse-briefing {
+  0% { box-shadow: 0 0 0 0 rgba(89, 196, 143, 0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(89, 196, 143, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(89, 196, 143, 0); }
+}
+
+
+
+/* --- Screen Spotlight Styles --- */
+======
+   Screen Choreography & Spotlight (إخراج الشاشة المتزامن)
+   Tujar & FSC Gold / Navy Accents
+   ========================================================================== */
+
+/* Active glowing spotlight aura */
+.spotlight-active {
+  position: relative !important;
+  z-index: 1000 !important;
+  outline: 2px solid rgba(212, 175, 55, 0.85) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.7) !important;
+  border-color: rgba(212, 175, 55, 0.9) !important;
+  transition: box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              outline-color 0.4s ease,
+              border-color 0.4s ease,
+              transform 0.3s ease-out;
+  animation: spotlight-pulse-glow 2.5s infinite alternate ease-in-out;
+}
+
+@keyframes spotlight-pulse-glow {
+  0% {
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.55);
+    outline-color: rgba(212, 175, 55, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 32px rgba(212, 175, 55, 0.85);
+    outline-color: rgba(245, 208, 92, 0.95);
+  }
+}
+
+/* Floating executive pulse badge */
+.spotlight-badge {
+  position: absolute;
+  top: -14px;
+  inset-inline-start: 14px;
+  z-index: 1001;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #10243b 0%, #081524 100%);
+  border: 1px solid rgba(212, 175, 55, 0.85);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(212, 175, 55, 0.35);
+  color: #fceec5;
+  font-family: var(--font, 'IBM Plex Sans Arabic'), system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: spotlight-badge-in 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+@keyframes spotlight-badge-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Executive pulse dot inside the badge */
+.spotlight-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4af37;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
+  animation: spotlight-pulse-ring 1.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+@keyframes spotlight-pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.8);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 7px rgba(212, 175, 55, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0);
+  }
+}
+
+/* Optional executive presentation backdrop overlay */
+.spotlight-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  background: rgba(4, 12, 22, 0.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.spotlight-backdrop.visible {
+  opacity: 1;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-active,
+  .spotlight-pulse,
+  .spotlight-badge,
+  .spotlight-backdrop {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Executive Header Responsive Controls */
+@media (max-width: 600px) {
+  header.top {
+    gap: 8px !important;
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+  .radar-pill {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+    font-size: 11px !important;
+  }
+  .radar-pill .radar-label {
+    display: none !important;
+  }
+  .report-btn {
+    padding: 4px 8px !important;
+    margin-inline-start: 4px !important;
+    font-size: 11px !important;
+  }
+  .report-btn .report-btn-label {
+    display: none !important;
+  }
+}
+
+

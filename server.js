@@ -11,6 +11,7 @@ import { toolsRouter } from './src/tools/index.js';
 import { uploadRouter } from './src/routes/upload.js';
 import { dashboardRouter } from './src/routes/dashboard.js';
 import { chatRouter } from './src/routes/chat.js';
+import { executiveRouter } from './src/routes/executive.js';
 import { bootstrap, shutdown } from './src/bootstrap.js';
 
 export const app = express();
@@ -30,6 +31,7 @@ app.use(toolsRouter);
 app.use(uploadRouter);
 app.use(dashboardRouter);
 app.use(chatRouter);
+app.use(executiveRouter);
 
 // 4) تهيئة الخدمات وتشغيل السيرفر
 let server;

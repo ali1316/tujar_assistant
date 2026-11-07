@@ -1,4 +1,7 @@
 import { tools } from '../tools/registry.js';
+import { spotlight_element } from '../tools/spotlight.js';
+export const spotlightDeclaration = spotlight_element.declaration;
+export { spotlight_element };
 import { ALLOW_WRITES, MODEL } from '../config.js';
 
 // أدوات «العرض»: تنفّذ في المتصفح (نوافذ منبثقة ورسوم) — السيرفر بس يعرّفها للموديل
