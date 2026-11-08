@@ -1,8 +1,11 @@
 // أرشيف «ملفات نورة» في Google Drive حق فواز (عن طريق Apps Script يشتغل باسمه) أو التخزين السحابي/المحلي
 // كل ملف يترفع: نصنّفه بالذكاء الاصطناعي، نحفظه في مجلد تصنيفه، ونخزّن رابطه عندنا عشان نورة ترجّعه وقت الطلب.
+import dns from 'node:dns';
 import { db } from './db.js';
 import { generate } from './history.js';
 import { getStorage } from './src/storage/storage-adapter.js';
+
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 
 export const CATEGORIES = ['المالية والميزانيات', 'العقود والمشتريات', 'المشاريع والمتابعة', 'التقارير والعروض', 'الموارد البشرية', 'أخرى'];
 const URL_ = () => process.env.DRIVE_SCRIPT_URL;
@@ -14,13 +17,21 @@ for (const [c, t] of [['category', 'TEXT'], ['drive_id', 'TEXT'], ['drive_url', 
   } catch {}
 }
 
-async function call(body) {
-  const r = await fetch(URL_(), { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(body), redirect: 'follow' });
+export async function callDriveApi(body, { timeout = 35000 } = {}) {
+  if (!driveReady()) throw new Error('DRIVE_SCRIPT_URL غير مضبوط');
+  const r = await fetch(URL_(), {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain' },
+    body: JSON.stringify(body),
+    redirect: 'follow',
+    signal: AbortSignal.timeout(timeout),
+  });
   const t = await r.text();
   try { return JSON.parse(t); } catch { throw new Error('Drive: رد غير متوقع ' + t.slice(0, 120)); }
 }
+const call = callDriveApi;
 
-async function classify(name, text) {
+export async function classify(name, text) {
   const out = await generate(`صنّف هذا الملف في واحد من التصنيفات بالضبط: ${CATEGORIES.join(' | ')}.
 واكتب وصف قصير (سطر واحد) يساعد البحث عنه لاحقاً. رجّع JSON: {"category": "...", "summary": "..."}
 اسم الملف: ${name}

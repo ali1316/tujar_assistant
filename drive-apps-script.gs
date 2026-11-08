@@ -39,6 +39,14 @@ function doPost(e) {
           if (!q.query || f.getName().indexOf(q.query) >= 0 || (f.getDescription() || '').indexOf(q.query) >= 0) res.push(info_(f, c));
         }
       });
+      // فحص الملفات الموجودة في المجلد الرئيسي مباشرة
+      if (!q.category) {
+        const rootFiles = root_().getFiles();
+        while (rootFiles.hasNext() && res.length < 200) {
+          const f = rootFiles.next();
+          if (!q.query || f.getName().indexOf(q.query) >= 0 || (f.getDescription() || '').indexOf(q.query) >= 0) res.push(info_(f, 'أخرى'));
+        }
+      }
       res.sort((a, b) => new Date(b.created) - new Date(a.created));
       return out_({ ok: true, root: root_().getUrl(), files: res });
     }
@@ -91,3 +99,25 @@ function ingest_(q) {
 }
 
 function doGet() { return out_({ ok: true, service: 'nora-drive', root: root_().getUrl() }); }
+
+// ===== إشعار تلقائي اختياري (Webhook Trigger) =====
+// لتشغيل إشعار لحظي عند رفع ملف في Drive:
+// 1. اضغط Triggers (الساعة باليسار) ← Add Trigger
+// 2. اختر دالة: pushUpdatesToDashboard
+// 3. نوع المشغّل: Time-driven (كل دقيقة أو 5 دقائق)
+function pushUpdatesToDashboard() {
+  const SERVER_URL = PropertiesService.getScriptProperties().getProperty('DASHBOARD_WEBHOOK_URL') || '';
+  const ACCESS_CODE = PropertiesService.getScriptProperties().getProperty('ACCESS_CODE') || '';
+  if (!SERVER_URL) return;
+  try {
+    UrlFetchApp.fetch(SERVER_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: ACCESS_CODE ? { 'x-access-code': ACCESS_CODE } : {},
+      payload: JSON.stringify({ action: 'sync', timestamp: new Date().toISOString() }),
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    Logger.log('Webhook push failed: ' + err);
+  }
+}

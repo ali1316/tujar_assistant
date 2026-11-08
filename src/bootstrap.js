@@ -7,6 +7,8 @@ import { initIngest } from '../ingest/index.js';
 import { ensureIndex } from '../retrieval.js';
 import { designerName } from '../designer.js';
 import { agentStatus } from '../agent.js';
+import { driveReady } from '../drive.js';
+import { startDriveSyncPolling, stopDriveSyncPolling, syncFromDrive } from './drive/sync.js';
 
 export async function bootstrap() {
   initMemory(ai);
@@ -22,6 +24,12 @@ export async function bootstrap() {
 
   ensureIndex().catch(e => console.warn('[rag] boot index failed:', e.message));
 
+  if (driveReady()) {
+    const pollInterval = +(process.env.DRIVE_SYNC_INTERVAL_SEC || 60);
+    startDriveSyncPolling(pollInterval);
+    syncFromDrive().catch(e => console.warn('[drive-sync] initial sync error:', e.message));
+  }
+
   return {
     backend,
     designer: designerName(),
@@ -31,6 +39,7 @@ export async function bootstrap() {
 
 export async function shutdown(server) {
   console.log('[server] Exiting cleanly');
+  stopDriveSyncPolling();
   if (server?.close) {
     server.close(() => process.exit(0));
   } else {
