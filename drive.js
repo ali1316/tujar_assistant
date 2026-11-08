@@ -42,7 +42,12 @@ ${String(text || '').slice(0, 3000)}`).catch(() => null);
 
 // يشتغل بالخلفية بعد الرفع (ما يأخّر بناء الداشبورد)
 export async function archiveToDrive(doc, buffer, mime) {
-  const docRow = await db.prepare('SELECT content FROM documents WHERE id=?').get(doc.id);
+  const docRow = await db.prepare('SELECT content, drive_id, drive_url, category FROM documents WHERE id=?').get(doc.id);
+  if (docRow?.drive_id) {
+    console.log(`[drive] doc #${doc.id} already archived in Drive (${docRow.drive_id})`);
+    return { category: docRow.category || 'أخرى', drive: true, url: docRow.drive_url, drive_id: docRow.drive_id };
+  }
+
   const { category, summary } = await classify(doc.name, docRow?.content);
   await db.prepare('UPDATE documents SET category=?, summary=? WHERE id=?').run(category, summary, doc.id);
 

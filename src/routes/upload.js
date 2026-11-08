@@ -41,7 +41,21 @@ export async function handleFileUpload(req, res) {
     }
   }
 
-  // ملفات PDF: مسار الاستقبال التفصيلي (مهمة خلفية قابلة للاستكمال، حزمة في Drive، تتبع لكل رقم)
+  // فحص التكرار أولاً بالبصمة قبل أي معالجة تفصيلية أو إطلاق مهام خلفية
+  const dup = await db.prepare('SELECT id, name, chars, drive_id, drive_url, category FROM documents WHERE sha256=?').get(digest);
+  step('checked', { duplicate: !!dup });
+  if (dup) {
+    console.log(`[upload] Duplicate detected: ${name} matches doc #${dup.id} (${digest})`);
+    return res.json({
+      ...dup,
+      duplicate: true,
+      datasets: [],
+      ingest: null,
+      message: 'الملف موجود مسبقاً بنفس البصمة — تم منعه من التكرار'
+    });
+  }
+
+  // ملفات PDF: مسار الاستقبال التفصيلي للملفات الجديدة فقط
   let ingest = null;
   if (/\.pdf$/i.test(name) || /pdf/i.test(req.file.mimetype)) {
     try {
@@ -51,10 +65,6 @@ export async function handleFileUpload(req, res) {
       console.warn('[ingest] receive failed:', e.message);
     }
   }
-
-  const dup = await db.prepare('SELECT id, name, chars FROM documents WHERE sha256=?').get(digest);
-  step('checked', { duplicate: !!dup });
-  if (dup) return res.json({ ...dup, duplicate: true, datasets: [], ingest }); // نفس الملف بالبصمة: ما نكرره
 
   try {
     const text = await extractText(req.file.buffer, name);

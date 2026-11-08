@@ -839,17 +839,18 @@ export async function uploadFile(file) {
     jr.finish('انضاف لمكتبة المعرفة', [k.title || k.id], [], { rest: 'skip' });
     return;
   }
+  if (d.duplicate) {
+    note(`📄 «${d.name}» مرفوع من قبل (ملف #${d.id}) ومحفوظ في Drive`);
+    const links = [];
+    if (d.drive_url) links.push(['📁 عرض في Drive', d.drive_url]);
+    jr.finish('الملف موجود مسبقاً — ما كررناه', [`ملف #${d.id}`, d.name], links, { rest: 'skip' });
+    return;
+  }
   if (jr.kind === 'pdf' && d.ingest) {
-    if (d.duplicate) note(`📄 «${d.name}» مرفوع قبل`);
     trackIngest(d.ingest, jr, d);
     return;
   }
   if (d.ingest) trackIngest(d.ingest, null, d);
-  if (d.duplicate) {
-    note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id})، نفس البصمة فما كررته`);
-    jr.finish('الملف مرفوع من قبل — ما كررناه', [`ملف #${d.id}`], [], { rest: 'skip' });
-    return;
-  }
   jr.set('read', 'ok', `${(d.chars || 0).toLocaleString('en-US')} حرف`);
   if (jr.kind === 'tabular') {
     const st = d.stats || jr.stats;
