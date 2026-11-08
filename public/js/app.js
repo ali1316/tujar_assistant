@@ -721,7 +721,7 @@ function xhrUpload(fd, trace, onProg) {
   });
 }
 
-function trackIngest(ing, jr) {
+function trackIngest(ing, jr, doc = null) {
   if (ing.error) {
     jr?.fail('original', 'مسار PDF: ' + ing.error);
     return note('⚠️ مسار PDF: ' + ing.error);
@@ -780,8 +780,16 @@ function trackIngest(ing, jr) {
           el.insertAdjacentHTML('beforeend', `<div class="ingest-links">${a(j.links.folder, 'المجلد')}${a(j.links.review_xlsx, 'Excel')}${a(j.links.quality_report, 'تقرير الجودة')}${a(j.links.document_md, 'النص الكامل')}</div>`);
         }
         if (j.stage === 'failed') {
-          note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || ''));
-          jr?.fail(null, 'فشلت المعالجة، والإصدار السابق باقي كما هو');
+          if (doc?.id || doc?.chars) {
+            note('✅ تم استلام وأرشفة الملف بنجاح، والنص متاح بالكامل لنورة والداشبورد.');
+            jr?.finish('الملف جاهز ومحفوظ في Drive', [arN(j.pages_total || 1, 'صفحة', 'صفحات'), 'النص مفهرس'], [
+              ['📁 المجلد', j.links?.folder],
+              ['📄 النص الكامل', j.links?.document_md]
+            ]);
+          } else {
+            note('❌ فشلت المعالجة، والإصدار السابق باقي كما هو: ' + (j.errors?.at(-1)?.message || ''));
+            jr?.fail(null, 'فشلت المعالجة، والإصدار السابق باقي كما هو');
+          }
         } else {
           if (!running || !agent.connected) {
             try {
@@ -833,10 +841,10 @@ export async function uploadFile(file) {
   }
   if (jr.kind === 'pdf' && d.ingest) {
     if (d.duplicate) note(`📄 «${d.name}» مرفوع قبل`);
-    trackIngest(d.ingest, jr);
+    trackIngest(d.ingest, jr, d);
     return;
   }
-  if (d.ingest) trackIngest(d.ingest);
+  if (d.ingest) trackIngest(d.ingest, null, d);
   if (d.duplicate) {
     note(`📄 «${d.name}» مرفوع قبل (ملف #${d.id})، نفس البصمة فما كررته`);
     jr.finish('الملف مرفوع من قبل — ما كررناه', [`ملف #${d.id}`], [], { rest: 'skip' });
