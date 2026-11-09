@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "نماذج محاكاة مسبقة لاختبار أداة simulate_scenario ومحرك المحاكاة التنفيذية"
+  },
+  "scenarios": [
+    {
+      "id": "scenario-accelerate-delayed",
+      "name": "تسريع المشاريع المتأخرة وضخ موارد إضافية",
+      "prompt_arabic": "وش يصير لو ضخينا 300 ألف ريال إضافية وسرعنا مشروع أتمتة رخص البناء شهرين؟",
+      "parameters": {
+        "project_id": 2,
+        "project_name": "أتمتة رخص البناء",
+        "budget_delta": 300000,
+        "schedule_days_delta": -60,
+        "additional_resources": 3
+      },
+      "expected_outcomes": {
+        "projected_progress_boost": "+35%",
+        "new_delivery_date": "2026-12-15",
+        "risk_mitigation": "انخفاض مستوى المخاطر من حرج إلى متوسط"
+      }
+    },
+    {
+      "id": "scenario-budget-cut-20",
+      "name": "ترشيد النفقات وخفض الميزانيات بنسبة 20%",
+      "prompt_arabic": "لو خفضنا ميزانية المشاريع قيد التنفيذ بنسبة 20%، كم الوفر المالي المتوقع وما أثره على الإنجاز؟",
+      "parameters": {
+        "target_scope": "all_active_projects",
+        "cut_percentage": 20
+      },
+      "expected_outcomes": {
+        "total_savings_sar": 1060000,
+        "average_progress_delay_days": 45,
+        "affected_projects": 4
+      }
+    },
+    {
+      "id": "scenario-cloud-restart",
+      "name": "استئناف مشروع ترحيل السحابة المتعثر",
+      "prompt_arabic": "محاكاة إعادة إطلاق مشروع ترحيل الأنظمة للسحابة بمزود سحابي محلي معتمد",
+      "parameters": {
+        "project_id": 5,
+        "project_name": "ترحيل الأنظمة للسحابة",
+        "new_vendor_type": "local_certified_cloud",
+        "unfreeze_budget": 1700000,
+        "target_duration_months": 6
+      },
+      "expected_outcomes": {
+        "compliance_boost": "100% توافق مع هيئة الأمن السيبراني",
+        "operational_sla_improvement": "+40%"
+      }
+    }
+  ]
+}

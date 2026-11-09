@@ -953,6 +953,9 @@ export async function uploadFile(file) {
   }
   if (d.duplicate) {
     note(`📄 «${d.name}» موجود مسبقاً (ملف #${d.id})`);
+    if (d.projects_sync?.added?.length || d.projects_sync?.updated?.length) {
+      note(`📊 تم استخلاص ${d.projects_sync.added?.length || 0} مشاريع جديدة وتحديث ${d.projects_sync.updated?.length || 0} مشاريع من الوثيقة (إجمالي المشاريع: ${d.projects_sync.totalProjects})`);
+    }
     const links = [];
     if (d.drive_url) links.push(['📁 عرض في Drive', d.drive_url]);
     jr.finish('الملف موجود مسبقاً — تم استرجاع لوحته', [`ملف #${d.id}`, d.name], links, { rest: 'skip' });
@@ -979,6 +982,9 @@ export async function uploadFile(file) {
     jr.stats = st;
   }
   note(`📄 انحفظ "${d.name}" في الداتابيس (ملف #${d.id})`);
+  if (d.projects_sync?.added?.length || d.projects_sync?.updated?.length) {
+    note(`📊 تم استخلاص ${d.projects_sync.added?.length || 0} مشاريع جديدة وتحديث ${d.projects_sync.updated?.length || 0} مشاريع من الوثيقة (إجمالي المشاريع: ${d.projects_sync.totalProjects})`);
+  }
   loadDashboard();
   window.NORA_LAST_DOC = d;
 

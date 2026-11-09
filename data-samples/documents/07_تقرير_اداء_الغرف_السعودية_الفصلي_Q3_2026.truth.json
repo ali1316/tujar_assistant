@@ -1,0 +1,14 @@
+{
+  "total": 89595,
+  "rows": 30,
+  "active_users": 48210,
+  "growth_pct": 12.5,
+  "prev_quarter": 41280,
+  "scanned_complaints": 1245,
+  "resolved_complaints": 1190,
+  "chart": {
+    "التصديق": 18000,
+    "العضوية": 9000,
+    "التصاريح": 4500
+  }
+}

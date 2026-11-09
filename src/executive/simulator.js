@@ -1,6 +1,7 @@
 // src/executive/simulator.js - What-If Scenario Simulator for Executive Decisions
 // محاكاة القرارات التنفيذية: دراسة أثر ضخ/خفض الميزانيات وتعديل الجداول الزمنية
 import { db } from '../../db.js';
+import { ai } from '../ai.js';
 
 /**
  * Format numbers cleanly in Arabic context
@@ -26,6 +27,7 @@ export async function simulateScenario({
   budgetDelta = 0,
   timelineDeltaDays = 0,
   targetStatus,
+  scenarioQuery,
 } = {}) {
   // 1. Fetch all portfolio projects
   const allProjects = await db.prepare('SELECT * FROM projects').all();
@@ -178,12 +180,13 @@ export async function simulateScenario({
       };
     });
 
-  // 6. Executive Narrative Synthesis in Arabic
+  // 6. Executive Narrative Synthesis & AI-Powered Scenario Reasoning
   let impactSummary = '';
   const daysNum = Math.abs(daysSavedOrDelayed);
   const burnAbs = Math.abs(burnRateDeltaPercent);
   const deltaAbsStr = Math.abs(bDelta).toLocaleString('en-US');
 
+  // Deterministic baseline heuristics
   if (bDelta > 0) {
     if (daysSavedOrDelayed > 0) {
       impactSummary = `ضخ ${deltaAbsStr} ريال يسرّع إطلاق ${project.name} بـ ${daysNum} يوماً، مع زيادة عبء الصرف بنسبة ${burnAbs}%.`;
@@ -208,8 +211,8 @@ export async function simulateScenario({
     }
   }
 
-  // 7. Structured Trade-offs
-  const tradeOffs = [
+  // 7. Structured Trade-offs (3 Pillars)
+  let tradeOffs = [
     {
       pillar: 'الجدول الزمني والجاهزية',
       type: daysSavedOrDelayed >= 0 ? 'advantage' : 'drawback',
@@ -235,6 +238,64 @@ export async function simulateScenario({
         : `استقرار مؤشر عائد المحفظة عند ${simulatedPortfolioRoi} نقطة، مع الحاجة لإعادة موازنة مخصصات المشاريع الشقيقة.`,
     },
   ];
+
+  let boardRecommendation = (daysSavedOrDelayed > 0 && bDelta <= 300000)
+    ? `يوصى باعتماد السيناريو لكونه يكسب ${daysNum} يوماً إضافياً في الجاهزية مع هامش مخاطرة مالي مقبول.`
+    : (bDelta < 0 && daysSavedOrDelayed < -20)
+    ? `لا يوصى بالخفض الشديد للميزانية لتجنب ترحيل التسليم وإرباك مواعيد الإطلاق الرسمية.`
+    : `اعتماد المراجعة الدورية مع مدراء المشاريع لمتابعة وتيرة الصرف الفعلية وتجنب الانحرافات.`;
+
+  // AI-Powered Strategic Scenario Reasoning (Gemini)
+  if (ai && scenarioQuery) {
+    try {
+      let tickets = [];
+      try {
+        tickets = await db.prepare('SELECT title, priority, status FROM tickets WHERE project_id=?').all(project.id);
+      } catch {}
+
+      const prompt = `أنت كبير مستشاري إدارة المشاريع والمحافظ الاستثمارية لاتحاد الغرف السعودية (منصة تجار).
+قم بتحليل سيناريو القرار التنفيذي (What-If Simulation) التالي وقدم تحليلاً عميقاً وتوصيات استراتيجية:
+
+المشروع: ${project.name} (${project.department})
+الحالة الحالية: ${project.status} · الإنجاز: ${progress}%
+الميزانية الحالية: ${budget.toLocaleString('en-US')} ر.س · المنصرف: ${spent.toLocaleString('en-US')} ر.س
+التذاكر والمخاطر المفتوحة: ${tickets?.map(t => t.title).join('، ') || 'لا توجد تذاكر مسجلة'}
+
+السيناريو المحاكى:
+- تعديل الميزانية: ${bDelta > 0 ? '+' : ''}${bDelta.toLocaleString('en-US')} ر.س (الميزانية الناتجة: ${simulatedBudget.toLocaleString('en-US')} ر.س)
+- تعديل الجدول الزمني: ${tDelta > 0 ? '+' : ''}${tDelta} يوماً
+- الموعد المتوقع الجديد: ${simulatedCompletionDate} (فارق ${daysSavedOrDelayed > 0 ? 'تسريع بـ' : 'تأخر بـ'} ${daysNum} يوماً)
+- معدل الحرق اليومي: ${simulatedDailyBurnRate.toLocaleString('en-US')} ر.س/يوم (تغير ${burnRateDeltaPercent}%)
+${scenarioQuery ? `- استفسار أو سيناريو مخصص من القيادة التنفيذية: "${scenarioQuery}"` : ''}
+
+المطلوب: توليد رد JSON صالح فقط بالشكل التالي دون نصوص إضافية:
+{
+  "impactSummary": "تحليل تنفيذي مكثف من جملتين إلى ثلاث يبرز أثر القرار على المشروع والمحفظة",
+  "boardRecommendation": "توصية حاسمة ومحددة للمجلس التنفيذي أو معالي الأمين العام",
+  "tradeOffs": [
+    { "pillar": "الجدول الزمني والجاهزية", "type": "advantage أو drawback", "title": "عنوان موجز ومباشر", "description": "شرح الأثر بدقة" },
+    { "pillar": "السيولة ومعدل الحرق", "type": "advantage أو drawback", "title": "عنوان موجز ومباشر", "description": "شرح التدفق المالي" },
+    { "pillar": "الحوكمة والمخاطر التشغيلية", "type": "advantage أو drawback أو neutral", "title": "عنوان موجز ومباشر", "description": "الأثر على الموردين والموارد والامتثال" }
+  ]
+}`;
+
+      const aiCall = ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3500));
+      const res = await Promise.race([aiCall, timeout]);
+
+      if (res?.text) {
+        const clean = res.text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        if (parsed.impactSummary) impactSummary = parsed.impactSummary;
+        if (parsed.boardRecommendation) boardRecommendation = parsed.boardRecommendation;
+        if (Array.isArray(parsed.tradeOffs) && parsed.tradeOffs.length >= 2) {
+          tradeOffs = parsed.tradeOffs;
+        }
+      }
+    } catch (e) {
+      console.warn('[simulator/ai] reasoning note:', e.message);
+    }
+  }
 
   return {
     ok: true,
@@ -274,6 +335,7 @@ export async function simulateScenario({
     },
     impactSummary,
     narrative: impactSummary,
+    boardRecommendation,
     tradeOffs,
     portfolioImpact: {
       baselineRoiIndex: baselinePortfolioRoi,

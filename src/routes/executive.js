@@ -193,13 +193,14 @@ executiveRouter.get('/api/executive/report/pdf', async (req, res) => {
 // POST /api/executive/simulate - Models budget injection/cuts and timeline shifts
 executiveRouter.post('/api/executive/simulate', async (req, res) => {
   try {
-    const { projectId, projectName, budgetDelta, timelineDeltaDays, targetStatus } = req.body || {};
+    const { projectId, projectName, budgetDelta, timelineDeltaDays, targetStatus, scenarioQuery } = req.body || {};
     const result = await simulateScenario({
       projectId,
       projectName,
       budgetDelta: budgetDelta != null ? Number(budgetDelta) : 0,
       timelineDeltaDays: timelineDeltaDays != null ? Number(timelineDeltaDays) : 0,
       targetStatus,
+      scenarioQuery,
     });
     res.json(result);
   } catch (err) {

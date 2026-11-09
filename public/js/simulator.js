@@ -103,6 +103,46 @@ export async function renderSimulatorCockpit({
           </div>
         </div>
 
+        <!-- Strategic Decision Packages -->
+        <div class="sim-card" style="margin-bottom: 20px; background: rgba(14, 34, 56, 0.85); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px;">
+          <div style="font-weight: 700; color: var(--sand); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <span>🎯 حزم السيناريوهات الاستراتيجية المعتمدة:</span>
+            <span style="font-size: 12px; color: var(--mute); font-weight: normal;">(تطبيق فوري لمعايير القرار التنفيذي)</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;" id="simStrategyPackages">
+            <button type="button" class="chipbtn sim-pkg-btn" data-b="300000" data-t="-25" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
+              <b style="color: #59c48f; display: block; font-size: 13px;">🚀 الإنقاذ والتسريع</b>
+              <small style="color: var(--mute); font-size: 11px;">ضخ 300K ر.س · ضغط 25 يوماً</small>
+            </button>
+            <button type="button" class="chipbtn sim-pkg-btn" data-b="-150000" data-t="20" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
+              <b style="color: #e0705f; display: block; font-size: 13px;">⚖️ ضبط الموازنة والسيولة</b>
+              <small style="color: var(--mute); font-size: 11px;">كبح 150K ر.س · تمديد 20 يوماً</small>
+            </button>
+            <button type="button" class="chipbtn sim-pkg-btn" data-b="150000" data-t="0" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
+              <b style="color: #38bdf8; display: block; font-size: 13px;">🛡️ الامتثال السيبراني والأمان</b>
+              <small style="color: var(--mute); font-size: 11px;">مخصص 150K ر.س · بدون تأخير</small>
+            </button>
+            <button type="button" class="chipbtn sim-pkg-btn" data-b="-50000" data-t="45" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
+              <b style="color: #d1a65c; display: block; font-size: 13px;">🔄 إعادة هيكلة التعاقد</b>
+              <small style="color: var(--mute); font-size: 11px;">خفض 50K ر.س · تمديد 45 يوماً</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Executive AI Scenario Box -->
+        <div class="sim-card" style="margin-bottom: 20px; background: rgba(14, 34, 56, 0.85); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px;">
+          <label for="simCustomQuery" style="font-weight: 700; color: var(--sand); font-size: 14px; margin-bottom: 8px; display: block;">
+            🧠 اسأل نورة عن أي سيناريو تنفيذي مخصص (AI What-If Reasoning):
+          </label>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" id="simCustomQuery" placeholder="مثال: ماذا لو قمنا بدمج فريق المشروع مع فريق البنية التحتية؟"
+                   style="flex: 1; min-width: 260px; padding: 10px 14px; font-size: 14px; border-radius: 8px; background: #081726; color: var(--ink); border: 1px solid var(--line);">
+            <button type="button" id="simAiQueryBtn" class="chipbtn" style="padding: 10px 20px; font-size: 14px; background: linear-gradient(135deg, #2b5687, #19385c); color: #eef2f7; border: 1px solid var(--acc); font-weight: 600; white-space: nowrap; cursor: pointer;">
+              محاكاة بالذكاء الاصطناعي ⚡
+            </button>
+          </div>
+        </div>
+
         <!-- Sliders & Interactive Controls -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
           <!-- Slider 1: Budget Delta (± 500k SAR) -->
@@ -166,6 +206,10 @@ export async function renderSimulatorCockpit({
               <p id="simNarrativeText" style="margin: 0; font-size: 16px; line-height: 1.6; color: var(--ink); font-weight: 500;">
                 جاري حساب أثر السيناريو…
               </p>
+              <div id="simBoardRecContainer" style="margin-top: 12px; padding: 10px 14px; background: rgba(89, 196, 143, 0.12); border: 1px solid var(--ok); border-radius: 8px;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--ok); display: block; margin-bottom: 2px;">🏛️ توصية نورة للمجلس التنفيذي:</span>
+                <span id="simBoardRecText" style="font-size: 14px; color: var(--ink);">—</span>
+              </div>
             </div>
           </div>
         </div>
@@ -329,10 +373,11 @@ export async function renderSimulatorCockpit({
 
   // Debounced Simulation Trigger
   let simTimer = null;
-  async function triggerSimulation() {
+  async function triggerSimulation(customQuery = null) {
     const pId = Number(projectSelect?.value || selectedId);
     const bDelta = Number(budgetSlider?.value || 0);
     const tDelta = Number(timelineSlider?.value || 0);
+    const query = typeof customQuery === 'string' ? customQuery : (mountEl.querySelector('#simCustomQuery')?.value || '');
 
     // Update Slider Value Readouts
     if (budgetValue) {
@@ -346,7 +391,13 @@ export async function renderSimulatorCockpit({
       timelineValue.style.color = tDelta < 0 ? 'var(--ok)' : (tDelta > 0 ? 'var(--warn)' : 'var(--sand)');
     }
 
+    const narrEl = mountEl.querySelector('#simNarrativeText');
+    if (narrEl && query) {
+      narrEl.textContent = `جاري استدعاء نموذج نورة بالذكاء الاصطناعي لتحليل: "${query}"…`;
+    }
+
     clearTimeout(simTimer);
+    const delay = query ? 0 : 150;
     simTimer = setTimeout(async () => {
       try {
         const apiCall = window.api || fetch;
@@ -357,6 +408,7 @@ export async function renderSimulatorCockpit({
             projectId: pId,
             budgetDelta: bDelta,
             timelineDeltaDays: tDelta,
+            scenarioQuery: query || undefined,
           }),
         });
 
@@ -367,7 +419,7 @@ export async function renderSimulatorCockpit({
       } catch (err) {
         console.warn('[simulator] simulate failed:', err);
       }
-    }, 150);
+    }, delay);
   }
 
   // Update DOM with Simulation Results
@@ -378,6 +430,12 @@ export async function renderSimulatorCockpit({
     // Narrative text
     const narrEl = mountEl.querySelector('#simNarrativeText');
     if (narrEl) narrEl.textContent = impactSummary;
+
+    // Board recommendation
+    const boardRecEl = mountEl.querySelector('#simBoardRecText');
+    if (boardRecEl) {
+      boardRecEl.textContent = data.boardRecommendation || 'يوصى بالمتابعة الدورية ومواءمة خطط التنفيذ مع الإدارات الشقيقة.';
+    }
 
     // Status badge
     const statusBadge = mountEl.querySelector('#simCurrentStatusBadge');
@@ -554,6 +612,33 @@ export async function renderSimulatorCockpit({
 
   if (budgetSlider) budgetSlider.oninput = triggerSimulation;
   if (timelineSlider) timelineSlider.oninput = triggerSimulation;
+
+  // Strategy Package buttons
+  mountEl.querySelectorAll('.sim-pkg-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (budgetSlider) budgetSlider.value = btn.dataset.b;
+      if (timelineSlider) timelineSlider.value = btn.dataset.t;
+      triggerSimulation();
+    };
+  });
+
+  // Custom AI Scenario query
+  const customQueryInput = mountEl.querySelector('#simCustomQuery');
+  const aiQueryBtn = mountEl.querySelector('#simAiQueryBtn');
+  if (aiQueryBtn) {
+    aiQueryBtn.onclick = () => {
+      const q = customQueryInput?.value?.trim();
+      triggerSimulation(q || 'تحليل ومحاكاة استراتيجية للسيناريو التنفيذي');
+    };
+  }
+  if (customQueryInput) {
+    customQueryInput.onkeydown = e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        aiQueryBtn?.click();
+      }
+    };
+  }
 
   // Preset buttons
   mountEl.querySelectorAll('#simBudgetPresets button').forEach(btn => {

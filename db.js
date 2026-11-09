@@ -12,7 +12,7 @@ let initialized = false;
 
 // Table column mappings for PostgreSQL PRAGMA table_info simulation
 const TABLE_COLUMNS = {
-  projects: ['id', 'name', 'department', 'status', 'progress', 'budget', 'spent', 'owner', 'due_date', 'start_date'],
+  projects: ['id', 'name', 'department', 'status', 'progress', 'budget', 'spent', 'owner', 'due_date', 'start_date', 'dashboard_id'],
   tickets: ['id', 'project_id', 'title', 'priority', 'status', 'created_at'],
   dev_requests: ['id', 'title', 'details', 'status', 'dev_note', 'created_at', 'updated_at'],
   documents: ['id', 'name', 'type', 'size', 'chars', 'content', 'sha256', 'category', 'drive_id', 'drive_url', 'summary', 'uploaded_at'],

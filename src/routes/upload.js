@@ -12,6 +12,7 @@ import { archiveToDrive } from '../../drive.js';
 import { uploadStep } from '../../events.js';
 import { dashboardFromDocument, getCurrentDash } from '../../file-dash.js';
 import { generateAutoDK } from '../ingest/auto-dk.js';
+import { syncProjectsFromDocument } from '../executive/project-sync.js';
 
 const router = Router();
 export const upload = multer({
@@ -42,7 +43,7 @@ export async function handleFileUpload(req, res) {
   }
 
   // فحص التكرار أولاً بالبصمة قبل أي معالجة تفصيلية أو إطلاق مهام خلفية
-  const dup = await db.prepare('SELECT id, name, chars, drive_id, drive_url, category FROM documents WHERE sha256=?').get(digest);
+  const dup = await db.prepare('SELECT id, name, chars, drive_id, drive_url, category, content FROM documents WHERE sha256=?').get(digest);
   step('checked', { duplicate: !!dup });
   if (dup) {
     console.log(`[upload] Duplicate detected: ${name} matches doc #${dup.id} (${digest})`);
@@ -52,6 +53,15 @@ export async function handleFileUpload(req, res) {
       archiveToDrive(dup, req.file.buffer, req.file.mimetype)
         .then(r => console.log(`[drive] doc #${dup.id} auto-healed archive:`, r?.category))
         .catch(e => console.warn(`[drive] doc #${dup.id} auto-heal failed:`, e.message));
+    }
+
+    // استخلاص وتحديث المشاريع المرتبطة بالوثيقة حتى عند تكرار الملف
+    let projectsSync = null;
+    try {
+      const textToScan = dup.content || (await extractText(req.file.buffer, name));
+      projectsSync = await syncProjectsFromDocument({ text: textToScan, fileName: name, docId: dup.id });
+    } catch (e) {
+      console.warn('[upload] project sync on duplicate warning:', e.message);
     }
 
     // استرجاع أو تجهيز الداشبورد لفتحه مباشرة أمام المستخدم
@@ -74,7 +84,8 @@ export async function handleFileUpload(req, res) {
       dashboard: dash,
       datasets: [],
       ingest: null,
-      message: 'الملف موجود مسبقاً بنفس البصمة — تم استرجاع لوحته وعرضها مباشرة'
+      projects_sync: projectsSync,
+      message: 'الملف موجود مسبقاً بنفس البصمة — تم استرجاع لوحته وتحديث المشاريع المرتبطة بها'
     });
   }
 
@@ -147,6 +158,15 @@ export async function handleFileUpload(req, res) {
       }
     }
 
+    // استخلاص وتحديث المشاريع من الوثيقة في قاعدة البيانات
+    let projectsSync = null;
+    try {
+      projectsSync = await syncProjectsFromDocument({ text, fileName: name, docId: doc.id });
+      step('projects_synced', { added: projectsSync.added?.length || 0, updated: projectsSync.updated?.length || 0 });
+    } catch (e) {
+      console.warn('[upload] project-sync error:', e.message);
+    }
+
     // أرشفة في Google Drive بالتصنيف الصح (بالخلفية)
     archiveToDrive(doc, req.file.buffer, req.file.mimetype)
       .then(r => step('archived', { category: r?.category || null, drive: r?.drive !== false }))
@@ -160,6 +180,7 @@ export async function handleFileUpload(req, res) {
       datasets,
       stats: datasets.stats || null,
       ingest,
+      projects_sync: projectsSync,
       ...(autoDK?.result ? { knowledge: autoDK.result, auto_dk: autoDK.result } : {}),
     });
   } catch (e) {

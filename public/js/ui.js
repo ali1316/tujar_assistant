@@ -68,6 +68,7 @@ export function qaBusy(btn, on, msg) {
     x.disabled = false;
   });
   if (!on) {
+    resetCur();
     if (sk) {
       sk.hidden = !msg;
       if (msg) {
@@ -266,19 +267,22 @@ export function bubble(kind, text, append = true) {
 }
 
 export function resetCur() {
-  if (cur.a && cur.a.textContent && !cur.a.classList.contains('exec-assistant-card')) {
-    const raw = cur.a.textContent.trim();
-    if (raw) {
-      const card = buildAssistantCard(raw);
-      cur.a.replaceWith(card);
-    }
-  }
-  if (cur.u && cur.u.textContent && !cur.u.classList.contains('exec-user-card')) {
-    const raw = cur.u.textContent.trim();
-    if (raw) {
-      const card = buildUserCard(raw);
-      cur.u.replaceWith(card);
-    }
+  const log = $('#log');
+  if (log) {
+    log.querySelectorAll('.m.a:not(.exec-assistant-card)').forEach(el => {
+      const raw = el.textContent.trim();
+      if (raw) {
+        const card = buildAssistantCard(raw);
+        el.replaceWith(card);
+      }
+    });
+    log.querySelectorAll('.m.u:not(.exec-user-card)').forEach(el => {
+      const raw = el.textContent.trim();
+      if (raw) {
+        const card = buildUserCard(raw);
+        el.replaceWith(card);
+      }
+    });
   }
   cur = { u: null, a: null };
 }
