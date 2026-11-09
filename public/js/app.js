@@ -9,6 +9,7 @@ import {
   applyPersona, fillVoices,
 } from './ui.js';
 import { stripToolTags, claimsScreen, SCREEN_TOOL, isDataTool, isVisualTool, isDashboardTool } from './text-guard.js';
+import { buildUserCard, buildAssistantCard, formatMarkdown } from './markdown.js';
 
 // Access Code & API Helpers
 let CODE = '';
@@ -223,12 +224,13 @@ async function loadHistory() {
           d.querySelector('pre').textContent = `${m[1]}(${m[2]})\n→ ${m[3]}`;
         }
       }
-      const clean = text.replace(ANN, '').replace(/\s{2,}/g, ' ').trim();
+      const clean = text.replace(ANN, '').trim();
       if (clean && log) {
-        log.append(Object.assign(document.createElement('div'), {
-          className: 'm ' + (t.role === 'user' ? 'u' : 'a') + ' old',
-          textContent: clean,
-        }));
+        if (t.role === 'user') {
+          log.append(buildUserCard(clean));
+        } else {
+          log.append(buildAssistantCard(clean, { isOld: true }));
+        }
       }
     });
     note('— نورة تتذكر هذا الكلام —');
@@ -527,8 +529,7 @@ $('#f')?.addEventListener('submit', async e => {
   // REST Chat fallback via FreeLLMAPI / Gemini
   const log = $('#log');
   if (log) {
-    const uEl = Object.assign(document.createElement('div'), { className: 'm u', textContent: t });
-    log.append(uEl);
+    log.append(buildUserCard(t));
     log.scrollTop = 1e9;
   }
   openLog(true);
@@ -539,8 +540,7 @@ $('#f')?.addEventListener('submit', async e => {
   try {
     const res = await apiJson('/api/chat/message', { text: t, sessionId: agent?.chatId || null });
     if (res?.reply && log) {
-      const aEl = Object.assign(document.createElement('div'), { className: 'm a', textContent: res.reply });
-      log.append(aEl);
+      log.append(buildAssistantCard(res.reply));
       log.scrollTop = 1e9;
       setStatus('اكتب طلبك أو اضغط للتحدث.');
     } else if (res?.error) {

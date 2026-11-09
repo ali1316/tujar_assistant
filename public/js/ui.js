@@ -4,6 +4,7 @@ import { createUIControl } from './ui-control.js';
 import { createAssistant } from './assistant.js';
 import { sayScript } from './speech.js';
 import { stripToolTags, claimsScreen, SCREEN_TOOL, isDataTool, isVisualTool, isDashboardTool } from './text-guard.js';
+import { buildUserCard, buildAssistantCard, formatMarkdown } from './markdown.js';
 
 export const $ = s => document.querySelector(s);
 export const $$ = s => [...document.querySelectorAll(s)];
@@ -246,7 +247,15 @@ let capTimer = null;
 export function bubble(kind, text, append = true) {
   const log = $('#log');
   if (!log) return;
-  if (!append || !cur[kind]) {
+  if (!append) {
+    const card = (kind === 'u') ? buildUserCard(text) : buildAssistantCard(text);
+    log.append(card);
+    log.scrollTop = 1e9;
+    caption(kind, text);
+    trimLog();
+    return;
+  }
+  if (!cur[kind]) {
     cur[kind] = Object.assign(document.createElement('div'), { className: 'm ' + kind });
     log.append(cur[kind]);
   }
@@ -257,6 +266,20 @@ export function bubble(kind, text, append = true) {
 }
 
 export function resetCur() {
+  if (cur.a && cur.a.textContent && !cur.a.classList.contains('exec-assistant-card')) {
+    const raw = cur.a.textContent.trim();
+    if (raw) {
+      const card = buildAssistantCard(raw);
+      cur.a.replaceWith(card);
+    }
+  }
+  if (cur.u && cur.u.textContent && !cur.u.classList.contains('exec-user-card')) {
+    const raw = cur.u.textContent.trim();
+    if (raw) {
+      const card = buildUserCard(raw);
+      cur.u.replaceWith(card);
+    }
+  }
   cur = { u: null, a: null };
 }
 

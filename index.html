@@ -80,12 +80,26 @@
 </main>
 <div class="tagline" aria-hidden="true"><span>مساحة العمل الذكية</span></div>
 <div id="sr" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-<div id="dock" role="region" aria-label="المحادثة مع نورة">
-  <div id="drawer" hidden role="dialog" aria-modal="false" aria-labelledby="drTitle">
-    <div class="dr-head"><b id="drTitle">سجل المحادثة</b><label for="voice">صوتها</label><select id="voice" class="chipsel"></select><button id="preview" type="button" aria-label="اسمع الصوت">▶ اسمعها</button><button id="drClose" type="button" aria-label="إغلاق السجل"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <div id="log" role="log" aria-label="رسائل المحادثة" tabindex="0"></div>
-    <div class="dr-foot"><small id="usage"></small></div>
+<div id="drawer" hidden role="dialog" aria-modal="false" aria-labelledby="drTitle">
+  <div class="dr-head">
+    <div class="dr-title-group">
+      <span class="dr-live-dot" aria-hidden="true"></span>
+      <b id="drTitle">سجل محادثة نورة</b>
+      <span class="dr-badge">مباشر</span>
+    </div>
+    <div class="dr-controls">
+      <label for="voice" hidden>صوتها</label>
+      <select id="voice" class="chipsel" hidden></select>
+      <button id="preview" type="button" aria-label="اسمع الصوت" hidden>▶ اسمعها</button>
+      <button id="drClose" class="dr-close-btn" type="button" aria-label="إغلاق السجل" title="إغلاق السجل (Esc)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
   </div>
+  <div id="log" role="log" aria-label="رسائل المحادثة" tabindex="0"></div>
+  <div class="dr-foot"><small id="usage"></small></div>
+</div>
+<div id="dock" role="region" aria-label="المحادثة مع نورة">
   <div id="caption" hidden title="اضغط لفتح سجل المحادثة"><div class="cu"></div><div class="ca"></div></div>
   <form id="f" class="composer">
     <button type="button" class="ic" id="attach" title="إرفاق ملف" aria-label="إرفاق ملف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button><span class="vsep" aria-hidden="true"></span>
