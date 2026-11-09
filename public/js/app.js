@@ -4,7 +4,7 @@ import { playPcmBuffer } from './audio.js';
 import {
   $, $$, sar, num, esc, who, announce, friendlyStatus, setStatus, qaBusy, qaDone,
   toolRow, toolDone, errorRow, note, bubble, resetCur, caption, captionDone, openLog,
-  VIEW, CUR_DASH, DASH_CTX, INGEST_LAST, setIngestLast, renderView, showView, showDash,
+  VIEW, CUR_DASH, DASH_CTX, ACTIVE_DASH_SPEC, INGEST_LAST, setIngestLast, renderView, showView, showDash,
   dashWaiting, hud, ui, assistant, screenTools, screenToolsExtra, PERSONA, VOICE_DESC,
   applyPersona, fillVoices,
 } from './ui.js';
@@ -538,7 +538,17 @@ $('#f')?.addEventListener('submit', async e => {
   $('#send')?.setAttribute('aria-disabled', 'true');
 
   try {
-    const res = await apiJson('/api/chat/message', { text: t, sessionId: agent?.chatId || null });
+    const getScreenContext = () => ({
+      view: VIEW,
+      curDash: CUR_DASH,
+      dashboard: ACTIVE_DASH_SPEC || null,
+      kpis: [...document.querySelectorAll('.kpi')].map(k => `${k.querySelector('span, .l')?.innerText || ''}: ${k.querySelector('b, .v, .cnt')?.innerText || ''}`.trim()).filter(Boolean).slice(0, 10),
+    });
+    const res = await apiJson('/api/chat/message', {
+      text: t,
+      sessionId: agent?.chatId || null,
+      screenContext: getScreenContext(),
+    });
     if (res?.reply && log) {
       log.append(buildAssistantCard(res.reply));
       requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });

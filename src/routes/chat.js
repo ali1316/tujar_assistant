@@ -1,8 +1,27 @@
 import { Router, text } from 'express';
 import { addTurns, digestNow, recentForUI, chatStart } from '../../history.js';
 import { ai } from '../ai.js';
+import { getCurrentDash } from '../../file-dash.js';
+import { dashGet } from '../../dashboards.js';
 
 const router = Router();
+
+// مساعدة ذكية لبناء ملخص تنفيذي احتياطي في حال غياب مفتاح API
+function buildExecutiveSummaryFallback(dashSpec, userText) {
+  if (!dashSpec) return 'أهلاً بك يا أستاذ فواز. أنا جاهزة لمساعدتك في استعراض بيانات ومشاريع منصة تُجّار.';
+  const kpisText = (dashSpec.kpis || []).map(k => `• ${k.label}: ${typeof k.value === 'number' ? k.value.toLocaleString('ar-SA') : k.value} ${k.unit || ''} ${k.delta ? `(${k.delta})` : ''}`).join('\n');
+  const insightsText = (dashSpec.insights || []).map(i => `• ${i}`).join('\n');
+  const actionsText = (dashSpec.actions || []).map(a => `• ${a.action}${a.impact ? ` (الأثر: ${a.impact})` : ''}`).join('\n');
+
+  return `### ملخص تنفيذي: ${dashSpec.title || 'لوحة البيانات'}
+
+${dashSpec.headline ? `> **النتيجة الأهم:** ${dashSpec.headline}\n` : ''}
+#### المؤشرات الرئيسية (KPIs):
+${kpisText || 'لا توجد مؤشرات رقمية معروضة.'}
+
+${insightsText ? `#### أبرز تحليلات الأداء:\n${insightsText}\n` : ''}
+${actionsText ? `#### التوصيات والإجراءات المقترحة:\n${actionsText}` : ''}`;
+}
 
 // إرسال رسالة نصية مباشرة والحصول على رد AI وحفظها في قاعدة البيانات
 router.post('/api/chat/message', async (req, res) => {
@@ -15,14 +34,71 @@ router.post('/api/chat/message', async (req, res) => {
       sessionId = await chatStart();
     }
 
+    const screenContext = req.body?.screenContext || null;
+    let dashSpec = screenContext?.dashboard;
+    if (!dashSpec) {
+      try {
+        const cur = await getCurrentDash();
+        if (cur?.id) {
+          const d = await dashGet(+cur.id);
+          if (d?.spec) dashSpec = d.spec;
+        }
+      } catch {}
+    }
+
+    let screenInfo = '';
+    if (dashSpec) {
+      screenInfo = `
+المعروض حالياً على الشاشة أمام الأستاذ فواز:
+لوحة: ${dashSpec.title || 'لوحة البيانات'}
+${dashSpec.subtitle ? `المصدر / النطاق: ${dashSpec.subtitle}` : ''}
+${dashSpec.headline ? `النتيجة الأهم: ${dashSpec.headline}` : ''}
+${dashSpec.kpis?.length ? `المؤشرات الرئيسية (KPIs):
+${dashSpec.kpis.map(k => `- ${k.label}: ${typeof k.value === 'number' ? k.value.toLocaleString('ar-SA') : k.value} ${k.unit || ''} ${k.delta ? `(${k.delta})` : ''}`).join('\n')}` : ''}
+${dashSpec.insights?.length ? `تحليلات ورؤى الأداء:
+${dashSpec.insights.map(i => `- ${i}`).join('\n')}` : ''}
+${dashSpec.charts?.length ? `الرسوم البيانية المعروضة:
+${dashSpec.charts.map(c => `- ${c.title}${c.insight ? `: ${c.insight}` : ''}`).join('\n')}` : ''}
+${dashSpec.actions?.length ? `التوصيات والإجراءات:
+${dashSpec.actions.map(a => `- ${a.action}${a.impact ? ` (الأثر: ${a.impact})` : ''}`).join('\n')}` : ''}
+`;
+    } else if (screenContext?.kpis?.length) {
+      screenInfo = `
+المؤشرات المعروضة على الشاشة حالياً:
+${screenContext.kpis.join('\n')}
+`;
+    }
+
     const prompt = `أنت نورة، المستشارة والمساعدة التنفيذية الذكية للأستاذ فواز في اتحاد الغرف السعودية ومنصة تُجّار.
-أجب باحترافية ودقة وبلهجة تنفيذية سعودية واضحة ومباشرة.
+أنتِ تشاهدين شاشة فواز مباشرة وتعرفين ما هو معروض عليها بدقة كاملة ولحظية.
+عندما يسألك فواز عن "المعروض" أو يطلب تلخيص المعروض أو يسأل عن اللوحة الحالية أو الأرقام الظاهرة أمامه:
+- لخصي له فوراً وبأسلوب تنفيذي موجز واحترافي الأرقام والمؤشرات الحقيقية المعروضة أمامه.
+- لا تطلبي منه تزويدك بالمحتوى أو المعروض إطلاقاً، لأنك ترينه بالفعل في بيانات الشاشة المعطاة لك أعلاه.
+- ركزي على الأرقام الدقيقة، والمؤشرات الإيجابية، ونقاط الحذر الحرجة، والتوصيات التنفيذية.
+أجيبي بلهجة تنفيذية سعودية رفيعة ومباشرة واضحة.
+
+${screenInfo}
 
 سؤال فواز:
 ${userText}`;
 
-    const r = await ai.models.generateContent({ contents: prompt });
-    const reply = r.text || r.output_text || 'عذراً، لم أستطع معالجة الطلب.';
+    let reply = '';
+    try {
+      const r = await ai.models.generateContent({ contents: prompt });
+      reply = r.text || r.output_text || '';
+    } catch (llmErr) {
+      console.warn('[chat/message] AI generateContent fallback:', llmErr.message);
+      // إذا كان السؤال عن تلخيص المعروض وحدث خطأ في النموذج، استخدام الملخص الاحترافي
+      if (/لخص|معروض|اللوحة|الارقام|الأرقام|شاشة|الشاشة/i.test(userText) && dashSpec) {
+        reply = buildExecutiveSummaryFallback(dashSpec, userText);
+      } else {
+        reply = 'أهلاً بك يا أستاذ فواز. بصفتي نورة، يسعدني تقديم المساعدة في متابعة مؤشرات ومشاريع التحول الرقمي لاتحاد الغرف ومنصة تُجّار.';
+      }
+    }
+
+    if (!reply) {
+      reply = buildExecutiveSummaryFallback(dashSpec, userText);
+    }
 
     // حفظ في قاعدة البيانات (PostgreSQL / SQLite)
     await addTurns(+sessionId, [

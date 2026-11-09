@@ -329,6 +329,7 @@ export const openLog = (open, refocus = false) => {
 export let VIEW = 'overview';
 export let CUR_DASH = null;
 export let DASH_CTX = null;
+export let ACTIVE_DASH_SPEC = null;
 export let INGEST_LAST = null;
 
 export function setIngestLast(val) {
@@ -373,6 +374,11 @@ export function showView(v) {
 export async function showDash(id, title = '', sub = '', save = true, show = true) {
   if (!id) return;
   CUR_DASH = { id, title };
+  if (id && window.apiJson) {
+    window.apiJson(`/api/dashboards/${id}`).then(r => {
+      if (r?.spec) ACTIVE_DASH_SPEC = r.spec;
+    }).catch(() => {});
+  }
   const wait = $('#fdWait');
   const frame = $('#fdFrame');
   if (wait) wait.hidden = true;
@@ -543,6 +549,15 @@ export const screenTools = {
       projects: rows('#projects'),
       tickets: rows('#tickets'),
       file_dashboard_on_screen: $('#filedash').hidden ? null : $('#fdTitle').innerText + ' ' + $('#fdSub').innerText,
+      active_file_dashboard: ACTIVE_DASH_SPEC ? {
+        title: ACTIVE_DASH_SPEC.title,
+        subtitle: ACTIVE_DASH_SPEC.subtitle,
+        headline: ACTIVE_DASH_SPEC.headline,
+        kpis: ACTIVE_DASH_SPEC.kpis,
+        insights: ACTIVE_DASH_SPEC.insights,
+        charts: (ACTIVE_DASH_SPEC.charts || []).map(c => ({ title: c.title, insight: c.insight })),
+        actions: ACTIVE_DASH_SPEC.actions,
+      } : null,
       dashboard_source: $('#filedash').hidden || !DASH_CTX ? null : {
         title: DASH_CTX.title,
         provenance: DASH_CTX.provenance,
@@ -664,5 +679,8 @@ window.addEventListener('message', e => {
   }
   if (e.data?.noraDashCtx) {
     DASH_CTX = e.data.noraDashCtx;
+  }
+  if (e.data?.noraDashSpec) {
+    ACTIVE_DASH_SPEC = e.data.noraDashSpec;
   }
 });

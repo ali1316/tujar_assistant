@@ -1,6 +1,6 @@
 import { db, tools as dataTools } from '../../db.js';
 import { kvGet } from '../../store.js';
-import { dashList } from '../../dashboards.js';
+import { dashList, dashGet } from '../../dashboards.js';
 import { getCurrentDash } from '../../file-dash.js';
 import { latestCatalog } from '../../datasets.js';
 import { knowledgeCatalog } from '../../knowledge.js';
@@ -138,11 +138,26 @@ export async function screenBlock() {
     const docs = await db.prepare('SELECT id, name, chars FROM documents ORDER BY id DESC LIMIT 1').all();
     const cur = (await getCurrentDash()) || {};
     const catalog = await latestCatalog();
+
+    let dashDetails = '';
+    if (cur.id) {
+      try {
+        const d = await dashGet(+cur.id);
+        if (d?.spec) {
+          const sp = d.spec;
+          dashDetails = `\n- تفاصيل اللوحة المعروضة حالياً على الشاشة:
+  * العنوان: ${sp.title}
+  * النتيجة الأهم: ${sp.headline || '—'}
+  * المؤشرات: ${(sp.kpis || []).map(k => `${k.label}: ${k.value} ${k.unit || ''}`).join(' | ')}
+  * الرسوم والتحليلات: ${(sp.charts || []).map(c => `${c.title}${c.insight ? ` (${c.insight})` : ''}`).join(' | ')}`;
+        }
+      } catch {}
+    }
     return `\n\n## بيانات المنصة (الشاشة تبدأ فاضية، وهذي البيانات تقدرين تعرضينها بـ show_screen)
 - البطاقات: ${projects.length} مشاريع، الميزانية ${s.total_budget} ريال، المصروف ${s.total_spent} ريال، ${s.open_tickets} تذاكر مفتوحة (${s.high_priority_open} عالية).
 - المشاريع: ${projects.map(p => `#${p.id} ${p.name} (${p.status}، ${p.progress}%)`).join('، ')}.
 - شكلها: الخط ${ui.font || 'IBM Plex Sans Arabic'}، الأرقام ${ui.numerals === 'latin' ? 'إنجليزية 123' : 'عربية ١٢٣'}${ui.numFont ? ` بخط ${ui.numFont}` : ''}، الجداول ${ui.table || 'default'}${(ui.css || []).length ? `، تعديلات مخصصة: ${ui.css.map(c => c.description).join('، ')}` : ''}.
-- لوحة آخر ملف (file_dashboard): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.
+- لوحة آخر ملف (file_dashboard): ${cur.id ? `#${cur.id} «${cur.title}»${cur.doc_name ? ` مبنية من ملف «${cur.doc_name}» رقم ${cur.doc_id}` : ''}` : 'لا يوجد'}.${dashDetails}
 - بيانات الملف الجاهزة للتحليل الفوري (استخدمي أسماء الأعمدة حرفياً):\n${catalog || 'لا يوجد ملف Excel/CSV'}
 - مكتبة المعرفة:\n${(await knowledgeCatalog()) || 'فاضية'}
 - مصادر PDF المعالجة (محفوظة في Drive، استخدمي أدوات pdf_* لها):\n${await sourcesBlock()}

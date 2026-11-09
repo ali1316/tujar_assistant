@@ -7,17 +7,26 @@ import { dashboardTools } from './dashboards.js';
 import { kvGet, kvSet } from './store.js';
 import { datasetsForDoc, runQuery, toECharts, dateStr } from './datasets.js';
 
-const TEXT_PROMPT = (name, text) => `أنت مصمم داشبوردات تنفيذية. هذا محتوى ملف رفعه فواز اسمه «${name}».
-صمّم داشبورد احترافي بالعربي من بيانات الملف الحقيقية فقط (ممنوع اختراع أرقام). رجّع JSON فقط:
+const TEXT_PROMPT = (name, text) => `أنت مصمم داشبوردات تنفيذية محترف. هذا محتوى ملف رفعه فواز اسمه «${name}».
+صمّم داشبورد احترافي بالعربي يمثل بيانات الملف الحقيقية بدقة تامة (ممنوع اختراع أرقام أو استخدام قوالب عامة مكررة).
+
+قواعد اختيار الرسوم لتمثيل البيانات بدقة وحسب طبيعتها (Data-Driven Visualizations):
+1. التركيب والحصص والنسب (Part-to-Whole): إذا كانت البيانات تمثل إجمالياً وتفاصيله (مثل: شكاوى محلولة مقابل معلقة، توزيع الميزانية بين الإدارات، أو الإيرادات مقابل المصروفات والفائض)، استخدم دائماً رسم دائري مفرغ (pie مع radius داخلي كـ donut) أو شريطي مكدس (stacked bar).
+2. المقارنة بين الفئات (Categorical Comparison): استخدم رسم أعمدة (bar أو hbar) بفئات حقيقية متعددة (3 فئات على الأقل) تشترك في نفس وحدة القياس.
+3. التوزيع الزمني (Time Trends): استخدم رسم خطي (line أو area) فقط إذا كان المحور يمثل تسلسلاً زمنياً حقيقياً (أشهر، أرباع، سنوات). ممنوع استخدام الرسم الخطي لفئات غير زمنية!
+4. تجنب تماماً خلط وحدات غير متجانسة على نفس المحور (مثل خلط المبالغ بالريال مع عدد المعاملات).
+5. ممنوع الرسوم ذات النقطة الواحدة (single point): كل رسم يجب أن يحتوي على فئتين على الأقل لإجراء مقارنة أو توزيع مفيد.
+
+رجّع JSON فقط بهذا الشكل:
 {"title": "...", "subtitle": "...", "kicker": "تصنيف قصير للوحة",
  "kpis": [{"label": "...", "value": رقم, "unit": "...", "delta": "اختياري"}],
- "charts": [{"title": "...", "span": 1 أو 2, "echarts_option": {كائن ECharts: series + xAxis/yAxis أو pie}}],
+ "charts": [{"title": "سؤال إدارة محدد يجاوبه الرسم", "span": 1 أو 2, "insight": "جواب سؤال الرسم برقم", "flag": ["أسماء الفئات اللي فيها مشكلة"], "echarts_option": {كائن ECharts: series + xAxis/yAxis أو pie}}],
  "tables": [{"title": "...", "columns": ["..."], "rows_json": "[[...]]"}],
- "insights": ["..."],
+ "insights": ["3-4 ملاحظات تحليلية دقيقة بالأرقام الحقيقية"],
  "headline": "سطر واحد: أهم نتيجة أو أكبر مشكلة برقمها", "headline_flag": true أو false,
  "actions": [{"action": "إجراء يبدأ بفعل", "impact": "الأثر المتوقع", "why": "الدليل من الملف"}]}
-3-6 مؤشرات، 2-4 رسوم، 1-2 جدول، 3-4 ملاحظات، 2-4 إجراءات مرتبة من الأكبر أثراً. عنوان كل رسم سؤال إدارة يجاوبه الرسم، وأضف للرسم "insight" (جوابه بجملة ورقم) و"flag" (أسماء الفئات اللي فيها مشكلة فقط، أو بدونه).
-كل النصوص عربي. لا دوال JavaScript ولا ألوان.
+3-6 مؤشرات، 2-4 رسوم، 1-2 جدول، 3-4 ملاحظات، 2-4 إجراءات مرتبة من الأكبر أثراً.
+كل النصوص عربي. لا دوال JavaScript ولا ألوان مخصصة.
 
 محتوى الملف:
 ${text}`;
@@ -101,18 +110,43 @@ function designRule(c, r, ds) {
   if (type === 'hbar' && n > 8) size = 'l';
   return { type, span, size, time: isTime };
 }
+
 // للرسوم الجاهزة (ملفات PDF/Word): نفس الفلسفة على مواصفة ECharts
 function lintOption(c) {
   let o; try { o = typeof c.echarts_option === 'string' ? JSON.parse(c.echarts_option) : c.echarts_option; } catch { return null; }
   if (!o || !o.series) return null;
   const series = [].concat(o.series), first = series[0] || {};
-  const cats = [].concat(o.xAxis || [], o.yAxis || []).find(a => a && Array.isArray(a.data))?.data || first.data || [];
+  const catAx = [].concat(o.xAxis || [], o.yAxis || []).find(a => a && Array.isArray(a.data));
+  const cats = catAx?.data || first.data || [];
   const n = cats.length;
-  if (n < 2 && first.type !== 'gauge') return null;
+
+  // إذا قام النموذج بتقسيم كل فئة إلى سلسلة مستقلة بطول 1:
+  // e.g. series: [{name: 'A', data: [400]}, {name: 'B', data: [12050]}] مع cats: ['A', 'B']
+  if (series.length > 1 && series.every(s => Array.isArray(s.data) && s.data.length === 1) && cats.length === series.length) {
+    if (first.type === 'pie') {
+      first.data = series.map((s, i) => ({ value: s.data[0], name: cats[i] || s.name }));
+      o.series = [first];
+    } else {
+      o.series = [{
+        name: c.title || 'البيانات',
+        type: first.type === 'line' ? 'bar' : (first.type || 'bar'),
+        data: series.map(s => s.data[0])
+      }];
+    }
+  }
+
+  // تجنب الرسوم الخطية على فئات غير زمنية
+  const updatedSeries = [].concat(o.series);
+  if (updatedSeries[0]?.type === 'line' && catAx && !cats.some(cat => /\d{4}|شهر|يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر|الربع|Q[1-4]|H[1-2]/i.test(String(cat)))) {
+    updatedSeries[0].type = 'bar';
+  }
+
+  if (n < 2 && updatedSeries[0]?.type !== 'gauge' && updatedSeries[0]?.type !== 'pie') return null;
   let span = c.span === 2 ? 2 : 1, size;
-  if (n <= 3 && series.length === 1 && first.type === 'bar') { span = 1; size = 's'; }
+  if (n <= 3 && updatedSeries.length === 1 && updatedSeries[0]?.type === 'bar') { span = 1; size = 's'; }
   return { title: c.title, span, size, echarts_option: JSON.stringify(o) };
 }
+
 // نربط ملاحظات المحلل بالرسوم والمؤشرات — والأحمر بس لفئات موجودة فعلاً في الرسم (ما نقبل أسماء مخترعة)
 export function enrich(ins, kpis, charts) {
   const norm = t => String(t ?? '').replace(/\s+/g, ' ').trim();
@@ -128,6 +162,7 @@ export function enrich(ins, kpis, charts) {
     }),
   };
 }
+
 // ترتيب اللوحة: الاتجاه الزمني والرسم العريض أول، والصغيرة جنب بعض
 function arrange(charts) {
   return [...charts].sort((a, b) => (b.t ? 1 : 0) - (a.t ? 1 : 0) || (b.span || 1) - (a.span || 1) || (a.size === 's') - (b.size === 's'));

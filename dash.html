@@ -180,6 +180,20 @@ function countUp(el, to, unit) {
   const r = await fetch(`/api/dashboards/${id}`, { headers: { 'x-access-code': CODE } });
   if (!r.ok) { $('#title').textContent = r.status === 401 ? 'افتح لوحة نورة وادخل رمز الدخول أول' : 'الداشبورد غير موجود'; return; }
   const { spec, created_at } = await r.json();
+  try {
+    parent.postMessage({
+      noraDashSpec: {
+        id,
+        title: spec.title,
+        subtitle: spec.subtitle,
+        headline: spec.headline,
+        kpis: spec.kpis,
+        charts: (spec.charts || []).map(c => ({ title: c.title, insight: c.insight })),
+        insights: spec.insights,
+        actions: spec.actions,
+      }
+    }, location.origin);
+  } catch {}
   const when = new Date(spec.generated_at || created_at);
   document.title = `${spec.title} · اتحاد الغرف`;
   $('#title').textContent = spec.title;
