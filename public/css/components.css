@@ -550,11 +550,13 @@ body.blank .ic.mic {
 #drawer {
   position: fixed;
   top: var(--hdr-h, 64px);
-  bottom: 0;
+  bottom: 72px;
   left: 0;
-  width: min(480px, 94vw);
-  height: calc(100dvh - var(--hdr-h, 64px));
-  max-height: calc(100dvh - var(--hdr-h, 64px));
+  width: min(460px, 92vw);
+  height: calc(100dvh - var(--hdr-h, 64px) - 72px);
+  max-height: calc(100dvh - var(--hdr-h, 64px) - 72px);
+  border-radius: 0 16px 16px 0;
+  border-bottom: 1px solid rgba(212, 168, 83, 0.28);
   z-index: 95;
   display: flex;
   flex-direction: column;
@@ -577,16 +579,13 @@ body.log-open #dock {
   background: var(--bg);
 }
 
-@media (min-width: 1200px) {
-  body.log-open main {
-    padding-left: 480px;
-    transition: padding-left 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  body.log-open #dock {
-    left: 480px;
-    width: calc(100% - 480px);
-    transition: left 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  }
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+body.log-open {
+  overflow-x: hidden;
 }
 
 .dr-head {
@@ -595,11 +594,14 @@ body.log-open #dock {
   justify-content: space-between;
   gap: 10px;
   padding: 12px 18px;
-  background: rgba(14, 29, 50, 0.75);
+  background: rgba(14, 29, 50, 0.85);
   border-bottom: 1px solid rgba(212, 168, 83, 0.2);
   font-size: 13px;
   color: var(--mute);
   flex-wrap: nowrap;
+  flex-shrink: 0;
+  height: 52px;
+  box-sizing: border-box;
 }
 
 .dr-title-group {
@@ -694,14 +696,16 @@ body.log-open #dock {
 }
 
 #log {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px 14px;
+  padding: 16px 14px 28px;
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 #log::-webkit-scrollbar {
@@ -723,12 +727,13 @@ body.log-open #dock {
 }
 
 .dr-foot {
+  flex-shrink: 0;
   padding: 8px 16px;
   color: var(--mute);
   font-size: 11.5px;
   opacity: .8;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 22, 38, 0.6);
+  background: rgba(10, 22, 38, 0.7);
 }
 
 .dr-foot:empty {

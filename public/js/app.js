@@ -530,7 +530,7 @@ $('#f')?.addEventListener('submit', async e => {
   const log = $('#log');
   if (log) {
     log.append(buildUserCard(t));
-    log.scrollTop = 1e9;
+    requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
   }
   openLog(true);
   setStatus('⏳ نورة تفكر…');
@@ -541,7 +541,7 @@ $('#f')?.addEventListener('submit', async e => {
     const res = await apiJson('/api/chat/message', { text: t, sessionId: agent?.chatId || null });
     if (res?.reply && log) {
       log.append(buildAssistantCard(res.reply));
-      log.scrollTop = 1e9;
+      requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
       setStatus('اكتب طلبك أو اضغط للتحدث.');
     } else if (res?.error) {
       setStatus('❌ ' + res.error);
@@ -551,12 +551,39 @@ $('#f')?.addEventListener('submit', async e => {
   }
 });
 
+// فتح الداشبورد التنفيذي مباشرة على الشاشة بدون شات
+export async function openDashboardDirect() {
+  openLog(false);
+  try {
+    const res = await apiJson('/api/current-dash').catch(() => null);
+    if (res?.id) {
+      await showDash(res.id, res.title, res.doc_name ? 'من ملف: ' + res.doc_name : '', false, true);
+      const fd = $('#filedash');
+      if (fd) {
+        fd.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      setStatus(`📊 تم فتح: ${res.title}`);
+    } else {
+      showView('dashboards');
+      setStatus('📊 استعراض داشبوردات نورة');
+    }
+  } catch (err) {
+    console.error('Failed to open dashboard:', err);
+    showView('dashboards');
+  }
+}
+window.openDashboardDirect = openDashboardDirect;
+
 // Quick Action Buttons
 $$('.qa-btn').forEach(b => {
   b.onclick = () => {
     if (b.dataset.act === 'file') return $('#file')?.click();
     if (b.dataset.act === 'simulator') {
       if (window.openSimulatorCockpit) window.openSimulatorCockpit();
+      return;
+    }
+    if (b.dataset.act === 'dashboard') {
+      openDashboardDirect();
       return;
     }
     qaBusy(b, true);

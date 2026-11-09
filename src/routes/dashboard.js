@@ -5,6 +5,7 @@ import { kvGet, kvSet, memDelete } from '../../store.js';
 import { listForUI } from '../../memory.js';
 import { dashGet, dashList } from '../../dashboards.js';
 import { getCurrentDash, setCurrentDash } from '../../file-dash.js';
+import { getOrSeedExecutiveDashboard } from '../dashboard/seed.js';
 import { importBundle, kList, legacyFind } from '../../knowledge.js';
 import { ensureIndex, hybridSearch, evaluate, W_COS, W_COV } from '../../retrieval.js';
 import { legacySearchDocs } from '../tools/registry.js';
@@ -32,7 +33,7 @@ router.get('/api/dashboards/:id', async (req, res) => {
 });
 
 // لوحة آخر ملف المعروضة
-router.get('/api/current-dash', async (req, res) => res.json((await getCurrentDash()) || {}));
+router.get('/api/current-dash', async (req, res) => res.json((await getOrSeedExecutiveDashboard()) || {}));
 router.post('/api/current-dash', async (req, res) => {
   await setCurrentDash(req.body?.id ? req.body : {});
   res.json({ ok: true });

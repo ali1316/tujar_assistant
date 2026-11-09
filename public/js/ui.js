@@ -250,7 +250,7 @@ export function bubble(kind, text, append = true) {
   if (!append) {
     const card = (kind === 'u') ? buildUserCard(text) : buildAssistantCard(text);
     log.append(card);
-    log.scrollTop = 1e9;
+    requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
     caption(kind, text);
     trimLog();
     return;
@@ -260,7 +260,7 @@ export function bubble(kind, text, append = true) {
     log.append(cur[kind]);
   }
   cur[kind].textContent = (cur[kind].textContent + text).replace(TAGS, '');
-  log.scrollTop = 1e9;
+  requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
   caption(kind, cur[kind].textContent);
   trimLog();
 }

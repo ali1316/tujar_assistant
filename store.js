@@ -115,11 +115,21 @@ export async function dashAdd(title, spec) {
 }
 
 export async function dashGet(id) {
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('SELECT * FROM dashboards WHERE id=$1', [id]);
+    return r.rows[0] ? { ...r.rows[0], spec: parse(r.rows[0].spec) } : null;
+  }
   const r = await db.prepare('SELECT * FROM dashboards WHERE id=?').get(id);
   return r ? { ...r, spec: parse(r.spec) } : null;
 }
 
 export async function dashList() {
+  const pool = getPool();
+  if (backend === 'postgres' && pool) {
+    const r = await pool.query('SELECT id, title, created_at FROM dashboards ORDER BY id DESC LIMIT 30');
+    return r.rows;
+  }
   return db.prepare('SELECT id, title, created_at FROM dashboards ORDER BY id DESC LIMIT 30').all();
 }
 
