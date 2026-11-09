@@ -5,7 +5,7 @@ import { kvGet, kvSet, memDelete } from '../../store.js';
 import { listForUI } from '../../memory.js';
 import { dashGet, dashList } from '../../dashboards.js';
 import { getCurrentDash, setCurrentDash } from '../../file-dash.js';
-import { getOrSeedExecutiveDashboard } from '../dashboard/seed.js';
+import { getOrSeedExecutiveDashboard, seedAllProjectDashboards } from '../dashboard/seed.js';
 import { importBundle, kList, legacyFind } from '../../knowledge.js';
 import { ensureIndex, hybridSearch, evaluate, W_COS, W_COV } from '../../retrieval.js';
 import { legacySearchDocs } from '../tools/registry.js';
@@ -25,6 +25,45 @@ router.post('/api/ui', async (req, res) => {
 // الذاكرة
 router.get('/api/memories', async (req, res) => res.json({ memories: await listForUI() }));
 router.delete('/api/memories/:id', async (req, res) => res.json({ ok: !!(await memDelete(+req.params.id)) }));
+
+// كتالوج الداشبوردات المتاحة لجميع المشاريع والمحافظ والملفات
+router.get('/api/dashboards/catalog', async (req, res) => {
+  try {
+    await seedAllProjectDashboards();
+    const projects = await db.prepare('SELECT id, name, department, status, progress, budget, spent, dashboard_id FROM projects ORDER BY id ASC').all();
+    const list = await dashList();
+    const validDashes = list.filter(d => d.title && d.title !== 'test dashboard');
+
+    const projectDashes = projects.map(p => ({
+      projectId: p.id,
+      name: p.name,
+      status: p.status,
+      progress: p.progress,
+      dashboardId: p.dashboard_id,
+      title: validDashes.find(d => d.id === p.dashboard_id)?.title || `مشروع: ${p.name}`
+    }));
+
+    const portfolioDashes = validDashes.filter(d =>
+      /محفظة|تقرير الأداء السنوي|الغرف السعودية/i.test(d.title) &&
+      !projectDashes.some(p => p.dashboardId === d.id)
+    );
+
+    const fileDashes = validDashes.filter(d =>
+      !projectDashes.some(p => p.dashboardId === d.id) &&
+      !portfolioDashes.some(p => p.id === d.id)
+    );
+
+    res.json({
+      ok: true,
+      projects: projectDashes,
+      portfolios: portfolioDashes,
+      files: fileDashes
+    });
+  } catch (err) {
+    console.error('[dashboards/catalog] error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // الداشبوردات المولّدة
 router.get('/api/dashboards/:id', async (req, res) => {

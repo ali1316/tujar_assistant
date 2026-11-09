@@ -62,8 +62,14 @@
       <div id="qaSkel" role="status" aria-live="polite" hidden></div>
     </div>
     <div class="card" id="filedash" data-v="file_dashboard" hidden>
-      <div class="fd-head"><div><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
-        <div><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div></div>
+      <div class="fd-head">
+        <div class="fd-head-info"><h2 id="fdTitle">لوحة الملف</h2><small id="fdSub"></small></div>
+        <div class="fd-selector-wrap">
+          <label for="fdSelect" class="sr-only">اختر اللوحة أو المشروع</label>
+          <select id="fdSelect" class="chipsel fd-select" title="اختر اللوحة أو المشروع" aria-label="اختر اللوحة أو المشروع"></select>
+        </div>
+        <div class="fd-actions"><a id="fdOpen" target="_blank" rel="noopener">↗ شاشة كاملة</a> <button id="fdHide" type="button" title="إخفاء">✕</button></div>
+      </div>
       <div id="fdWait" class="fd-wait" hidden><b>نورة تحلل الملف وتبني اللوحة…</b>ثواني وتظهر هنا</div>
       <iframe id="fdFrame" title="لوحة الملف"></iframe>
     </div>

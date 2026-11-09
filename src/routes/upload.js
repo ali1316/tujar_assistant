@@ -10,7 +10,7 @@ import { receive as ingestReceive } from '../../ingest/pipeline.js';
 import { ensureIndex, invalidateIndex } from '../../retrieval.js';
 import { archiveToDrive } from '../../drive.js';
 import { uploadStep } from '../../events.js';
-import { dashboardFromDocument } from '../../file-dash.js';
+import { dashboardFromDocument, getCurrentDash } from '../../file-dash.js';
 import { generateAutoDK } from '../ingest/auto-dk.js';
 
 const router = Router();
@@ -46,12 +46,35 @@ export async function handleFileUpload(req, res) {
   step('checked', { duplicate: !!dup });
   if (dup) {
     console.log(`[upload] Duplicate detected: ${name} matches doc #${dup.id} (${digest})`);
+
+    // المعالجة الذاتية: إذا لم يكن الملف قد رُفع لـ Drive بنجاح، أعد محاولة الأرشفة فوراً
+    if (!dup.drive_id) {
+      archiveToDrive(dup, req.file.buffer, req.file.mimetype)
+        .then(r => console.log(`[drive] doc #${dup.id} auto-healed archive:`, r?.category))
+        .catch(e => console.warn(`[drive] doc #${dup.id} auto-heal failed:`, e.message));
+    }
+
+    // استرجاع أو تجهيز الداشبورد لفتحه مباشرة أمام المستخدم
+    let dash = null;
+    try {
+      const cur = await getCurrentDash();
+      if (cur?.id && (cur.doc_id === dup.id || cur.doc_name === dup.name)) {
+        dash = { id: cur.id, title: cur.title };
+      } else {
+        const dRes = await dashboardFromDocument(dup.id);
+        if (dRes?.ok) dash = { id: dRes.id, title: dRes.title };
+      }
+    } catch (e) {
+      console.warn('[upload] dashboard recovery note:', e.message);
+    }
+
     return res.json({
       ...dup,
       duplicate: true,
+      dashboard: dash,
       datasets: [],
       ingest: null,
-      message: 'الملف موجود مسبقاً بنفس البصمة — تم منعه من التكرار'
+      message: 'الملف موجود مسبقاً بنفس البصمة — تم استرجاع لوحته وعرضها مباشرة'
     });
   }
 

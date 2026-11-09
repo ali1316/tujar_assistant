@@ -45,11 +45,76 @@ export async function loadDashboard(flash) {
     const projEl = $('#projects');
     if (projEl) {
       projEl.innerHTML = '<caption class="sr-only">جدول المشاريع: الحالة ونسبة الإنجاز والمسؤول</caption>' +
-        TH([['c-id', '#'], ['c-name', 'المشروع'], ['c-dept', 'الإدارة'], ['c-status', 'الحالة'], ['c-prog', 'الإنجاز'], ['c-owner', 'المسؤول']]) +
+        TH([['c-id', '#'], ['c-name', 'المشروع'], ['c-dept', 'الإدارة'], ['c-status', 'الحالة'], ['c-prog', 'الإنجاز'], ['c-owner', 'المسؤول'], ['c-act', 'لوحة المشروع']]) +
         '<tbody>' +
         d.projects.map(p => `<tr><td class="num c-id">${num(p.id)}</td><td class="c-name">${esc(p.name)}</td><td class="c-dept">${esc(p.department)}</td><td class="c-status"><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td>
-          <td class="c-prog"><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${+p.progress || 0}" aria-label="نسبة إنجاز ${esc(p.name)}"><i style="width:${+p.progress || 0}%"></i></div><span class="num pct" aria-hidden="true">${num(p.progress)}٪</span></div></td><td class="c-owner">${esc(p.owner)}</td></tr>`).join('') +
+          <td class="c-prog"><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${+p.progress || 0}" aria-label="نسبة إنجاز ${esc(p.name)}"><i style="width:${+p.progress || 0}%"></i></div><span class="num pct" aria-hidden="true">${num(p.progress)}٪</span></div></td>
+          <td class="c-owner">${esc(p.owner)}</td>
+          <td class="c-act"><button type="button" class="btn-proj-dash" data-proj-id="${p.id}" data-dash-id="${p.dashboard_id || ''}" title="فتح لوحة مشروع ${esc(p.name)}">عرض اللوحة ↗</button></td>
+        </tr>`).join('') +
         '</tbody>';
+
+      if (!projEl.__boundDash) {
+        projEl.__boundDash = true;
+        projEl.addEventListener('click', async e => {
+          const btn = e.target.closest('.btn-proj-dash');
+          if (!btn) return;
+          const projId = +btn.dataset.projId;
+          let dashId = +btn.dataset.dashId;
+          const tr = btn.closest('tr');
+          const name = tr?.querySelector('.c-name')?.textContent || 'مشروع #' + projId;
+          if (!dashId) {
+            const catalog = await apiJson('/api/dashboards/catalog').catch(() => null);
+            const found = catalog?.projects?.find(p => p.projectId === projId);
+            if (found?.dashboardId) dashId = found.dashboardId;
+          }
+          if (dashId) {
+            await showDash(dashId, name, 'مشروع رقم #' + projId, true, true);
+          }
+        });
+      }
+    }
+
+    // تحديث قائمة لوحات المشاريع والتقارير في الشريط العلوي للوحة
+    const fdSel = $('#fdSelect');
+    if (fdSel) {
+      apiJson('/api/dashboards/catalog').then(catalog => {
+        if (!catalog) return;
+        let html = '<option value="">-- اختر المشروع أو التقرير التنفيذي --</option>';
+        if (catalog.projects?.length) {
+          html += '<optgroup label="🚀 لوحات المشاريع الاستراتيجية">';
+          catalog.projects.forEach(p => {
+            html += `<option value="${p.dashboardId}" data-sub="مشروع #${p.projectId}: ${esc(p.name)}">${esc(p.title || p.name)} (${esc(p.status)} - ${p.progress}%)</option>`;
+          });
+          html += '</optgroup>';
+        }
+        if (catalog.portfolios?.length) {
+          html += '<optgroup label="📊 التقارير والمحافظ التنفيذية">';
+          catalog.portfolios.forEach(d => {
+            html += `<option value="${d.id}" data-sub="${esc(d.title)}">${esc(d.title)}</option>`;
+          });
+          html += '</optgroup>';
+        }
+        if (catalog.files?.length) {
+          html += '<optgroup label="📁 لوحات الملفات والوثائق">';
+          catalog.files.forEach(f => {
+            html += `<option value="${f.id}" data-sub="${esc(f.title)}">${esc(f.title)}</option>`;
+          });
+          html += '</optgroup>';
+        }
+        fdSel.innerHTML = html;
+        if (CUR_DASH?.id) fdSel.value = String(CUR_DASH.id);
+      }).catch(() => {});
+
+      if (!fdSel.__bound) {
+        fdSel.__bound = true;
+        fdSel.addEventListener('change', async e => {
+          const dashId = +e.target.value;
+          if (!dashId) return;
+          const opt = e.target.selectedOptions[0];
+          await showDash(dashId, opt.textContent, opt?.dataset?.sub || '', true, true);
+        });
+      }
     }
 
     const tixEl = $('#tickets');
@@ -508,10 +573,19 @@ $('#f')?.addEventListener('submit', async e => {
   const txt = $('#txt');
   const t = txt?.value?.trim();
   if (!t) return;
+  const notifyLiveScreenContext = () => {
+    if (agent?.connected && (ACTIVE_DASH_SPEC?.title || CUR_DASH?.title)) {
+      const dTitle = ACTIVE_DASH_SPEC?.title || CUR_DASH?.title;
+      const kpisStr = (ACTIVE_DASH_SPEC?.kpis || []).map(k => `${k.label}: ${k.value} ${k.unit || ''}`).slice(0, 4).join('، ');
+      agent.sendText(`[تحديث الشاشة] المعروض حالياً أمام فواز: لوحة «${dTitle}». ${ACTIVE_DASH_SPEC?.headline ? `النتيجة الأهم: ${ACTIVE_DASH_SPEC.headline}.` : ''} ${kpisStr ? `المؤشرات: ${kpisStr}.` : ''}`, { silent: true });
+    }
+  };
+
   if (!running || !agent.connected) {
     try {
       await agent.start({ mic: false, mode: modeFor(), voice: VOICE });
       running = true;
+      notifyLiveScreenContext();
       agent.sendText(t);
       if (txt) txt.value = '';
       $('#send')?.setAttribute('aria-disabled', 'true');
@@ -520,6 +594,7 @@ $('#f')?.addEventListener('submit', async e => {
       console.log('[app] Live WebSocket unavailable, using REST Chat:', err.message);
     }
   } else {
+    notifyLiveScreenContext();
     agent.sendText(t);
     if (txt) txt.value = '';
     $('#send')?.setAttribute('aria-disabled', 'true');
@@ -877,10 +952,19 @@ export async function uploadFile(file) {
     return;
   }
   if (d.duplicate) {
-    note(`📄 «${d.name}» مرفوع من قبل (ملف #${d.id}) ومحفوظ في Drive`);
+    note(`📄 «${d.name}» موجود مسبقاً (ملف #${d.id})`);
     const links = [];
     if (d.drive_url) links.push(['📁 عرض في Drive', d.drive_url]);
-    jr.finish('الملف موجود مسبقاً — ما كررناه', [`ملف #${d.id}`, d.name], links, { rest: 'skip' });
+    jr.finish('الملف موجود مسبقاً — تم استرجاع لوحته', [`ملف #${d.id}`, d.name], links, { rest: 'skip' });
+    if (d.dashboard?.id) {
+      showDash(d.dashboard.id, d.dashboard.title, 'من ملف: ' + d.name);
+      note(`📊 تم فتح لوحة الملف #${d.dashboard.id}: ${d.dashboard.title}`);
+    } else {
+      apiJson(`/api/docs/${d.id}/dashboard`, {}).then(g => {
+        if (g?.ok) showDash(g.id, g.title, 'من ملف: ' + d.name);
+      }).catch(() => {});
+    }
+    loadDashboard();
     return;
   }
   if (jr.kind === 'pdf' && d.ingest) {

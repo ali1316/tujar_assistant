@@ -3,6 +3,8 @@ import { addTurns, digestNow, recentForUI, chatStart } from '../../history.js';
 import { ai } from '../ai.js';
 import { getCurrentDash } from '../../file-dash.js';
 import { dashGet } from '../../dashboards.js';
+import { db } from '../../db.js';
+import { getOrSeedExecutiveDashboard } from '../dashboard/seed.js';
 
 const router = Router();
 
@@ -46,6 +48,16 @@ router.post('/api/chat/message', async (req, res) => {
       } catch {}
     }
 
+    if (!dashSpec) {
+      try {
+        const seeded = await getOrSeedExecutiveDashboard();
+        if (seeded?.id) {
+          const d = await dashGet(+seeded.id);
+          if (d?.spec) dashSpec = d.spec;
+        }
+      } catch {}
+    }
+
     let screenInfo = '';
     if (dashSpec) {
       screenInfo = `
@@ -69,26 +81,38 @@ ${screenContext.kpis.join('\n')}
 `;
     }
 
+    // جلب محفظة المشاريع الخمسة وحالة التذاكر لتعزيز إجابات نورة الذكية
+    let portfolioInfo = '';
+    try {
+      const projs = await db.prepare('SELECT id, name, status, progress, budget, spent FROM projects ORDER BY id ASC').all();
+      if (projs?.length) {
+        portfolioInfo = `
+بيانات محفظة مشاريع التحول الرقمي لاتحاد الغرف (مشاريع 1 إلى 5):
+${projs.map(p => `- مشروع #${p.id} (${p.name}): الحالة [${p.status}]، الإنجاز [${p.progress}%]، الميزانية [${Number(p.budget).toLocaleString('ar-SA')} ر.س]، المصروف [${Number(p.spent).toLocaleString('ar-SA')} ر.س]`).join('\n')}
+`;
+      }
+    } catch {}
+
     const prompt = `أنت نورة، المستشارة والمساعدة التنفيذية الذكية للأستاذ فواز في اتحاد الغرف السعودية ومنصة تُجّار.
-أنتِ تشاهدين شاشة فواز مباشرة وتعرفين ما هو معروض عليها بدقة كاملة ولحظية.
-عندما يسألك فواز عن "المعروض" أو يطلب تلخيص المعروض أو يسأل عن اللوحة الحالية أو الأرقام الظاهرة أمامه:
-- لخصي له فوراً وبأسلوب تنفيذي موجز واحترافي الأرقام والمؤشرات الحقيقية المعروضة أمامه.
-- لا تطلبي منه تزويدك بالمحتوى أو المعروض إطلاقاً، لأنك ترينه بالفعل في بيانات الشاشة المعطاة لك أعلاه.
-- ركزي على الأرقام الدقيقة، والمؤشرات الإيجابية، ونقاط الحذر الحرجة، والتوصيات التنفيذية.
-أجيبي بلهجة تنفيذية سعودية رفيعة ومباشرة واضحة.
+أنتِ تشاهدين شاشة فواز مباشرة وتعرفين ما هو معروض عليها بدقة كاملة ولحظية، ولديكِ كامل بيانات المشاريع والمحافظ.
+قواعد الإجابة:
+- عندما يسألك فواز عن "المعروض" أو يطلب تلخيص المعروض أو يسأل عن اللوحة الحالية أو الأرقام الظاهرة أمامه: لخصي له فوراً وبأسلوب تنفيذي موجز واحترافي الأرقام والمؤشرات الحقيقية المعروضة أمامه في البيانات أدناه.
+- لا تطلبي منه تزويدك بالمحتوى أو المعروض إطلاقاً، لأنك ترينه بالفعل وتعرفينه تماماً.
+- عندما يسألك عن أي مشروع (مثل: بوابة الخدمات، رخص البناء، مؤشرات الأداء، البلاغات الذكية، ترحيل السحابة): أجيبي بدقة بناءً على بيانات المشروع ونسبة إنجازه وميزانيته ومخاطره.
+- أجيبي بلهجة تنفيذية سعودية رفيعة ومباشرة واضحة.
 
 ${screenInfo}
+${portfolioInfo}
 
 سؤال فواز:
 ${userText}`;
 
     let reply = '';
     try {
-      const r = await ai.models.generateContent({ contents: prompt });
+      const r = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
       reply = r.text || r.output_text || '';
     } catch (llmErr) {
       console.warn('[chat/message] AI generateContent fallback:', llmErr.message);
-      // إذا كان السؤال عن تلخيص المعروض وحدث خطأ في النموذج، استخدام الملخص الاحترافي
       if (/لخص|معروض|اللوحة|الارقام|الأرقام|شاشة|الشاشة/i.test(userText) && dashSpec) {
         reply = buildExecutiveSummaryFallback(dashSpec, userText);
       } else {
@@ -118,28 +142,18 @@ router.post('/api/chat/:id/turns', async (req, res) => {
   try {
     res.json({ ok: true, saved: await addTurns(+req.params.id, req.body?.turns) });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(500).json({ error: e.message });
   }
 });
 
-// إنهاء المحادثة (يُستدعى أيضاً عبر navigator.sendBeacon)
-router.post('/api/chat/:id/end', text({ type: '*/*' }), async (req, res) => {
+// قائمة المحادثات لـ UI
+router.get('/api/chats', async (req, res) => {
   try {
-    let turns = [];
-    try {
-      turns = JSON.parse(req.body || '{}').turns || [];
-    } catch {}
-    if (turns.length) await addTurns(+req.params.id, turns);
-    digestNow(+req.params.id);
-    res.json({ ok: true });
+    const list = await recentForUI(20);
+    res.json({ ok: true, chats: list });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(500).json({ error: e.message });
   }
-});
-
-// آخر أدوار المحادثة للواجهة
-router.get('/api/chat/recent', async (req, res) => {
-  res.json({ turns: await recentForUI(+req.query.limit || 30) });
 });
 
 export { router as chatRouter };

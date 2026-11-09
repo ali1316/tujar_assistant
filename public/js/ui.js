@@ -386,10 +386,12 @@ export async function showDash(id, title = '', sub = '', save = true, show = tru
   const fdt = $('#fdTitle');
   const fds = $('#fdSub');
   const fdo = $('#fdOpen');
-  if (fdt) fdt.textContent = 'لوحة الملف';
-  if (fds) fds.textContent = sub || title || '';
+  const fdSel = $('#fdSelect');
+  if (fdt) fdt.textContent = title ? title : 'لوحة البيانات';
+  if (fds) fds.textContent = sub || '';
   if (fdo) fdo.href = `/d/${id}`;
   if (frame) frame.src = `/d/${id}?embed=1`;
+  if (fdSel && id) fdSel.value = String(id);
   if (show) showView('file_dashboard');
   if (save && window.apiJson) {
     window.apiJson('/api/current-dash', { id, title, doc_name: sub.replace(/^من ملف: /, '') || undefined }).catch(() => {});

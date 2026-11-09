@@ -17,27 +17,57 @@ for (const [c, t] of [['category', 'TEXT'], ['drive_id', 'TEXT'], ['drive_url', 
   } catch {}
 }
 
-export async function callDriveApi(body, { timeout = 35000 } = {}) {
+export async function callDriveApi(body, { timeout = 45000, retries = 1 } = {}) {
   if (!driveReady()) throw new Error('DRIVE_SCRIPT_URL غير مضبوط');
-  const r = await fetch(URL_(), {
-    method: 'POST',
-    headers: { 'content-type': 'text/plain' },
-    body: JSON.stringify(body),
-    redirect: 'follow',
-    signal: AbortSignal.timeout(timeout),
-  });
-  const t = await r.text();
-  try { return JSON.parse(t); } catch { throw new Error('Drive: رد غير متوقع ' + t.slice(0, 120)); }
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(URL_(), {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify(body),
+        redirect: 'follow',
+        signal: AbortSignal.timeout(timeout),
+      });
+      const t = await r.text();
+      try { return JSON.parse(t); } catch { throw new Error('Drive: رد غير متوقع ' + t.slice(0, 120)); }
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        console.warn(`[drive] callDriveApi retry #${attempt + 1}: ${err.message}`);
+        await new Promise(res => setTimeout(res, 2000));
+      }
+    }
+  }
+  throw lastErr;
 }
 const call = callDriveApi;
 
+function fastClassifyCategory(name, text) {
+  const str = (String(name || '') + ' ' + String(text || '')).toLowerCase();
+  if (/مالي|ميزان|إيراد|ايراد|حساب|صرف|تكلف|budget|financ/i.test(str)) return 'المالية والميزانيات';
+  if (/عقد|منافس|مشتري|توريد|شراء|contract|procure/i.test(str)) return 'العقود والمشتريات';
+  if (/مشروع|مشاريع|خطة|متابعة|إنجاز|انجاز|project/i.test(str)) return 'المشاريع والمتابعة';
+  if (/تقرير|عرض|سنوي|مؤشر|أداء|اداء|report|annual/i.test(str)) return 'التقارير والعروض';
+  if (/موارد|موظف|رواتب|تدريب|hr|human/i.test(str)) return 'الموارد البشرية';
+  return 'أخرى';
+}
+
 export async function classify(name, text) {
-  const out = await generate(`صنّف هذا الملف في واحد من التصنيفات بالضبط: ${CATEGORIES.join(' | ')}.
+  const fallbackCat = fastClassifyCategory(name, text);
+  try {
+    const aiPromise = generate(`صنّف هذا الملف في واحد من التصنيفات بالضبط: ${CATEGORIES.join(' | ')}.
 واكتب وصف قصير (سطر واحد) يساعد البحث عنه لاحقاً. رجّع JSON: {"category": "...", "summary": "..."}
 اسم الملف: ${name}
 بداية المحتوى:
-${String(text || '').slice(0, 3000)}`).catch(() => null);
-  return { category: CATEGORIES.includes(out?.category) ? out.category : 'أخرى', summary: String(out?.summary || '').slice(0, 300) };
+${String(text || '').slice(0, 3000)}`);
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 3500));
+    const out = await Promise.race([aiPromise, timeoutPromise]);
+    if (out && CATEGORIES.includes(out.category)) {
+      return { category: out.category, summary: String(out.summary || '').slice(0, 300) };
+    }
+  } catch {}
+  return { category: fallbackCat, summary: `${name} — مصنّف تحت ${fallbackCat}` };
 }
 
 // يشتغل بالخلفية بعد الرفع (ما يأخّر بناء الداشبورد)
