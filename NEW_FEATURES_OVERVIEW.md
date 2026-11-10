@@ -1,7 +1,7 @@
 # دليل المزايا والقدرات الجديدة الشامل · منصة تُجّار ونورة الذكية
 ### Comprehensive Guide to New Features, Architecture, Schema & Process Diagrams
 **اتحاد الغرف التجارية السعودية · Federation of Saudi Chambers**
-*تاريخ التحديث: نوفمبر 2026 · الفرع: `feat/executive-wow-suite`*
+*تاريخ التحديث: نوفمبر 2026 · الفرع: `feat/executive-intelligence-suite`*
 
 ---
 
@@ -591,7 +591,7 @@ sequenceDiagram
 
 كافة الوثائق والعروض المرئية تم رفعها وتكاملها سحابياً مع حساب Google Drive الخاص بك في تصنيف **«التقارير والعروض»**:
 
-### أولاً: موارد المنصة المطورة (Executive WOW Suite)
+### أولاً: موارد المنصة المطورة
 * **مشغل العرض التفاعلي السحابي (HTML):**
   [العرض المرئي التنفيذي الشامل](https://drive.google.com/file/d/1POO0rogYM-HjtGb7My7U5ztcADNAz95B/view?usp=drivesdk) `(ID: 1POO0rogYM-HjtGb7My7U5ztcADNAz95B)`
 * **فيديو العرض التنفيذي بدقة 1080p (MP4):**
