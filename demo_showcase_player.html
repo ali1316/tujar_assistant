@@ -38,7 +38,16 @@
 
     header {
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
+    }
+
+    .badge-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
     }
 
     .badge {
@@ -52,8 +61,28 @@
       border-radius: 30px;
       font-size: 13px;
       font-weight: 600;
-      margin-bottom: 12px;
       box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .badge-cloud {
+      background: rgba(89, 196, 143, 0.12);
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 15px rgba(89, 196, 143, 0.2);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
     }
 
     h1 {
@@ -66,10 +95,46 @@
 
     p.sub {
       color: var(--mute);
-      font-size: 16px;
-      max-width: 740px;
+      font-size: 15px;
+      max-width: 780px;
       margin: 0 auto;
       line-height: 1.6;
+    }
+
+    .source-tabs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+      margin-bottom: 20px;
+    }
+
+    .source-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(14, 34, 56, 0.7);
+      border: 1px solid var(--border);
+      color: var(--mute);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .source-btn:hover {
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .source-btn.active {
+      background: rgba(209, 166, 92, 0.16);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 12px var(--accent-glow);
     }
 
     .video-grid {
@@ -102,11 +167,48 @@
       aspect-ratio: 16 / 9;
     }
 
-    video {
+    iframe#drivePlayer {
       width: 100%;
       height: 100%;
+      border: none;
       display: block;
+    }
+
+    video#demoVideo {
+      width: 100%;
+      height: 100%;
+      display: none;
       outline: none;
+    }
+
+    .chapter-toast {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      background: rgba(5, 13, 24, 0.92);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 10;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      transition: all 0.3s;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px);
+    }
+
+    .chapter-toast.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
     }
 
     .video-controls-bar {
@@ -121,6 +223,7 @@
 
     .video-specs {
       display: flex;
+      flex-wrap: wrap;
       gap: 14px;
       font-size: 13px;
       color: var(--mute);
@@ -134,6 +237,7 @@
 
     .download-btns {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
@@ -254,20 +358,50 @@
 <body>
   <div class="container">
     <header>
-      <div class="badge">
-        <span>🎬</span>
-        <span>عرض مرئي تنفيذي شامل · Full 1080p Walkthrough</span>
+      <div class="badge-bar">
+        <div class="badge">
+          <span>🎬</span>
+          <span>عرض مرئي تنفيذي شامل · Full 1080p Walkthrough</span>
+        </div>
+        <div class="badge badge-cloud">
+          <span class="pulse-dot"></span>
+          <span>بث مباشر سحابي من Google Drive</span>
+        </div>
       </div>
       <h1>منصة تجار · اتحاد الغرف السعودية</h1>
       <p class="sub">
         استعراض حي لكافة المزايا التنفيذية: محاكي القرارات (What-If)، استخلاص المشاريع التلقائي من الوثائق، اللوحات المستقلة، نورة الذكية، ورادار المخاطر.
       </p>
+
+      <div class="source-tabs">
+        <button id="tabDrive" class="source-btn active" onclick="setPlayerMode('drive')">
+          <span class="pulse-dot"></span>
+          <span>☁️ مشغل Google Drive السحابي (افتراضي)</span>
+        </button>
+        <button id="tabLocal" class="source-btn" onclick="setPlayerMode('local')">
+          <span>💻 مشغل الفيديو المحلي (MP4 / WebM)</span>
+        </button>
+      </div>
     </header>
 
     <div class="video-grid">
       <div class="video-card">
         <div class="video-wrapper">
-          <video id="demoVideo" controls preload="metadata" poster="">
+          <div id="toast" class="chapter-toast">
+            <span id="toastMsg">⏱️ الانتقال إلى الفصل...</span>
+            <button onclick="dismissToast()" style="background:none;border:none;color:var(--mute);cursor:pointer;font-size:16px;">✕</button>
+          </div>
+
+          <!-- مشغل Google Drive السحابي (الافتراضي والأساسي) -->
+          <iframe id="drivePlayer"
+            src="https://drive.google.com/file/d/1PMgPLOoXBJs9fUw-flvmv1UtnVdLP21d/preview"
+            allow="autoplay; fullscreen"
+            allowfullscreen
+            title="فيديو العرض التنفيذي الشامل 1080p - منصة تجار ونورة">
+          </iframe>
+
+          <!-- مشغل الفيديو المحلي البديل -->
+          <video id="demoVideo" controls preload="metadata">
             <source src="demo_executive_showcase.mp4" type="video/mp4">
             <source src="demo_executive_showcase.webm" type="video/webm">
             متصفحك لا يدعم تشغيل الفيديو المباشر.
@@ -278,15 +412,18 @@
           <div class="video-specs">
             <span>📺 الدقة: <b>1920×1080 Full HD</b></span>
             <span>⏱️ المدة: <b>~1:35 دقيقة</b></span>
-            <span>📦 الكودك: <b>H.264 / WebM</b></span>
+            <span>☁️ المصدر: <b>Google Drive Cloud Stream</b></span>
           </div>
 
           <div class="download-btns">
-            <a href="demo_executive_showcase.mp4" download class="btn btn-gold">
-              تحميل الفيديو (MP4) 📥
+            <a href="https://drive.google.com/file/d/1PMgPLOoXBJs9fUw-flvmv1UtnVdLP21d/view?usp=drivesdk" target="_blank" rel="noopener noreferrer" class="btn btn-gold">
+              <span>☁️ فتح في Google Drive</span>
             </a>
-            <a href="demo_executive_showcase.webm" download class="btn">
-              تحميل (WebM)
+            <a href="https://drive.google.com/uc?export=download&id=1PMgPLOoXBJs9fUw-flvmv1UtnVdLP21d" target="_blank" rel="noopener noreferrer" class="btn">
+              <span>📥 تنزيل من السحابة</span>
+            </a>
+            <a href="demo_executive_showcase.mp4" download class="btn" style="background: rgba(14, 34, 56, 0.7);">
+              <span>💾 تنزيل محلي (MP4)</span>
             </a>
           </div>
         </div>
@@ -298,35 +435,35 @@
           <span>فصول ومحطات العرض (Chapters)</span>
         </h3>
         <ul class="chapters-list">
-          <li class="chapter-item active" onclick="seekTo(0)">
+          <li class="chapter-item active" onclick="selectChapter(0, '00:00', '1. لوحة القيادة والمؤشرات العامة')">
             <span>1. لوحة القيادة والمؤشرات العامة</span>
             <span class="chapter-time">00:00</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(10)">
+          <li class="chapter-item" onclick="selectChapter(10, '00:10', '2. محاكي القرارات وحزمة الإنقاذ')">
             <span>2. محاكي القرارات وحزمة الإنقاذ</span>
             <span class="chapter-time">00:10</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(22)">
+          <li class="chapter-item" onclick="selectChapter(22, '00:22', '3. محاكاة السيناريو الحر بالـ AI')">
             <span>3. محاكاة السيناريو الحر بالـ AI</span>
             <span class="chapter-time">00:22</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(32)">
+          <li class="chapter-item" onclick="selectChapter(32, '00:32', '4. رفع الوثيقة واستخلاص المشاريع')">
             <span>4. رفع الوثيقة واستخلاص المشاريع</span>
             <span class="chapter-time">00:32</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(48)">
+          <li class="chapter-item" onclick="selectChapter(48, '00:48', '5. لوحة مشروع الذكاء الاصطناعي')">
             <span>5. لوحة مشروع الذكاء الاصطناعي</span>
             <span class="chapter-time">00:48</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(58)">
+          <li class="chapter-item" onclick="selectChapter(58, '00:58', '6. تسليط الهالة الذهبية (Spotlight)')">
             <span>6. تسليط الهالة الذهبية (Spotlight)</span>
             <span class="chapter-time">00:58</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(67)">
+          <li class="chapter-item" onclick="selectChapter(67, '01:07', '7. محادثة نورة الذكية (Apple HIG)')">
             <span>7. محادثة نورة الذكية (Apple HIG)</span>
             <span class="chapter-time">01:07</span>
           </li>
-          <li class="chapter-item" onclick="seekTo(78)">
+          <li class="chapter-item" onclick="selectChapter(78, '01:18', '8. تقرير المجلس (PDF و WhatsApp)')">
             <span>8. تقرير المجلس (PDF و WhatsApp)</span>
             <span class="chapter-time">01:18</span>
           </li>
@@ -355,19 +492,66 @@
   </div>
 
   <script>
-    const vid = document.getElementById('demoVideo');
+    let currentMode = 'drive';
+    const driveIframe = document.getElementById('drivePlayer');
+    const localVideo = document.getElementById('demoVideo');
+    const tabDrive = document.getElementById('tabDrive');
+    const tabLocal = document.getElementById('tabLocal');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
     const items = document.querySelectorAll('.chapter-item');
+    let toastTimer = null;
 
-    function seekTo(seconds) {
-      if (vid) {
-        vid.currentTime = seconds;
-        vid.play();
+    function setPlayerMode(mode) {
+      currentMode = mode;
+      if (mode === 'drive') {
+        driveIframe.style.display = 'block';
+        localVideo.style.display = 'none';
+        localVideo.pause();
+        tabDrive.classList.add('active');
+        tabLocal.classList.remove('active');
+      } else {
+        driveIframe.style.display = 'none';
+        localVideo.style.display = 'block';
+        tabDrive.classList.remove('active');
+        tabLocal.classList.add('active');
       }
     }
 
-    if (vid) {
-      vid.addEventListener('timeupdate', () => {
-        const cur = vid.currentTime;
+    function selectChapter(seconds, timeStr, title) {
+      // Highlight chapter item
+      items.forEach(it => it.classList.remove('active'));
+      const clicked = Array.from(items).find(it => it.textContent.includes(timeStr));
+      if (clicked) clicked.classList.add('active');
+
+      if (currentMode === 'local') {
+        if (localVideo) {
+          localVideo.currentTime = seconds;
+          localVideo.play();
+        }
+      } else {
+        showToast(`⏱️ المحطة: [${timeStr}] ${title} — اسحب مؤشر تشغيل مشغل Drive إلى ${timeStr}`);
+      }
+    }
+
+    function showToast(msg) {
+      if (!toast) return;
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 5500);
+    }
+
+    function dismissToast() {
+      if (toast) toast.classList.remove('show');
+    }
+
+    if (localVideo) {
+      localVideo.addEventListener('timeupdate', () => {
+        if (currentMode !== 'local') return;
+        const cur = localVideo.currentTime;
         const times = [0, 10, 22, 32, 48, 58, 67, 78];
         let activeIdx = 0;
         times.forEach((t, i) => {

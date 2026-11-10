@@ -38,17 +38,26 @@ router.post('/api/chat/message', async (req, res) => {
 
     const screenContext = req.body?.screenContext || null;
     let dashSpec = screenContext?.dashboard;
-    if (!dashSpec) {
+    if (!dashSpec || !dashSpec.kpis || !dashSpec.kpis.length) {
       try {
         const cur = await getCurrentDash();
         if (cur?.id) {
           const d = await dashGet(+cur.id);
-          if (d?.spec) dashSpec = d.spec;
+          if (d?.spec?.kpis?.length) dashSpec = d.spec;
         }
       } catch {}
     }
 
-    if (!dashSpec) {
+    if (!dashSpec || !dashSpec.kpis || !dashSpec.kpis.length) {
+      try {
+        const rows = await db.prepare("SELECT spec FROM dashboards WHERE spec LIKE '%kpis%' ORDER BY id DESC LIMIT 1").all();
+        if (rows?.[0]?.spec) {
+          dashSpec = typeof rows[0].spec === 'string' ? JSON.parse(rows[0].spec) : rows[0].spec;
+        }
+      } catch {}
+    }
+
+    if (!dashSpec || !dashSpec.kpis || !dashSpec.kpis.length) {
       try {
         const seeded = await getOrSeedExecutiveDashboard();
         if (seeded?.id) {
@@ -120,7 +129,7 @@ ${userText}`;
       }
     }
 
-    if (!reply) {
+    if (!reply || (/أحتاج.*(تزويدي|المعروض|بمحتوى)|يرجى.*تزويدي/i.test(reply) && dashSpec)) {
       reply = buildExecutiveSummaryFallback(dashSpec, userText);
     }
 

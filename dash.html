@@ -158,11 +158,14 @@ if (EMBED) {
 
 function countUp(el, to, unit) {
   const t0 = performance.now(), d = 1400, dec = Number.isInteger(to) ? 0 : 1;
-  const cleanUnit = (unit === '%' || unit === 'percent' || unit === '٪') ? '%' : unit;
-  const step = now => { const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3), v = to * e;
+  const isPercent = (unit === '%' || unit === 'percent' || unit === '٪');
+  const cleanUnit = isPercent ? '٪' : unit;
+  const step = now => {
+    const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3), v = to * e;
     const formattedVal = dec ? new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 }).format(v) : fmt(Math.round(v));
-    el.innerHTML = formattedVal + (cleanUnit ? ` <small class="unit">${esc(cleanUnit)}</small>` : '');
-    if (p < 1) requestAnimationFrame(step); };
+    el.innerHTML = formattedVal + (cleanUnit ? ` <small class="unit" translate="no" dir="rtl">${esc(cleanUnit)}</small>` : '');
+    if (p < 1) requestAnimationFrame(step);
+  };
   requestAnimationFrame(step);
 }
 
