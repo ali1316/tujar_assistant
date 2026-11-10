@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العرض المرئي التنفيذي الشامل · منصة تجار ونورة الذكية</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050d18;
+      --card-bg: rgba(14, 34, 56, 0.85);
+      --border: rgba(29, 58, 90, 0.6);
+      --accent: #d1a65c;
+      --accent-glow: rgba(209, 166, 92, 0.25);
+      --text: #eef2f7;
+      --mute: #8ea3bd;
+      --green: #59c48f;
+      --red: #e0705f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #0d2238 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: 'IBM Plex Sans Arabic', -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 32px 20px 60px;
+      direction: rtl;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(209, 166, 92, 0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    p.sub {
+      color: var(--mute);
+      font-size: 16px;
+      max-width: 740px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .video-grid { grid-template-columns: 1fr; }
+    }
+
+    .video-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      aspect-ratio: 16 / 9;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+
+    .video-controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      padding: 8px 6px;
+    }
+
+    .video-specs {
+      display: flex;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--mute);
+    }
+
+    .video-specs span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .download-btns {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(29, 58, 90, 0.8);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--accent);
+      color: #050d18;
+      border-color: var(--accent);
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #d1a65c, #e8d3a8);
+      color: #050d18;
+      border: none;
+    }
+
+    .btn-gold:hover {
+      box-shadow: 0 4px 15px var(--accent-glow);
+      filter: brightness(1.08);
+    }
+
+    .sidebar {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+    }
+
+    .sidebar h3 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chapters-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chapter-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(8, 23, 38, 0.6);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+    }
+
+    .chapter-item:hover, .chapter-item.active {
+      background: rgba(209, 166, 92, 0.12);
+      border-color: rgba(209, 166, 92, 0.4);
+      color: #fff;
+    }
+
+    .chapter-time {
+      font-family: monospace;
+      color: var(--accent);
+      font-size: 12px;
+      direction: ltr;
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .feat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+
+    .feat-card b {
+      color: var(--accent);
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .feat-card p {
+      color: var(--mute);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">
+        <span>🎬</span>
+        <span>عرض مرئي تنفيذي شامل · Full 1080p Walkthrough</span>
+      </div>
+      <h1>منصة تجار · اتحاد الغرف السعودية</h1>
+      <p class="sub">
+        استعراض حي لكافة المزايا التنفيذية: محاكي القرارات (What-If)، استخلاص المشاريع التلقائي من الوثائق، اللوحات المستقلة، نورة الذكية، ورادار المخاطر.
+      </p>
+    </header>
+
+    <div class="video-grid">
+      <div class="video-card">
+        <div class="video-wrapper">
+          <video id="demoVideo" controls preload="metadata" poster="">
+            <source src="demo_executive_showcase.mp4" type="video/mp4">
+            <source src="demo_executive_showcase.webm" type="video/webm">
+            متصفحك لا يدعم تشغيل الفيديو المباشر.
+          </video>
+        </div>
+
+        <div class="video-controls-bar">
+          <div class="video-specs">
+            <span>📺 الدقة: <b>1920×1080 Full HD</b></span>
+            <span>⏱️ المدة: <b>~1:35 دقيقة</b></span>
+            <span>📦 الكودك: <b>H.264 / WebM</b></span>
+          </div>
+
+          <div class="download-btns">
+            <a href="demo_executive_showcase.mp4" download class="btn btn-gold">
+              تحميل الفيديو (MP4) 📥
+            </a>
+            <a href="demo_executive_showcase.webm" download class="btn">
+              تحميل (WebM)
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <h3>
+          <span>📑</span>
+          <span>فصول ومحطات العرض (Chapters)</span>
+        </h3>
+        <ul class="chapters-list">
+          <li class="chapter-item active" onclick="seekTo(0)">
+            <span>1. لوحة القيادة والمؤشرات العامة</span>
+            <span class="chapter-time">00:00</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(10)">
+            <span>2. محاكي القرارات وحزمة الإنقاذ</span>
+            <span class="chapter-time">00:10</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(22)">
+            <span>3. محاكاة السيناريو الحر بالـ AI</span>
+            <span class="chapter-time">00:22</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(32)">
+            <span>4. رفع الوثيقة واستخلاص المشاريع</span>
+            <span class="chapter-time">00:32</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(48)">
+            <span>5. لوحة مشروع الذكاء الاصطناعي</span>
+            <span class="chapter-time">00:48</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(58)">
+            <span>6. تسليط الهالة الذهبية (Spotlight)</span>
+            <span class="chapter-time">00:58</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(67)">
+            <span>7. محادثة نورة الذكية (Apple HIG)</span>
+            <span class="chapter-time">01:07</span>
+          </li>
+          <li class="chapter-item" onclick="seekTo(78)">
+            <span>8. تقرير المجلس (PDF و WhatsApp)</span>
+            <span class="chapter-time">01:18</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="features-grid">
+      <div class="feat-card">
+        <b>🚀 محاكي القرارات الاستراتيجية</b>
+        <p>حساب فوري للأيام المكتسبة، تغير معدل الحرق اليومي، توصيات المجلس، وحزم الإنقاذ المعتمدة.</p>
+      </div>
+      <div class="feat-card">
+        <b>📄 الاستخلاص التلقائي للمشاريع</b>
+        <p>اكتشاف المشاريع المتعثرة والمتأخرة فور رفع تقارير التدقيق ورفع عدد المشاريع آلياً من 5 إلى 7.</p>
+      </div>
+      <div class="feat-card">
+        <b>📊 لوحات القيادة المستقلة (ECharts)</b>
+        <p>توليد داشبورد لكل مشروع يقارن الميزانية بالمصروف الفعلي ونسب الإنجاز ونقاط التنبيه الحساسة.</p>
+      </div>
+      <div class="feat-card">
+        <b>🏛️ نورة المستشار التنفيذي الذكي</b>
+        <p>مساعد ذكي يدرك المعروض على الشاشة ويولد بطاقات تنفيذية متوافقة مع معايير Apple HIG مع أزرار النسخ والاستماع.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const vid = document.getElementById('demoVideo');
+    const items = document.querySelectorAll('.chapter-item');
+
+    function seekTo(seconds) {
+      if (vid) {
+        vid.currentTime = seconds;
+        vid.play();
+      }
+    }
+
+    if (vid) {
+      vid.addEventListener('timeupdate', () => {
+        const cur = vid.currentTime;
+        const times = [0, 10, 22, 32, 48, 58, 67, 78];
+        let activeIdx = 0;
+        times.forEach((t, i) => {
+          if (cur >= t) activeIdx = i;
+        });
+        items.forEach((item, i) => {
+          item.classList.toggle('active', i === activeIdx);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
