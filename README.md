@@ -1,3 +1,13 @@
+---
+title: Tujar Assistant
+emoji: 🎙️
+colorFrom: yellow
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Gemini Live — مساعد صوتي عربي مربوط بالداتابيس
 
 ## التشغيل

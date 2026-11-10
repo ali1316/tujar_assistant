@@ -50,7 +50,7 @@ RUN npm run lint && npm run test:unit
 FROM base AS runner
 
 ENV NODE_ENV=production \
-    PORT=3000
+    PORT=7860
 
 # Install curl for container health check
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -71,11 +71,11 @@ RUN mkdir -p /app/ingest-data && chown -R node:node /app
 USER node
 
 # Expose default application port
-EXPOSE 3000
+EXPOSE 7860
 
 # Container healthcheck using the /health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:7860/health || exit 1
 
 # Start production server
 CMD ["node", "server.js"]

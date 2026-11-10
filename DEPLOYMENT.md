@@ -59,8 +59,17 @@ Render provides 750 free hours per month (runs 1 web service 24/7).
    - `CORS_ORIGIN` = `*` (or your Vercel frontend URL)
 5. Click **Create Web Service**.
 
+> 💡 **Best No-Card Free Alternative: Hugging Face Spaces (Docker)**
+> If Render asks for a credit card, use **[Hugging Face Spaces](https://huggingface.co/spaces)** (100% Free, NO credit card ever required, 2 vCPUs, 16 GB RAM!):
+> 1. Sign up for free at [huggingface.co](https://huggingface.co).
+> 2. Click **New Space** → Name it `tujar-assistant` → Choose **Docker** (Blank).
+> 3. Under **Settings** → **Variables and secrets**, add:
+>    - `GEMINI_API_KEY`: your API key
+>    - `DATABASE_URL`: your Neon PostgreSQL URL
+> 4. Push your repo to the Space Git URL or connect GitHub. It builds the Dockerfile automatically and runs on port 7860!
+>
 > 💡 **Alternative Backend: Koyeb**
-> If you prefer a backend that does not sleep on the free tier, deploy on [Koyeb.com](https://koyeb.com) (Hobby tier: 1 free micro service, 512MB RAM). Simply select GitHub repo, set start command to `node server.js`, port to `3000`, and paste your environment variables.
+> Deploy on [Koyeb.com](https://koyeb.com) (Hobby tier: 1 free micro service, 512MB RAM). Simply select GitHub repo, set start command to `node server.js`, port to `3000`, and paste your environment variables.
 
 ---
 
