@@ -4,3 +4,5 @@ node_modules
 reply.wav
 ingest-data/
 .superpowers/
+temp_videos/
+temp_videos_original/

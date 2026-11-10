@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://YOUR_BACKEND_URL.onrender.com/api/:path*"
+    },
+    {
+      "source": "/vendor/:path*",
+      "destination": "https://YOUR_BACKEND_URL.onrender.com/vendor/:path*"
+    },
+    {
+      "source": "/d/:path*",
+      "destination": "/dash.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/brand/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    }
+  ]
+}

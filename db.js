@@ -110,7 +110,7 @@ export async function initDb() {
     try {
       pool = new pg.Pool({
         connectionString: URL,
-        ssl: /render\.com|sslmode=require/.test(URL) ? { rejectUnauthorized: false } : undefined,
+        ssl: /render\.com|neon\.tech|supabase\.co|sslmode=require/i.test(URL) ? { rejectUnauthorized: false } : undefined,
         max: 10,
       });
       pool.on('error', e => console.warn('[db] idle pg client error:', e.message));

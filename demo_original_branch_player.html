@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العرض المرئي للفرع الأصلي (main) · منصة تجار ونورة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #081726;
+      --card-bg: rgba(14, 34, 56, 0.9);
+      --border: rgba(29, 58, 90, 0.65);
+      --accent: #d1a65c;
+      --accent-glow: rgba(209, 166, 92, 0.25);
+      --text: #eef2f7;
+      --mute: #8ea3bd;
+      --green: #59c48f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #0d2238 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: 'IBM Plex Sans Arabic', -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 32px 20px 60px;
+      direction: rtl;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .badge-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(209, 166, 92, 0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .badge-cloud {
+      background: rgba(89, 196, 143, 0.12);
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 15px rgba(89, 196, 143, 0.2);
+    }
+
+    .badge-branch {
+      background: rgba(95, 134, 179, 0.15);
+      border-color: #5f86b3;
+      color: #9dbfe6;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    p.sub {
+      color: var(--mute);
+      font-size: 15px;
+      max-width: 780px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .source-tabs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+      margin-bottom: 20px;
+    }
+
+    .source-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(14, 34, 56, 0.7);
+      border: 1px solid var(--border);
+      color: var(--mute);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .source-btn:hover {
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .source-btn.active {
+      background: rgba(209, 166, 92, 0.16);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .video-grid { grid-template-columns: 1fr; }
+    }
+
+    .video-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      aspect-ratio: 16 / 9;
+    }
+
+    iframe#drivePlayer {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    video#demoVideo {
+      width: 100%;
+      height: 100%;
+      display: none;
+      outline: none;
+    }
+
+    .chapter-toast {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      background: rgba(5, 13, 24, 0.92);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 10;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      transition: all 0.3s;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px);
+    }
+
+    .chapter-toast.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .video-controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      padding: 8px 6px;
+    }
+
+    .video-specs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--mute);
+    }
+
+    .download-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(29, 58, 90, 0.8);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--accent);
+      color: #050d18;
+      border-color: var(--accent);
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #d1a65c, #e8d3a8);
+      color: #050d18;
+      border: none;
+    }
+
+    .btn-gold:hover {
+      box-shadow: 0 4px 15px var(--accent-glow);
+      filter: brightness(1.08);
+    }
+
+    .sidebar {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+    }
+
+    .sidebar h3 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chapters-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chapter-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(8, 23, 38, 0.6);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+    }
+
+    .chapter-item:hover, .chapter-item.active {
+      background: rgba(209, 166, 92, 0.12);
+      border-color: rgba(209, 166, 92, 0.4);
+      color: #fff;
+    }
+
+    .chapter-time {
+      font-family: monospace;
+      color: var(--accent);
+      font-size: 12px;
+      direction: ltr;
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .feat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+
+    .feat-card b {
+      color: var(--accent);
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .feat-card p {
+      color: var(--mute);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge-bar">
+        <div class="badge">
+          <span>🎬</span>
+          <span>عرض مرئي شامل للفرع الأصلي · Baseline Walkthrough</span>
+        </div>
+        <div class="badge badge-cloud">
+          <span class="pulse-dot"></span>
+          <span>بث مباشر سحابي من Google Drive</span>
+        </div>
+        <div class="badge badge-branch">
+          <span>🌿 Git Branch: <b>main</b></span>
+        </div>
+      </div>
+      <h1>لوحة المشاريع · الفرع الأصلي (Baseline)</h1>
+      <p class="sub">
+        استعراض حي لكافة المزايا الأصلية المضمنة في فرع main الأساسي: المحادثة الصوتية الحية عبر Gemini Live، محفظة المشاريع الخمسة، تعدد المساعدين (نورة، فواز، جداوي)، ولوحات الملفات التحليلية.
+      </p>
+
+      <div class="source-tabs">
+        <button id="tabDrive" class="source-btn active" onclick="setPlayerMode('drive')">
+          <span class="pulse-dot"></span>
+          <span>☁️ مشغل Google Drive السحابي (افتراضي)</span>
+        </button>
+        <button id="tabLocal" class="source-btn" onclick="setPlayerMode('local')">
+          <span>💻 مشغل الفيديو المحلي (MP4)</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="video-grid">
+      <div class="video-card">
+        <div class="video-wrapper">
+          <div id="toast" class="chapter-toast">
+            <span id="toastMsg">⏱️ الانتقال إلى الفصل...</span>
+            <button onclick="dismissToast()" style="background:none;border:none;color:var(--mute);cursor:pointer;font-size:16px;">✕</button>
+          </div>
+
+          <!-- مشغل Google Drive السحابي الافتراضي والأساسي -->
+          <iframe id="drivePlayer"
+            src="https://drive.google.com/file/d/1FVFVcLEk0f4-sjzrOV3bfx5cCuMfMe2g/preview"
+            allow="autoplay; fullscreen"
+            allowfullscreen
+            title="فيديو عرض الفرع الأصلي 1080p - منصة تجار ونورة">
+          </iframe>
+
+          <!-- مشغل الفيديو المحلي البديل -->
+          <video id="demoVideo" controls preload="metadata">
+            <source src="demo_original_branch_showcase.mp4" type="video/mp4">
+            متصفحك لا يدعم تشغيل الفيديو.
+          </video>
+        </div>
+
+        <div class="video-controls-bar">
+          <div class="video-specs">
+            <span>📺 الدقة: <b>1920×1080 Full HD</b></span>
+            <span>⏱️ المدة: <b>~1:05 دقيقة</b></span>
+            <span>☁️ المصدر: <b>Google Drive Cloud Stream</b></span>
+            <span>🌿 الفرع: <b>main</b></span>
+          </div>
+
+          <div class="download-btns">
+            <a href="https://drive.google.com/file/d/1FVFVcLEk0f4-sjzrOV3bfx5cCuMfMe2g/view?usp=drivesdk" target="_blank" rel="noopener noreferrer" class="btn btn-gold">
+              <span>☁️ فتح في Google Drive</span>
+            </a>
+            <a href="https://drive.google.com/uc?export=download&id=1FVFVcLEk0f4-sjzrOV3bfx5cCuMfMe2g" target="_blank" rel="noopener noreferrer" class="btn">
+              <span>📥 تنزيل من السحابة</span>
+            </a>
+            <a href="demo_original_branch_showcase.mp4" download class="btn" style="background: rgba(14, 34, 56, 0.7);">
+              <span>💾 تنزيل محلي (MP4)</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <h3>
+          <span>📑</span>
+          <span>فصول ومحطات العرض (Chapters)</span>
+        </h3>
+        <ul class="chapters-list">
+          <li class="chapter-item active" onclick="selectChapter(0, '00:00', '1. الهوية الأساسية والشاشة الترحيبية')">
+            <span>1. الهوية الأساسية والشاشة الترحيبية</span>
+            <span class="chapter-time">00:00</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(7, '00:07', '2. محفظة المشاريع الخمسة والـ KPIs')">
+            <span>2. محفظة المشاريع الخمسة والـ KPIs</span>
+            <span class="chapter-time">00:07</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(18, '00:18', '3. تعدد المساعدين (نورة، فواز، جداوي)')">
+            <span>3. تعدد المساعدين (نورة، فواز، جداوي)</span>
+            <span class="chapter-time">00:18</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(26, '00:26', '4. سجل المحادثة وتجربة الصوت')">
+            <span>4. سجل المحادثة وتجربة الصوت</span>
+            <span class="chapter-time">00:26</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(35, '00:35', '5. لوحة الملف التحليلية (File Dashboard)')">
+            <span>5. لوحة الملف التحليلية (File Dashboard)</span>
+            <span class="chapter-time">00:35</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(43, '00:43', '6. ذاكرة نورة وتفضيلات المستخدم')">
+            <span>6. ذاكرة نورة وتفضيلات المستخدم</span>
+            <span class="chapter-time">00:43</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(49, '00:49', '7. شريط التفاعل الصوتي والكتابي')">
+            <span>7. شريط التفاعل الصوتي والكتابي</span>
+            <span class="chapter-time">00:49</span>
+          </li>
+          <li class="chapter-item" onclick="selectChapter(54, '00:54', '8. خلاصة إمكانيات الفرع الأصلي')">
+            <span>8. خلاصة إمكانيات الفرع الأصلي</span>
+            <span class="chapter-time">00:54</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="features-grid">
+      <div class="feat-card">
+        <b>🎙️ مساعد صوتي ثنائي الاتجاه</b>
+        <p>ربط صوتي مباشر عبر Gemini Live WebSocket للتفاعل اللحظي مع فواز بالصوت والنص.</p>
+      </div>
+      <div class="feat-card">
+        <b>👥 3 شخصيات صوتية متنوعة</b>
+        <p>نورة (المستشارة الرسمية)، فواز (صوت فواز المستنسخ)، وجداوي (المساعد باللهجة الحجازية).</p>
+      </div>
+      <div class="feat-card">
+        <b>📊 محفظة المشاريع الخمسة</b>
+        <p>جداول المتابعة للمشاريع الخمسة المعتمدة مع نسب الإنجاز وجدول تذاكر الدعم في SQLite.</p>
+      </div>
+      <div class="feat-card">
+        <b>🧠 ذاكرة نورة الدائمة</b>
+        <p>تخزين التفضيلات الدائمة والتعليمات الخاصة بالمستخدم لاسترجاعها في كل جلسة.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentMode = 'drive';
+    const driveIframe = document.getElementById('drivePlayer');
+    const localVideo = document.getElementById('demoVideo');
+    const tabDrive = document.getElementById('tabDrive');
+    const tabLocal = document.getElementById('tabLocal');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    const items = document.querySelectorAll('.chapter-item');
+    let toastTimer = null;
+
+    function setPlayerMode(mode) {
+      currentMode = mode;
+      if (mode === 'drive') {
+        driveIframe.style.display = 'block';
+        localVideo.style.display = 'none';
+        localVideo.pause();
+        tabDrive.classList.add('active');
+        tabLocal.classList.remove('active');
+      } else {
+        driveIframe.style.display = 'none';
+        localVideo.style.display = 'block';
+        tabDrive.classList.remove('active');
+        tabLocal.classList.add('active');
+      }
+    }
+
+    function selectChapter(seconds, timeStr, title) {
+      items.forEach(it => it.classList.remove('active'));
+      const clicked = Array.from(items).find(it => it.textContent.includes(timeStr));
+      if (clicked) clicked.classList.add('active');
+
+      if (currentMode === 'local') {
+        if (localVideo) {
+          localVideo.currentTime = seconds;
+          localVideo.play();
+        }
+      } else {
+        showToast(`⏱️ المحطة: [${timeStr}] ${title} — اسحب مؤشر مشغل Drive إلى ${timeStr}`);
+      }
+    }
+
+    function showToast(msg) {
+      if (!toast) return;
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 5500);
+    }
+
+    function dismissToast() {
+      if (toast) toast.classList.remove('show');
+    }
+
+    if (localVideo) {
+      localVideo.addEventListener('timeupdate', () => {
+        if (currentMode !== 'local') return;
+        const cur = localVideo.currentTime;
+        const times = [0, 7, 18, 26, 35, 43, 49, 54];
+        let activeIdx = 0;
+        times.forEach((t, i) => {
+          if (cur >= t) activeIdx = i;
+        });
+        items.forEach((item, i) => {
+          item.classList.toggle('active', i === activeIdx);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

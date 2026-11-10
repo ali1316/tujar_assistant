@@ -2,6 +2,7 @@ import { ACCESS_CODE } from '../config.js';
 
 // رمز الدخول لكل مسارات /api
 export function authMiddleware(req, res, next) {
+  if (req.method === 'OPTIONS') return next();
   if (!ACCESS_CODE || (req.get('x-access-code') || req.query.code) === ACCESS_CODE) {
     return next();
   }

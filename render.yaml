@@ -1,0 +1,33 @@
+# ==============================================================================
+# Render Blueprint Specification for gemini-live-dashboard
+# Free Tier Web Service Configuration
+# ==============================================================================
+services:
+  - type: web
+    name: gemini-live-dashboard
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-live
+      - key: GEMINI_VOICE
+        value: Sulafat
+      - key: GEMINI_API_VERSION
+        value: v1alpha
+      - key: DATABASE_URL
+        sync: false
+      - key: ACCESS_CODE
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"

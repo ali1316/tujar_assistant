@@ -1,0 +1,20 @@
+# Netlify Configuration for gemini-live-dashboard Frontend
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://YOUR_BACKEND_URL.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/vendor/*"
+  to = "https://YOUR_BACKEND_URL.onrender.com/vendor/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/d/*"
+  to = "/dash.html"
+  status = 200

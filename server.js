@@ -18,6 +18,17 @@ import { bootstrap, shutdown } from './src/bootstrap.js';
 export const app = express();
 app.use(express.json({ limit: '1mb' }));
 
+// تمكين CORS لدعم نشر الواجهة منفصلة (مثل Vercel أو Netlify)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-access-code, x-upload-trace');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 // 1) الملفات الثابتة والواجهة (بدون رمز دخول)
 app.use(staticRouter);
 
