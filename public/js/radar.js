@@ -650,6 +650,13 @@ function handleAskNora(query) {
  */
 function handleFetchReport(projectName, riskTitle) {
   closeRadarDrawer();
+  if (window.openReportModal) {
+    window.openReportModal({
+      title: projectName ? `تقرير مشروع «${projectName}» التنفيذي` : `تقرير رادار المخاطر: ${riskTitle}`,
+      filter: projectName ? { query: projectName } : undefined,
+    });
+    return;
+  }
   const txtInput = document.getElementById('txt');
   const query = projectName
     ? `نورة، اعرضي لي تقريراً تحليلياً شاملاً لمشروع «${projectName}»`

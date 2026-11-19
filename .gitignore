@@ -6,3 +6,4 @@ ingest-data/
 .superpowers/
 temp_videos/
 temp_videos_original/
+.neon

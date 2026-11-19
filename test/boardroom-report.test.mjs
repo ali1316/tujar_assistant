@@ -70,7 +70,9 @@ test('generateExecutiveReport respects filters for status or department', async 
   assert.equal(filtered.success, true);
   assert.equal(filtered.metadata.stats.total_projects, 1);
   assert.equal(filtered.metadata.stats.delayed_projects, 1);
+  assert.equal(filtered.metadata.stats.open_tickets, 1, 'Open tickets must be scoped to filtered project');
   assert.match(filtered.whatsappText, /أتمتة رخص البناء/);
+  assert.match(filtered.whatsappText, /متوقف/, 'Must include stopped breakdown');
 });
 
 // 4. فحص تعريف وأداء أداة الذكاء الاصطناعي (AI Tool Definition)
@@ -85,7 +87,7 @@ test('generate_executive_report tool is properly declared and executes successfu
   assert.equal(runRes.success, true);
   assert.ok(typeof runRes.whatsappText === 'string');
   assert.ok(typeof runRes.metadata === 'object');
-  assert.equal(runRes.downloadUrl, '/api/executive/report/pdf');
+  assert.match(runRes.downloadUrl, /^\/api\/executive\/report\/pdf/);
 
   // التأكد من تسجيلها في سجل الأدوات العام
   const { tools } = await import('../src/tools/registry.js');
@@ -113,20 +115,26 @@ test('Executive report API endpoints respond correctly', async () => {
     const postData = await postRes.json();
     assert.ok(postData.whatsappText, 'Response must include whatsappText');
     assert.ok(postData.metadata, 'Response must include metadata');
-    assert.equal(postData.downloadUrl, '/api/executive/report/pdf');
+    assert.match(postData.downloadUrl, /^\/api\/executive\/report\/pdf/);
     assert.equal(postData.metadata.title, 'تقرير مجلس الإدارة لشهر نوفمبر');
 
-    // 5.2 GET /api/executive/report/pdf
+    // 5.2 GET /api/executive/report?query=بوابة
+    const getQueryRes = await fetch(`${baseUrl}/api/executive/report?query=${encodeURIComponent('بوابة')}`);
+    assert.equal(getQueryRes.status, 200);
+    const queryData = await getQueryRes.json();
+    assert.equal(queryData.metadata.stats.total_projects, 1);
+
+    // 5.3 GET /api/executive/report/pdf
     const getPdfRes = await fetch(`${baseUrl}/api/executive/report/pdf`);
     assert.equal(getPdfRes.status, 200, `GET /api/executive/report/pdf failed with ${getPdfRes.status}`);
 
-    // التحقق من ترويسات الاستجابة
+    // التحقق من ترويسات الاستجابة المتوافقة مع RFC 5987 / 6266
     const contentType = getPdfRes.headers.get('content-type');
     assert.match(contentType, /application\/pdf/, 'Content-Type must be application/pdf');
 
     const contentDisposition = getPdfRes.headers.get('content-disposition');
     assert.match(contentDisposition, /attachment/, 'Content-Disposition must be attachment');
-    assert.match(contentDisposition, /\.pdf/, 'Content-Disposition must specify a .pdf filename');
+    assert.match(contentDisposition, /filename\*=UTF-8''/, 'Content-Disposition must support UTF-8 filename');
 
     // التحقق من المحتوى الثنائي لملف PDF
     const arrayBuffer = await getPdfRes.arrayBuffer();

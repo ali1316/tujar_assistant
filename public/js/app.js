@@ -401,7 +401,11 @@ const agentOpts = {
       } else if (fc.name === 'spotlight_element' && window.spotlightElement) {
         window.spotlightElement(fc.args);
       } else if (fc.name === 'generate_executive_report' && window.openReportModal) {
-        window.openReportModal();
+        window.openReportModal({
+          title: fc.args?.title,
+          filter: fc.args?.filter,
+          directData: r,
+        });
       } else if (/create|update|request_dev|remember|forget|build_dashboard|task/.test(fc.name)) {
         loadDashboard(r.ticket_id || fc.args?.ticket_id);
       }

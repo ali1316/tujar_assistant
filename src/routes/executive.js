@@ -131,7 +131,57 @@ executiveRouter.post('/api/executive/radar/check', async (req, res) => {
 // =============================================================================
 // 3. Boardroom Report & WhatsApp Brief (تقرير المعالي)
 // =============================================================================
-let lastReportCache = null;
+const reportCache = new Map();
+const REPORT_CACHE_TTL_MS = 60 * 1000;
+
+function getReportCacheKey(title, filter) {
+  return JSON.stringify({
+    title: title || '',
+    department: filter?.department || '',
+    status: filter?.status || '',
+    query: filter?.query || '',
+  });
+}
+
+async function getOrGenerateReport({ title, filter }) {
+  const key = getReportCacheKey(title, filter);
+  const hit = reportCache.get(key);
+  if (hit && Date.now() - hit.ts < REPORT_CACHE_TTL_MS) {
+    return hit.report;
+  }
+  const report = await generateExecutiveReport({ title, filter });
+  reportCache.set(key, { report, ts: Date.now() });
+  if (reportCache.size > 30) {
+    const oldestKey = reportCache.keys().next().value;
+    reportCache.delete(oldestKey);
+  }
+  return report;
+}
+
+function setPdfResponseHeaders(res, report) {
+  const rawTitle = report.metadata?.title || 'Executive_Boardroom_Report';
+  const hasNonAscii = /[^\x20-\x7E]/.test(rawTitle);
+  const safeAscii = hasNonAscii
+    ? 'Boardroom_Executive_Report'
+    : (rawTitle.replace(/["\\]/g, '').trim() || 'Boardroom_Executive_Report');
+  const encodedUtf8 = encodeURIComponent(rawTitle + '.pdf');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${safeAscii}.pdf"; filename*=UTF-8''${encodedUtf8}`
+  );
+  res.setHeader('Content-Length', report.pdfBuffer.length);
+}
+
+function buildDownloadUrl(title, filter) {
+  const params = new URLSearchParams();
+  if (title && title !== 'تقرير مجلس الإدارة التنفيذي (تقرير المعالي)') params.set('title', title);
+  if (filter?.department) params.set('department', filter.department);
+  if (filter?.status) params.set('status', filter.status);
+  if (filter?.query) params.set('query', filter.query);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return `/api/executive/report/pdf${qs}`;
+}
 
 // GET /api/executive/report - Fetches report as JSON, WhatsApp text, or streamed PDF
 executiveRouter.get('/api/executive/report', async (req, res) => {
@@ -140,16 +190,13 @@ executiveRouter.get('/api/executive/report', async (req, res) => {
     const title = req.query.title;
     const department = req.query.department;
     const status = req.query.status;
-    const filter = (department || status) ? { department, status } : undefined;
+    const query = req.query.query;
+    const filter = (department || status || query) ? { department, status, query } : undefined;
 
-    const report = await generateExecutiveReport({ title, filter });
-    lastReportCache = report;
+    const report = await getOrGenerateReport({ title, filter });
 
     if (format === 'pdf') {
-      const filename = encodeURIComponent((report.metadata?.title || 'تقرير_المجلس_التنفيذي') + '.pdf');
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', report.pdfBuffer.length);
+      setPdfResponseHeaders(res, report);
       return res.send(report.pdfBuffer);
     }
 
@@ -159,6 +206,7 @@ executiveRouter.get('/api/executive/report', async (req, res) => {
       whatsappText: report.whatsappText,
       metadata: report.metadata,
       downloadUrl: '/api/executive/report/pdf',
+      filteredDownloadUrl: buildDownloadUrl(title, filter),
     });
   } catch (err) {
     console.error('[executive-route] error getting report:', err);
@@ -170,15 +218,14 @@ executiveRouter.get('/api/executive/report', async (req, res) => {
 executiveRouter.post('/api/executive/report', async (req, res) => {
   try {
     const { title, filter } = req.body || {};
-    const report = await generateExecutiveReport({ title, filter });
-    lastReportCache = report;
+    const report = await getOrGenerateReport({ title, filter });
 
     res.json({
       ok: true,
       whatsappText: report.whatsappText,
       text: report.whatsappText,
       metadata: report.metadata,
-      downloadUrl: '/api/executive/report/pdf',
+      downloadUrl: buildDownloadUrl(title, filter),
     });
   } catch (err) {
     console.error('[executive-route] error generating report:', err);
@@ -192,22 +239,11 @@ executiveRouter.get('/api/executive/report/pdf', async (req, res) => {
     const title = req.query.title;
     const department = req.query.department;
     const status = req.query.status;
+    const query = req.query.query;
+    const filter = (department || status || query) ? { department, status, query } : undefined;
 
-    let report = null;
-    if (!title && !department && !status && lastReportCache) {
-      report = lastReportCache;
-    } else {
-      report = await generateExecutiveReport({
-        title,
-        filter: (department || status) ? { department, status } : undefined,
-      });
-      lastReportCache = report;
-    }
-
-    const filename = encodeURIComponent((report.metadata?.title || 'تقرير_المجلس_التنفيذي') + '.pdf');
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', report.pdfBuffer.length);
+    const report = await getOrGenerateReport({ title, filter });
+    setPdfResponseHeaders(res, report);
     res.send(report.pdfBuffer);
   } catch (err) {
     console.error('[executive-route] error streaming PDF:', err);

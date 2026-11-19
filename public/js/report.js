@@ -39,7 +39,8 @@ export function showToast(msg, duration = 3000) {
     document.body.appendChild(toast);
   }
 
-  toast.innerHTML = `<span style="color:#d1a65c;font-size:16px;">✦</span> <span>${msg}</span>`;
+  toast.innerHTML = `<span style="color:#d1a65c;font-size:16px;">✦</span> <span id="toastMsg"></span>`;
+  toast.querySelector('#toastMsg').textContent = String(msg || '');
   toast.style.opacity = '1';
   toast.style.transform = 'translateY(0)';
 
@@ -51,7 +52,7 @@ export function showToast(msg, duration = 3000) {
 }
 
 // بناء وتشغيل نافذة التقرير التنفيذي
-export async function openReportModal() {
+export async function openReportModal(opts = {}) {
   let modal = document.getElementById('boardroomModal');
   if (!modal) {
     modal = document.createElement('div');
@@ -127,12 +128,12 @@ export async function openReportModal() {
               border-radius: 8px;
               padding: 14px;
               margin-bottom: 20px;
-              font-family: monospace;
+              font-family: var(--font, 'IBM Plex Sans Arabic', system-ui, sans-serif);
               white-space: pre-wrap;
-              font-size: 12px;
-              line-height: 1.6;
+              font-size: 12.5px;
+              line-height: 1.7;
               color: #cbd5e1;
-              max-height: 190px;
+              max-height: 200px;
               overflow-y: auto;
               direction: rtl;
             " id="reportBriefPreview"></div>
@@ -202,7 +203,6 @@ export async function openReportModal() {
     // ربط إغلاق النافذة
     const closeModal = () => {
       modal.style.display = 'none';
-      document.getElementById('btnBoardroomReport')?.focus();
     };
     modal.querySelector('#closeModalBtn').addEventListener('click', closeModal);
     modal.addEventListener('click', e => {
@@ -216,26 +216,49 @@ export async function openReportModal() {
   }
 
   modal.style.display = 'flex';
+  const titleEl = modal.querySelector('#modalTitle');
+  if (titleEl) {
+    if (opts.title) {
+      titleEl.innerHTML = `<span>🏛️</span> ${opts.title}`;
+    } else {
+      titleEl.innerHTML = `<span>🏛️</span> تقرير مجلس الإدارة التنفيذي (تقرير المعالي)`;
+    }
+  }
+
   const loadingEl = modal.querySelector('#reportLoading');
   const contentEl = modal.querySelector('#reportContent');
   const previewEl = modal.querySelector('#reportBriefPreview');
   const kpiEl = modal.querySelector('#kpiPreview');
 
+  // إعادة ضبط محتوى التحميل في حال حدوث خطأ سابق
+  loadingEl.innerHTML = `
+    <div style="font-size: 24px; margin-bottom: 10px; animation: spin 1s linear infinite;">⏳</div>
+    <div>جاري إعداد وتحليل مؤشرات المحفظة ورادار المخاطر…</div>
+  `;
   loadingEl.style.display = 'block';
   contentEl.style.display = 'none';
 
   try {
-    const res = await fetch('/api/executive/report', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify({}),
-    });
+    let data;
+    if (opts.directData?.whatsappText && opts.directData?.metadata) {
+      data = opts.directData;
+    } else {
+      const postBody = {};
+      if (opts.title) postBody.title = opts.title;
+      if (opts.filter) postBody.filter = opts.filter;
 
-    if (!res.ok) throw new Error('فشل جلب بيانات التقرير');
-    const data = await res.json();
+      const res = await fetch('/api/executive/report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(postBody),
+      });
+
+      if (!res.ok) throw new Error('فشل جلب بيانات التقرير');
+      data = await res.json();
+    }
 
     const stats = data.metadata?.stats || {};
     kpiEl.innerHTML = `
@@ -253,7 +276,11 @@ export async function openReportModal() {
       </div>
     `;
 
-    previewEl.textContent = data.whatsappText;
+    previewEl.textContent = data.whatsappText || '';
+
+    // إعداد الرابط الكامل للمشاركة لواتساب والحافظة
+    const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
+    const shareableText = (data.whatsappText || '').replace(/(\/api\/executive\/report\/pdf[^\s]*)/g, `${origin}$1`);
 
     // 1. تحميل PDF
     const btnDownload = modal.querySelector('#btnDownloadPdf');
@@ -262,7 +289,14 @@ export async function openReportModal() {
       const originalText = btnDownload.innerHTML;
       btnDownload.innerHTML = '<span>⏳</span> جاري تجهيز الملف…';
       try {
-        const pdfRes = await fetch('/api/executive/report/pdf', {
+        const dlParams = new URLSearchParams();
+        if (opts.title) dlParams.set('title', opts.title);
+        if (opts.filter?.department) dlParams.set('department', opts.filter.department);
+        if (opts.filter?.status) dlParams.set('status', opts.filter.status);
+        if (opts.filter?.query) dlParams.set('query', opts.filter.query);
+        const dlQs = dlParams.toString() ? `?${dlParams.toString()}` : '';
+
+        const pdfRes = await fetch(`/api/executive/report/pdf${dlQs}`, {
           headers: getAuthHeaders(),
         });
         if (!pdfRes.ok) throw new Error('فشل تنزيل ملف PDF');
@@ -270,11 +304,12 @@ export async function openReportModal() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'تقرير_المجلس_التنفيذي_2026.pdf';
+        const reportTitle = (data.metadata?.title || 'تقرير_المجلس_التنفيذي_2026').replace(/[\/\\?%*:|"<>]/g, '_');
+        a.download = `${reportTitle}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
         showToast('✓ تم بدء تحميل تقرير PDF بنجاح');
       } catch (e) {
         showToast('❌ تعذر تحميل ملف PDF: ' + e.message);
@@ -288,11 +323,11 @@ export async function openReportModal() {
     const btnWa = modal.querySelector('#btnShareWhatsApp');
     btnWa.onclick = async () => {
       try {
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(data.whatsappText);
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(shareableText);
         }
       } catch {}
-      const waUrl = `https://wa.me/?text=${encodeURIComponent(data.whatsappText)}`;
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(shareableText)}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
       showToast('✓ تم نسخ النص وفتح واتساب للمشاركة');
     };
@@ -301,17 +336,29 @@ export async function openReportModal() {
     const btnCopy = modal.querySelector('#btnCopyReport');
     btnCopy.onclick = async () => {
       try {
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(data.whatsappText);
-        } else {
+        let copied = false;
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(shareableText);
+            copied = true;
+          } catch {}
+        }
+        if (!copied) {
           const ta = document.createElement('textarea');
-          ta.value = data.whatsappText;
+          ta.value = shareableText;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
           document.body.appendChild(ta);
           ta.select();
-          document.execCommand('copy');
+          copied = document.execCommand('copy');
           document.body.removeChild(ta);
         }
-        showToast('✓ تم نسخ التقرير التنفيذي للحافظة بنجاح');
+        if (copied) {
+          showToast('✓ تم نسخ التقرير التنفيذي للحافظة بنجاح');
+        } else {
+          throw new Error('تعذر النسخ التلقائي');
+        }
       } catch (e) {
         showToast('❌ تعذر النسخ: ' + e.message);
       }

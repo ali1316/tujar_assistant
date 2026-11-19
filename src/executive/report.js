@@ -248,7 +248,6 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
   };
 
   // 3. صياغة موجز واتساب التنفيذي (WhatsApp Markdown)
-  const stoppedBreakdown = stoppedProjects.length > 0 ? ` · ${stoppedProjects.length} متوقف` : '';
   const waLines = [
     `🏛️ *اتحاد الغرف السعودية | منصة تُجّار*`,
     `📊 *${title}*`,
@@ -256,7 +255,7 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
     `🇸🇦 *رؤية المملكة 2030* — تسريع التحول الرقمي وتمكين قطاع الأعمال`,
     `━━━━━━━━━━━━━━━━━━━━━`,
     `📌 *المؤشرات القيادية الرئيسية (KPIs):*`,
-    `• *إجمالي المشاريع:* ${totalProjects} مشاريع (${completedProjects.length} مكتمل · ${inProgressProjects.length} قيد التنفيذ · ${delayedProjects.length} متأخر${stoppedBreakdown})`,
+    `• *إجمالي المشاريع:* ${totalProjects} مشاريع (${completedProjects.length} مكتمل · ${inProgressProjects.length} قيد التنفيذ · ${delayedProjects.length} متأخر · ${stoppedProjects.length} متوقف)`,
     `• *متوسط نسبة الإنجاز العام:* ${avgProgress}%`,
     `• *إجمالي الميزانية المعتمدة:* ${formatSAR(totalBudget)}`,
     `• *المصروف الفعلي:* ${formatSAR(totalSpent)} (${spentPct}%)`,
@@ -419,60 +418,78 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
   const rowH = 24;
   let curY = headerY;
 
-  for (let i = 0; i < Math.min(projects.length, 6); i++) {
-    const p = projects[i];
+  if (projects.length === 0) {
     curY -= rowH;
-    const rowBg = i % 2 === 0 ? cWhite : rgb(241 / 255, 245 / 255, 249 / 255);
-    page.drawRectangle({ x: 36, y: curY, width: 523.28, height: rowH, color: rowBg, borderColor: cLine, borderWidth: 0.5 });
+    page.drawRectangle({ x: 36, y: curY, width: 523.28, height: rowH, color: cWhite, borderColor: cLine, borderWidth: 0.5 });
+    page.drawText('No initiatives found matching current filter criteria.', { x: 44, y: curY + 8, font, size: 7.5, color: cTextMute });
+  } else {
+    for (let i = 0; i < Math.min(projects.length, 6); i++) {
+      const p = projects[i];
+      curY -= rowH;
+      const rowBg = i % 2 === 0 ? cWhite : rgb(241 / 255, 245 / 255, 249 / 255);
+      page.drawRectangle({ x: 36, y: curY, width: 523.28, height: rowH, color: rowBg, borderColor: cLine, borderWidth: 0.5 });
 
-    // ID
-    page.drawText(String(p.id), { x: 44, y: curY + 8, font: fontBold, size: 7.5, color: cNavy });
+      // ID
+      page.drawText(String(p.id), { x: 44, y: curY + 8, font: fontBold, size: 7.5, color: cNavy });
 
-    // Name & Dept
-    page.drawText(toAsciiSafe(p.name, 28), { x: 68, y: curY + 8, font: fontBold, size: 7.5, color: cTextDark });
-    page.drawText(toAsciiSafe(p.department, 18), { x: 236, y: curY + 8, font, size: 7, color: cTextMute });
+      // Name & Dept
+      page.drawText(toAsciiSafe(p.name, 28), { x: 68, y: curY + 8, font: fontBold, size: 7.5, color: cTextDark });
+      page.drawText(toAsciiSafe(p.department, 18), { x: 236, y: curY + 8, font, size: 7, color: cTextMute });
 
-    // Budget & Spent
-    const budgetStr = `${formatCompactSAR(p.spent)} / ${formatCompactSAR(p.budget)}`;
-    page.drawText(budgetStr, { x: 332, y: curY + 8, font, size: 6.5, color: cTextDark });
+      // Budget & Spent
+      const budgetStr = `${formatCompactSAR(p.spent)} / ${formatCompactSAR(p.budget)}`;
+      page.drawText(budgetStr, { x: 332, y: curY + 8, font, size: 6.5, color: cTextDark });
 
-    // Progress Bar
-    const barW = 42;
-    const barX = 424;
-    page.drawRectangle({ x: barX, y: curY + 7, width: barW, height: 7, color: rgb(226 / 255, 232 / 255, 240 / 255) });
-    const fillW = Math.max(0, Math.min(barW, Math.round(barW * ((p.progress || 0) / 100))));
-    const barColor = p.status === 'مكتمل' ? rgb(16 / 255, 185 / 255, 129 / 255) : p.status === 'متأخر' ? rgb(245 / 255, 158 / 255, 11 / 255) : p.status === 'متوقف' ? rgb(239 / 255, 68 / 255, 68 / 255) : rgb(56 / 255, 189 / 255, 248 / 255);
-    if (fillW > 0) {
-      page.drawRectangle({ x: barX, y: curY + 7, width: fillW, height: 7, color: barColor });
+      // Progress Bar
+      const barW = 42;
+      const barX = 424;
+      page.drawRectangle({ x: barX, y: curY + 7, width: barW, height: 7, color: rgb(226 / 255, 232 / 255, 240 / 255) });
+      const fillW = Math.max(0, Math.min(barW, Math.round(barW * ((p.progress || 0) / 100))));
+      const barColor = p.status === 'مكتمل' ? rgb(16 / 255, 185 / 255, 129 / 255) : p.status === 'متأخر' ? rgb(245 / 255, 158 / 255, 11 / 255) : p.status === 'متوقف' ? rgb(239 / 255, 68 / 255, 68 / 255) : rgb(56 / 255, 189 / 255, 248 / 255);
+      if (fillW > 0) {
+        page.drawRectangle({ x: barX, y: curY + 7, width: fillW, height: 7, color: barColor });
+      }
+      page.drawText(`${p.progress ?? 0}%`, { x: barX + barW + 5, y: curY + 8, font: fontBold, size: 7, color: cNavy });
+
+      // Status Badge
+      let badgeBg = rgb(224 / 255, 242 / 255, 254 / 255);
+      let badgeColor = rgb(7 / 255, 89 / 255, 133 / 255);
+      let safeStatus = 'IN PROGRESS';
+
+      if (p.status === 'مكتمل') {
+        badgeBg = rgb(220 / 255, 252 / 255, 231 / 255);
+        badgeColor = rgb(22 / 255, 101 / 255, 52 / 255);
+        safeStatus = 'COMPLETED';
+      } else if (p.status === 'متأخر') {
+        badgeBg = rgb(254 / 255, 243 / 255, 199 / 255);
+        badgeColor = rgb(146 / 255, 64 / 255, 14 / 255);
+        safeStatus = 'DELAYED';
+      } else if (p.status === 'متوقف') {
+        badgeBg = rgb(254 / 255, 226 / 255, 226 / 255);
+        badgeColor = rgb(153 / 255, 27 / 255, 27 / 255);
+        safeStatus = 'ON HOLD';
+      }
+
+      page.drawRectangle({ x: 500, y: curY + 5, width: 52, height: 14, color: badgeBg });
+      page.drawText(safeStatus, { x: 504, y: curY + 9, font: fontBold, size: 6, color: badgeColor });
     }
-    page.drawText(`${p.progress}%`, { x: barX + barW + 5, y: curY + 8, font: fontBold, size: 7, color: cNavy });
 
-    // Status Badge
-    let badgeBg = rgb(224 / 255, 242 / 255, 254 / 255);
-    let badgeColor = rgb(7 / 255, 89 / 255, 133 / 255);
-    let safeStatus = 'IN PROGRESS';
-
-    if (p.status === 'مكتمل') {
-      badgeBg = rgb(220 / 255, 252 / 255, 231 / 255);
-      badgeColor = rgb(22 / 255, 101 / 255, 52 / 255);
-      safeStatus = 'COMPLETED';
-    } else if (p.status === 'متأخر') {
-      badgeBg = rgb(254 / 255, 243 / 255, 199 / 255);
-      badgeColor = rgb(146 / 255, 64 / 255, 14 / 255);
-      safeStatus = 'DELAYED';
-    } else if (p.status === 'متوقف') {
-      badgeBg = rgb(254 / 255, 226 / 255, 226 / 255);
-      badgeColor = rgb(153 / 255, 27 / 255, 27 / 255);
-      safeStatus = 'ON HOLD';
+    if (projects.length > 6) {
+      page.drawText(`* Showing top 6 of ${projects.length} initiatives. Full portfolio tracked in digital system.`, {
+        x: 36, y: curY - 10, font, size: 6.5, color: cTextMute,
+      });
+      curY -= 12;
     }
-
-    page.drawRectangle({ x: 500, y: curY + 5, width: 52, height: 14, color: badgeBg });
-    page.drawText(safeStatus, { x: 504, y: curY + 9, font: fontBold, size: 6, color: badgeColor });
   }
 
   // قسم رادار المخاطر (Boardroom Risk Radar)
-  const riskSectionY = curY - 20;
-  page.drawText('BOARDROOM RISK RADAR & CRITICAL INTERVENTIONS', {
+  // Layout balancing: prevent excessive whitespace collapse when initiatives are few
+  const effectiveCurY = Math.min(curY, 612 - (Math.max(projects.length, 3) * rowH));
+  const riskSectionY = effectiveCurY - 20;
+  const riskHeaderTxt = riskRadar.length > 2
+    ? `BOARDROOM RISK RADAR & CRITICAL INTERVENTIONS (${riskRadar.length} Flagged · Showing Top 2)`
+    : 'BOARDROOM RISK RADAR & CRITICAL INTERVENTIONS';
+  page.drawText(riskHeaderTxt, {
     x: 36, y: riskSectionY, font: fontBold, size: 10, color: cNavy,
   });
 
@@ -481,7 +498,17 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
   const riskCardY = riskSectionY - 12 - riskCardH;
 
   const topRisks = riskRadar.slice(0, 2);
-  const displayRisks = topRisks.length > 0 ? topRisks : [
+  const displayRisks = totalProjects === 0 ? [
+    {
+      project_name: 'No Matching Initiatives',
+      status: 'مستقرة',
+      progress: 0,
+      spent: 0,
+      budget: 0,
+      reasons: ['No projects found under current filter criteria'],
+      recommendation: 'Adjust filter parameters or inspect portfolio records',
+    },
+  ] : (topRisks.length > 0 ? topRisks : [
     {
       project_name: 'Portfolio Health Stable',
       status: 'قيد التنفيذ',
@@ -491,7 +518,7 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
       reasons: ['جميع المؤشرات ضمن النطاق التشغيلي المعتمد'],
       recommendation: 'الاستمرار في التنفيذ وفق الخطط الزمنية المعتمدة',
     },
-  ];
+  ]);
 
   displayRisks.forEach((r, idx) => {
     const rx = 36 + idx * (riskCardW + 10);
@@ -607,11 +634,18 @@ export const generate_executive_report = {
   },
   run: async (args = {}) => {
     const res = await generateExecutiveReport(args);
+    const dlParams = new URLSearchParams();
+    if (args?.title) dlParams.set('title', args.title);
+    if (args?.filter?.department) dlParams.set('department', args.filter.department);
+    if (args?.filter?.status) dlParams.set('status', args.filter.status);
+    if (args?.filter?.query) dlParams.set('query', args.filter.query);
+    const dlQs = dlParams.toString() ? `?${dlParams.toString()}` : '';
     return {
       success: res.success,
       whatsappText: res.whatsappText,
       metadata: res.metadata,
       downloadUrl: '/api/executive/report/pdf',
+      filteredDownloadUrl: `/api/executive/report/pdf${dlQs}`,
     };
   },
 };
