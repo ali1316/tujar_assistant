@@ -11,6 +11,237 @@ function fmtSar(num) {
 }
 
 /**
+ * Format compact numbers (e.g. 1.2M, 350K, 50K)
+ */
+export function fmtCompact(n) {
+  const num = Math.abs(Number(n || 0));
+  if (num >= 1000000) {
+    const val = (num / 1000000).toFixed(1).replace(/\.0$/, '');
+    return `${val}M`;
+  }
+  if (num >= 1000) {
+    const val = (num / 1000).toFixed(0);
+    return `${val}K`;
+  }
+  return String(num);
+}
+
+/**
+ * Derives content-driven control parameters, slider boundaries, clean steps,
+ * and context-tailored accelerator packages from the project/file's actual state.
+ */
+export function deriveProjectControls(project, baselineRemainingDays = 30) {
+  const budget = Number(project?.budget || 0);
+  const spent = Number(project?.spent || 0);
+  const progress = Math.min(100, Math.max(0, Number(project?.progress || 0)));
+  const status = project?.status || 'قيد التنفيذ';
+
+  // 1. Dynamic Budget Slider Bounds based on actual project budget
+  let maxBudgetDelta = 500000;
+  let minBudgetDelta = -300000;
+  let budgetStep = 25000;
+
+  if (budget > 0) {
+    if (budget < 150000) {
+      maxBudgetDelta = Math.max(25000, Math.round((budget * 0.75) / 5000) * 5000);
+      minBudgetDelta = -Math.min(maxBudgetDelta, Math.max(5000, Math.round((budget * 0.5) / 5000) * 5000));
+      budgetStep = 5000;
+    } else if (budget < 800000) {
+      maxBudgetDelta = Math.max(50000, Math.round((budget * 0.5) / 10000) * 10000);
+      minBudgetDelta = -Math.min(maxBudgetDelta, Math.max(10000, Math.round((budget * 0.4) / 10000) * 10000));
+      budgetStep = 10000;
+    } else if (budget < 3000000) {
+      maxBudgetDelta = Math.max(100000, Math.round((budget * 0.4) / 25000) * 25000);
+      minBudgetDelta = -Math.min(maxBudgetDelta, Math.max(25000, Math.round((budget * 0.35) / 25000) * 25000));
+      budgetStep = 25000;
+    } else {
+      maxBudgetDelta = Math.max(250000, Math.round((budget * 0.3) / 50000) * 50000);
+      minBudgetDelta = -Math.min(maxBudgetDelta, Math.max(50000, Math.round((budget * 0.25) / 50000) * 50000));
+      budgetStep = 50000;
+    }
+  }
+
+  // Generate 5-6 clean budget preset chips derived from max/min
+  const halfPositive = Math.round(maxBudgetDelta * 0.5 / budgetStep) * budgetStep;
+  const halfNegative = Math.round(minBudgetDelta * 0.5 / budgetStep) * budgetStep;
+  const rawBudgetPresets = [
+    { label: `+${fmtCompact(maxBudgetDelta)}`, value: maxBudgetDelta },
+    ...(halfPositive > 0 && halfPositive < maxBudgetDelta ? [{ label: `+${fmtCompact(halfPositive)}`, value: halfPositive }] : []),
+    { label: 'تعادل (0)', value: 0 },
+    ...(halfNegative < 0 && halfNegative > minBudgetDelta ? [{ label: `-${fmtCompact(Math.abs(halfNegative))}`, value: halfNegative }] : []),
+    { label: `-${fmtCompact(Math.abs(minBudgetDelta))}`, value: minBudgetDelta },
+  ];
+  // Deduplicate
+  const budgetPresets = rawBudgetPresets.filter((p, i, arr) => arr.findIndex(x => x.value === p.value) === i);
+
+  // 2. Dynamic Timeline Slider Bounds based on remaining duration & planned duration
+  const isCompleted = progress >= 100 || status === 'مكتمل';
+  let minTimelineDelta = -30;
+  let maxTimelineDelta = 45;
+  let timelineStep = 1;
+
+  if (isCompleted) {
+    minTimelineDelta = 0;
+    maxTimelineDelta = 0;
+  } else if (baselineRemainingDays > 0) {
+    maxTimelineDelta = Math.max(14, Math.min(180, Math.round(baselineRemainingDays * 0.65)));
+    minTimelineDelta = -Math.max(7, Math.min(Math.max(5, baselineRemainingDays - 5), Math.round(baselineRemainingDays * 0.5)));
+    timelineStep = baselineRemainingDays > 120 ? 5 : 1;
+  }
+
+  const halfTimeCompress = Math.round(minTimelineDelta * 0.5);
+  const halfTimeExtend = Math.round(maxTimelineDelta * 0.5);
+  const rawTimelinePresets = isCompleted ? [] : [
+    { label: `${minTimelineDelta} يوم (تسريع)`, value: minTimelineDelta },
+    ...(halfTimeCompress < 0 && halfTimeCompress > minTimelineDelta ? [{ label: `${halfTimeCompress} يوم`, value: halfTimeCompress }] : []),
+    { label: '0 (الأصل)', value: 0 },
+    ...(halfTimeExtend > 0 && halfTimeExtend < maxTimelineDelta ? [{ label: `+${halfTimeExtend} يوم`, value: halfTimeExtend }] : []),
+    { label: `+${maxTimelineDelta} يوم (تمديد)`, value: maxTimelineDelta },
+  ];
+  const timelinePresets = rawTimelinePresets.filter((p, i, arr) => arr.findIndex(x => x.value === p.value) === i);
+
+  // 3. Dynamic Strategy Packages (Accelerators) derived from actual status & deficits
+  const strategyPackages = [];
+  const bScale = budget > 0 ? budget : 1000000;
+  const remDays = Math.max(15, baselineRemainingDays);
+
+  if (status === 'متأخر' || (spent > budget && budget > 0)) {
+    const deficit = spent > budget ? spent - budget : 0;
+    const rawRescue = Math.max(deficit * 1.25, bScale * 0.22);
+    const rescueBudget = Math.min(maxBudgetDelta, Math.max(budgetStep, Math.round(rawRescue / budgetStep) * budgetStep));
+    const rescueDays = Math.max(minTimelineDelta, -Math.max(10, Math.round(remDays * 0.35)));
+
+    strategyPackages.push({
+      id: 'rescue',
+      name: '🚀 خطة الإنقاذ وتدارك التأخير',
+      badgeColor: '#59c48f',
+      budgetDelta: rescueBudget,
+      timelineDelta: rescueDays,
+      description: `ضخ ${fmtCompact(rescueBudget)} ر.س لضغط الجدول بـ ${Math.abs(rescueDays)} يوماً واستعادة المسار الحرج.`,
+    });
+
+    const rawContain = Math.round((bScale * 0.12) / budgetStep) * budgetStep;
+    const containBudget = Math.max(minBudgetDelta, -rawContain);
+    const containDays = Math.min(maxTimelineDelta, Math.round(remDays * 0.3));
+
+    strategyPackages.push({
+      id: 'contain',
+      name: '⚖️ احتواء العجز وإعادة الموازنة',
+      badgeColor: '#e0705f',
+      budgetDelta: containBudget,
+      timelineDelta: containDays,
+      description: `كبح الصرف بـ ${fmtCompact(Math.abs(containBudget))} ر.س مع تمديد ${containDays} يوماً لضبط السيولة.`,
+    });
+  } else if (status === 'متوقف' || status === 'متعثر') {
+    const rawRestart = Math.round((bScale * 0.25) / budgetStep) * budgetStep;
+    const restartBudget = Math.min(maxBudgetDelta, rawRestart);
+    const restartDays = Math.min(maxTimelineDelta, Math.round(remDays * 0.3));
+
+    strategyPackages.push({
+      id: 'restart',
+      name: '🔄 فك التعثر وتحديث التعاقد',
+      badgeColor: '#d1a65c',
+      budgetDelta: restartBudget,
+      timelineDelta: restartDays,
+      description: `تخصيص ${fmtCompact(restartBudget)} ر.س مع مهلة ${restartDays} يوماً لإعادة تشغيل فرق المقاولات.`,
+    });
+
+    const rawRescope = Math.round((bScale * 0.15) / budgetStep) * budgetStep;
+    const rescopeBudget = Math.max(minBudgetDelta, -rawRescope);
+    const rescopeDays = Math.min(maxTimelineDelta, Math.round(remDays * 0.4));
+
+    strategyPackages.push({
+      id: 'rescope',
+      name: '✂️ تقليص النطاق (Scope Reduction)',
+      badgeColor: '#e0705f',
+      budgetDelta: rescopeBudget,
+      timelineDelta: rescopeDays,
+      description: `خفض النطاق يوفر ${fmtCompact(Math.abs(rescopeBudget))} ر.س مع ترحيل التسليم لتفادي الخسائر.`,
+    });
+  } else if (isCompleted) {
+    strategyPackages.push({
+      id: 'audit_close',
+      name: '📑 الإغلاق المالي والتدقيق النهائي',
+      badgeColor: '#59c48f',
+      budgetDelta: 0,
+      timelineDelta: 0,
+      description: 'المشروع مكتمل بنسبة 100%. اعتماد المطابقات المالية ومراجعة فترات الضمان.',
+    });
+
+    const surplus = budget > spent ? budget - spent : 0;
+    if (surplus > 0) {
+      strategyPackages.push({
+        id: 'reallocate',
+        name: '💸 تحرير الوفر المالي للمحفظة',
+        badgeColor: '#38bdf8',
+        budgetDelta: -surplus,
+        timelineDelta: 0,
+        description: `تحرير الفائض البالغ ${fmtCompact(surplus)} ر.س لإعادة توجيهه لدعم مشاريع أخرى.`,
+      });
+    }
+  } else {
+    // Normal / In Progress
+    const rawAccel = Math.round((bScale * 0.18) / budgetStep) * budgetStep;
+    const accelBudget = Math.min(maxBudgetDelta, rawAccel);
+    const accelDays = Math.max(minTimelineDelta, -Math.max(10, Math.round(remDays * 0.25)));
+
+    strategyPackages.push({
+      id: 'accelerate',
+      name: '⚡ التدشين المبكر ومضاعفة الوتيرة',
+      badgeColor: '#59c48f',
+      budgetDelta: accelBudget,
+      timelineDelta: accelDays,
+      description: `ضخ ${fmtCompact(accelBudget)} ر.س لتقديم موعد الإطلاق بـ ${Math.abs(accelDays)} يوماً.`,
+    });
+
+    const rawQuality = Math.round((bScale * 0.08) / budgetStep) * budgetStep;
+    const qualityBudget = Math.min(maxBudgetDelta, rawQuality);
+
+    strategyPackages.push({
+      id: 'quality',
+      name: '🛡️ تعزيز الأمان والجودة والاعتمادية',
+      badgeColor: '#38bdf8',
+      budgetDelta: qualityBudget,
+      timelineDelta: 0,
+      description: `مخصص نوعي ${fmtCompact(qualityBudget)} ر.س للامتثال دون التأثير على الجدول الزمني.`,
+    });
+
+    const rawThrift = Math.round((bScale * 0.1) / budgetStep) * budgetStep;
+    const thriftBudget = Math.max(minBudgetDelta, -rawThrift);
+    const thriftDays = Math.min(maxTimelineDelta, Math.max(7, Math.round(remDays * 0.15)));
+
+    strategyPackages.push({
+      id: 'thrift',
+      name: '💰 ترشيد الإنفاق وتحقيق وفورات',
+      badgeColor: '#d1a65c',
+      budgetDelta: thriftBudget,
+      timelineDelta: thriftDays,
+      description: `توفير ${fmtCompact(Math.abs(thriftBudget))} ر.س مع تمديد مرن ${thriftDays} يوماً.`,
+    });
+  }
+
+  return {
+    hasFinancialLevers: !isCompleted || budget > spent,
+    hasTimelineLevers: !isCompleted,
+    isCompleted,
+    componentType: isCompleted ? 'completed_audit' : 'whatif_simulator',
+    budgetRange: {
+      min: minBudgetDelta,
+      max: maxBudgetDelta,
+      step: budgetStep,
+      presets: budgetPresets,
+    },
+    timelineRange: {
+      min: minTimelineDelta,
+      max: maxTimelineDelta,
+      step: timelineStep,
+      presets: timelinePresets,
+    },
+    strategyPackages,
+  };
+}
+
+/**
  * Simulates executive decision scenarios on a given project and calculates portfolio ripple effects.
  *
  * @param {Object} params
@@ -297,8 +528,14 @@ ${scenarioQuery ? `- استفسار أو سيناريو مخصص من القيا
     }
   }
 
+  const controls = deriveProjectControls(project, baselineRemainingDays);
+
   return {
     ok: true,
+    capabilities: controls,
+    budgetRange: controls.budgetRange,
+    timelineRange: controls.timelineRange,
+    strategyPackages: controls.strategyPackages,
     baseline: {
       projectId: project.id,
       projectName: project.name,

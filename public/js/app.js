@@ -34,11 +34,11 @@ export async function loadDashboard(flash) {
     const kpisEl = $('#kpis');
     if (kpisEl) {
       kpisEl.innerHTML = [
-        ['المشاريع', num(d.projects.length)],
-        ['الميزانية (ر.س)', sar(s.total_budget)],
-        ['المصروف (ر.س)', sar(s.total_spent)],
-        ['تذاكر مفتوحة', num(s.open_tickets)],
-      ].map(([k, v]) => `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join('');
+        ['المشاريع', num(d.projects.length), 'kpi-projects'],
+        ['الميزانية (ر.س)', sar(s.total_budget), 'kpi-budget'],
+        ['المصروف (ر.س)', sar(s.total_spent), 'kpi-spent'],
+        ['تذاكر مفتوحة', num(s.open_tickets), 'kpi-tickets'],
+      ].map(([k, v, id]) => `<div class="kpi" id="${id}" data-kpi="${id}"><span>${k}</span><b>${v}</b></div>`).join('');
     }
 
     const TH = cols => `<thead><tr>${cols.map(([c, t]) => `<th scope="col" class="${c}">${t}</th>`).join('')}</tr></thead>`;
@@ -47,7 +47,7 @@ export async function loadDashboard(flash) {
       projEl.innerHTML = '<caption class="sr-only">جدول المشاريع: الحالة ونسبة الإنجاز والمسؤول</caption>' +
         TH([['c-id', '#'], ['c-name', 'المشروع'], ['c-dept', 'الإدارة'], ['c-status', 'الحالة'], ['c-prog', 'الإنجاز'], ['c-owner', 'المسؤول'], ['c-act', 'لوحة المشروع']]) +
         '<tbody>' +
-        d.projects.map(p => `<tr><td class="num c-id">${num(p.id)}</td><td class="c-name">${esc(p.name)}</td><td class="c-dept">${esc(p.department)}</td><td class="c-status"><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td>
+        d.projects.map(p => `<tr id="project-${p.id}" data-project-id="${p.id}" class="project-row"><td class="num c-id">${num(p.id)}</td><td class="c-name">${esc(p.name)}</td><td class="c-dept">${esc(p.department)}</td><td class="c-status"><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td>
           <td class="c-prog"><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${+p.progress || 0}" aria-label="نسبة إنجاز ${esc(p.name)}"><i style="width:${+p.progress || 0}%"></i></div><span class="num pct" aria-hidden="true">${num(p.progress)}٪</span></div></td>
           <td class="c-owner">${esc(p.owner)}</td>
           <td class="c-act"><button type="button" class="btn-proj-dash" data-proj-id="${p.id}" data-dash-id="${p.dashboard_id || ''}" title="فتح لوحة مشروع ${esc(p.name)}">عرض اللوحة ↗</button></td>
@@ -122,7 +122,7 @@ export async function loadDashboard(flash) {
       tixEl.innerHTML = '<caption class="sr-only">جدول التذاكر: المشروع والأولوية والحالة</caption>' +
         TH([['c-id', '#'], ['', 'العنوان'], ['', 'المشروع'], ['', 'الأولوية'], ['', 'الحالة']]) +
         '<tbody>' +
-        d.tickets.map(t => `<tr class="${flash === t.id ? 'flash' : ''}"><td class="num c-id">${num(t.id)}</td><td>${esc(t.title)}</td><td>${esc(t.project_name)}</td>
+        d.tickets.map(t => `<tr id="ticket-${t.id}" data-ticket-id="${t.id}" class="ticket-row ${flash === t.id ? 'flash' : ''}"><td class="num c-id">${num(t.id)}</td><td>${esc(t.title)}</td><td>${esc(t.project_name)}</td>
           <td><span class="tag ${esc(t.priority)}">${esc(t.priority)}</span></td><td><span class="tag ${esc(t.status)}">${esc(t.status)}</span></td></tr>`).join('') +
         '</tbody>';
     }
@@ -169,6 +169,11 @@ export async function loadDashboard(flash) {
       docsEl.innerHTML = d.documents.map(x =>
         `<li><span>📄 ${x.drive_url ? `<a href="${x.drive_url}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(x.name)}</a>` : esc(x.name)}${x.category ? ` <span class="tag">${esc(x.category)}</span>` : ''}</span><small>#${x.id}${x.drive_url ? ' · في Drive ✓' : ''}</small></li>`
       ).join('');
+    }
+
+    // Preserve and restore active executive spotlight if re-rendered during briefing
+    if (window.__screenSpotlight?.refreshActive) {
+      window.__screenSpotlight.refreshActive();
     }
   } catch (err) {
     console.error('Error loading dashboard:', err);

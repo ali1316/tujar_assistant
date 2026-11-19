@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { simulateScenario, simulate_scenario } from '../src/executive/simulator.js';
+import { simulateScenario, simulate_scenario, deriveProjectControls } from '../src/executive/simulator.js';
 import { app } from '../server.js';
 import { db } from '../db.js';
 
@@ -210,13 +210,17 @@ test('POST /api/executive/simulate and related routes respond correctly', async 
     assert.equal(errData.ok, false);
     assert.ok(errData.error.includes('مشروع غير موجود'));
 
-    // 3. GET /api/executive/projects
+    // 3. GET /api/executive/projects (Checks enriched dynamic controls)
     const projRes = await fetch(`${baseUrl}/api/executive/projects`);
     assert.equal(projRes.status, 200);
     const projData = await projRes.json();
     assert.equal(projData.ok, true);
     assert.ok(Array.isArray(projData.projects));
     assert.ok(projData.projects.length >= 5);
+    const firstProj = projData.projects[0];
+    assert.ok(firstProj.budgetRange, 'Projects must include dynamic budgetRange');
+    assert.ok(firstProj.timelineRange, 'Projects must include dynamic timelineRange');
+    assert.ok(Array.isArray(firstProj.strategyPackages), 'Projects must include dynamic strategyPackages');
 
     // 4. POST /api/executive/apply (Commit plan change)
     const applyRes = await fetch(`${baseUrl}/api/executive/apply`, {
@@ -240,4 +244,40 @@ test('POST /api/executive/simulate and related routes respond correctly', async 
   } finally {
     server.close();
   }
+});
+
+// ============================================================================
+// 4. Content-Driven Controls & Dynamic Sliders per File/Project
+// ============================================================================
+test('deriveProjectControls derives proportional slider bounds and tailored packages', () => {
+  // Test Case A: Small Budget Project (80,000 SAR)
+  const smallProj = { id: 101, name: 'تطبيق تجريبي', budget: 80000, spent: 40000, progress: 50, status: 'قيد التنفيذ' };
+  const smallControls = deriveProjectControls(smallProj, 30);
+  assert.equal(smallControls.hasFinancialLevers, true);
+  assert.equal(smallControls.hasTimelineLevers, true);
+  assert.ok(smallControls.budgetRange.max <= 65000, 'Small budget must not have 500k slider');
+  assert.equal(smallControls.budgetRange.step, 5000, 'Small budget must have granular 5k step');
+  assert.ok(smallControls.strategyPackages.length >= 2);
+
+  // Test Case B: Large Budget Project (15,000,000 SAR)
+  const largeProj = { id: 102, name: 'البنية التحتية الوطنية', budget: 15000000, spent: 5000000, progress: 30, status: 'قيد التنفيذ' };
+  const largeControls = deriveProjectControls(largeProj, 180);
+  assert.ok(largeControls.budgetRange.max >= 2000000, 'Large project must scale sliders into millions');
+  assert.equal(largeControls.budgetRange.step, 50000, 'Large project step should be at least 50k');
+
+  // Test Case C: Delayed Project with Deficit
+  const delayedProj = { id: 103, name: 'مشروع متعثر', budget: 1000000, spent: 1200000, progress: 40, status: 'متأخر' };
+  const delayedControls = deriveProjectControls(delayedProj, 45);
+  const rescuePkg = delayedControls.strategyPackages.find(p => p.id === 'rescue');
+  assert.ok(rescuePkg, 'Delayed project must generate a rescue accelerator package');
+  assert.ok(rescuePkg.budgetDelta > 0, 'Rescue package must inject capital');
+  assert.ok(rescuePkg.timelineDelta < 0, 'Rescue package must compress timeline');
+
+  // Test Case D: Completed Project (100%)
+  const completedProj = { id: 104, name: 'بوابة مكتملة', budget: 500000, spent: 450000, progress: 100, status: 'مكتمل' };
+  const completedControls = deriveProjectControls(completedProj, 0);
+  assert.equal(completedControls.hasTimelineLevers, false, 'Completed project cannot have timeline levers');
+  assert.equal(completedControls.timelineRange.max, 0);
+  const auditPkg = completedControls.strategyPackages.find(p => p.id === 'audit_close');
+  assert.ok(auditPkg, 'Completed project must generate audit closeout package');
 });

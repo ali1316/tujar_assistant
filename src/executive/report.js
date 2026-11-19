@@ -21,21 +21,42 @@ const SAFE_TRANSLATIONS = {
   'العمليات': 'Operations',
   'التحول الرقمي': 'Digital Transformation',
   'المشاريع': 'PMO',
+  'الاستراتيجية': 'Strategy & Governance',
+  'خدمة المستفيدين': 'Beneficiary Services',
+  'الخدمات المشتركة': 'Shared Services',
+  'الشؤون القانونية': 'Legal Affairs',
+  'الموارد البشرية': 'Human Resources',
+  'المالية': 'Finance & Accounts',
   'سارة العتيبي': 'Sarah Al-Otaibi',
   'خالد الحربي': 'Khalid Al-Harbi',
   'فهد الدوسري': 'Fahad Al-Dossari',
   'نورة الشمري': 'Nora Al-Shammari',
   'عبدالله القحطاني': 'Abdullah Al-Qahtani',
+  'نورة القحطاني': 'Nora Al-Qahtani',
+  'فهد الشمري': 'Fahad Al-Shammari',
   'قيد التنفيذ': 'IN PROGRESS',
   'مكتمل': 'COMPLETED',
   'متأخر': 'DELAYED',
   'متوقف': 'ON HOLD',
+  'جديد': 'NEW',
+  'ملغي': 'CANCELLED',
   'عالية': 'HIGH',
   'متوسطة': 'MEDIUM',
   'منخفضة': 'LOW',
   'مفتوحة': 'OPEN',
   'قيد المعالجة': 'PROCESSING',
   'مغلقة': 'CLOSED',
+  'حرجة': 'CRITICAL',
+  'مرتفعة': 'HIGH RISK',
+  'مستقرة': 'STABLE',
+  'المشروع متوقف بالكامل': 'Project is completely halted',
+  'المشروع متأخر عن الجدول المعتمد': 'Project delayed behind approved schedule',
+  'جميع المؤشرات ضمن النطاق التشغيلي المعتمد': 'All indicators within approved operational thresholds',
+  'الاستمرار في التنفيذ وفق الخطط الزمنية المعتمدة': 'Proceed according to approved roadmap',
+  'تدخل عاجل للمجلس لإزالة العوائق واعتماد مخصصات الموردين': 'Urgent Board action to unblock vendor allocations',
+  'تشكيل فريق تسريع مشترك بين الإدارات المعنية لمراجعة مسار الربط': 'Form joint taskforce to accelerate integration',
+  'إلزام المقاول والاستشاري بحل التذاكر الحرجة خلال 48 ساعة': 'Enforce 48h contractor SLA on critical tickets',
+  'متابعة مؤشرات الأداء الأسبوعية مع مدير المشروع': 'Monitor weekly KPI cadence with Project Manager',
 };
 
 const AR_CHAR_MAP = {
@@ -43,12 +64,35 @@ const AR_CHAR_MAP = {
   'د': 'd', 'ذ': 'dh', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z',
   'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'و': 'w',
   'ي': 'y', 'ى': 'a', 'ئ': 'e', 'ء': "'", 'ؤ': 'o', 'ة': 'ah', ' ': ' ',
+  '٪': '%', '،': ',', '؛': ';', '؟': '?',
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
 };
 
 export function toAsciiSafe(str, maxLen = 40) {
   if (!str) return '';
   const trimmed = String(str).trim();
   if (SAFE_TRANSLATIONS[trimmed]) return SAFE_TRANSLATIONS[trimmed].slice(0, maxLen);
+
+  // Dynamic regex patterns for reasons and recommendations
+  const burnMatch = trimmed.match(/استهلاك الميزانية أعلى من الإنجاز بفارق\s*(\d+)/);
+  if (burnMatch) {
+    return `Budget burn exceeds progress by ${burnMatch[1]}%`.slice(0, maxLen);
+  }
+  const ticketMatch = trimmed.match(/توجد\s*(\d+)\s*تذكرة حرجة/);
+  if (ticketMatch) {
+    return `${ticketMatch[1]} critical ticket(s) open`.slice(0, maxLen);
+  }
+  if (/خلل في تسجيل الدخول/i.test(trimmed)) {
+    return 'SSO national authentication issue'.slice(0, maxLen);
+  }
+  if (/تأخر ربط نظام/i.test(trimmed)) {
+    return 'Land system integration delay'.slice(0, maxLen);
+  }
+  if (/اعتماد مزود السحابة/i.test(trimmed)) {
+    return 'Cloud vendor sign-off pending'.slice(0, maxLen);
+  }
+
   let res = '';
   for (const ch of trimmed) {
     if (AR_CHAR_MAP[ch] !== undefined) res += AR_CHAR_MAP[ch];
@@ -88,7 +132,12 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
   }
 
   const projects = await db.prepare(sql).all(...params);
-  const tickets = await db.prepare('SELECT t.*, p.name as project_name FROM tickets t LEFT JOIN projects p ON p.id = t.project_id').all();
+  const allTickets = await db.prepare('SELECT t.*, p.name as project_name FROM tickets t LEFT JOIN projects p ON p.id = t.project_id').all();
+
+  // Scope tickets to filtered projects if filters were applied
+  const isFiltered = Boolean(filter?.department || filter?.status || filter?.query);
+  const projectIds = new Set(projects.map(p => p.id));
+  const tickets = isFiltered ? allTickets.filter(t => projectIds.has(t.project_id)) : allTickets;
 
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.status === 'مكتمل');
@@ -199,6 +248,7 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
   };
 
   // 3. صياغة موجز واتساب التنفيذي (WhatsApp Markdown)
+  const stoppedBreakdown = stoppedProjects.length > 0 ? ` · ${stoppedProjects.length} متوقف` : '';
   const waLines = [
     `🏛️ *اتحاد الغرف السعودية | منصة تُجّار*`,
     `📊 *${title}*`,
@@ -206,7 +256,7 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
     `🇸🇦 *رؤية المملكة 2030* — تسريع التحول الرقمي وتمكين قطاع الأعمال`,
     `━━━━━━━━━━━━━━━━━━━━━`,
     `📌 *المؤشرات القيادية الرئيسية (KPIs):*`,
-    `• *إجمالي المشاريع:* ${totalProjects} مشاريع (${completedProjects.length} مكتمل · ${inProgressProjects.length} قيد التنفيذ · ${delayedProjects.length} متأخر)`,
+    `• *إجمالي المشاريع:* ${totalProjects} مشاريع (${completedProjects.length} مكتمل · ${inProgressProjects.length} قيد التنفيذ · ${delayedProjects.length} متأخر${stoppedBreakdown})`,
     `• *متوسط نسبة الإنجاز العام:* ${avgProgress}%`,
     `• *إجمالي الميزانية المعتمدة:* ${formatSAR(totalBudget)}`,
     `• *المصروف الفعلي:* ${formatSAR(totalSpent)} (${spentPct}%)`,
@@ -214,36 +264,64 @@ export async function generateExecutiveReport({ title = 'تقرير مجلس ا�
     `• *التذاكر التشغيلية المفتوحة:* ${openTickets.length} تذكرة (منها ${highPriorityTickets.length} حرجة)`,
   ];
 
-  if (riskRadar.length > 0) {
+  if (totalProjects === 0) {
     waLines.push(
       `━━━━━━━━━━━━━━━━━━━━━`,
-      `🚦 *رادار المخاطر والمشاريع الحرجة (تحتاج تدخلاً عاجلاً):*`
+      `🔍 *موقف المشاريع الميدانية:*`,
+      `لا توجد مشاريع مطابقة لمعايير البحث أو الفلترة المحددة.`,
+      `━━━━━━━━━━━━━━━━━━━━━`,
+      `💼 *توجيه المجلس / المعالي الموصى به:*`,
+      `مراجعة معايير البحث أو تحديث سجلات المحفظة لإدراج المبادرات المطلوبة.`
     );
-    for (const r of riskRadar.slice(0, 3)) {
-      const badge = r.level === 'حرجة' ? '🛑' : '⚠️';
-      waLines.push(`${badge} *${r.project_name}* [الحالة: ${r.status}]`);
-      waLines.push(`  ├ *نسبة الإنجاز:* ${r.progress}% | *المصروف:* ${formatSAR(r.spent)} (${r.spent_pct}%)`);
-      waLines.push(`  ├ *أسباب الخطر:* ${r.reasons.join(' · ')}`);
-      waLines.push(`  └ *التوصية:* ${r.recommendation}`);
+  } else {
+    if (riskRadar.length > 0) {
+      waLines.push(
+        `━━━━━━━━━━━━━━━━━━━━━`,
+        `🚦 *رادار المخاطر والمشاريع الحرجة (تحتاج تدخلاً عاجلاً):*`
+      );
+      for (const r of riskRadar.slice(0, 3)) {
+        const badge = r.level === 'حرجة' ? '🛑' : '⚠️';
+        waLines.push(`${badge} *${r.project_name}* [الحالة: ${r.status}]`);
+        waLines.push(`  ├ *نسبة الإنجاز:* ${r.progress ?? 0}% | *المصروف:* ${formatSAR(r.spent)} (${r.spent_pct}%)`);
+        waLines.push(`  ├ *أسباب الخطر:* ${r.reasons.join(' · ')}`);
+        waLines.push(`  └ *التوصية:* ${r.recommendation}`);
+      }
+      if (riskRadar.length > 3) {
+        waLines.push(`  └ *ملاحظة:* توجد ${riskRadar.length - 3} حالات خطر إضافية موضحة في التقرير الشامل.`);
+      }
     }
+
+    waLines.push(
+      `━━━━━━━━━━━━━━━━━━━━━`,
+      `📈 *موقف المشاريع الميدانية:*`
+    );
+    for (const p of projects) {
+      const icon = p.status === 'مكتمل' ? '✅' : p.status === 'متأخر' ? '⚠️' : p.status === 'متوقف' ? '🛑' : '🔄';
+      waLines.push(`${icon} *${p.name}* — ${p.status} (${p.progress ?? 0}%)`);
+    }
+
+    waLines.push(
+      `━━━━━━━━━━━━━━━━━━━━━`,
+      `💼 *توجيه المجلس / المعالي الموصى به:*`,
+      riskRadar.length > 0
+        ? `الموافقة على مصفوفة الإجراءات التصحيحية لرادار المخاطر، وتكليف فرق العمل بحل معوقات الربط التقني والاعتمادات.`
+        : `الاستمرار في متابعة خطط التنفيذ والالتزام بمؤشرات الأداء المعتمدة لجميع المبادرات المستقرة.`
+    );
   }
 
-  waLines.push(
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `📈 *موقف المشاريع الميدانية:*`
-  );
-  for (const p of projects) {
-    const icon = p.status === 'مكتمل' ? '✅' : p.status === 'متأخر' ? '⚠️' : p.status === 'متوقف' ? '🛑' : '🔄';
-    waLines.push(`${icon} *${p.name}* — ${p.status} (${p.progress}%)`);
-  }
+  // Construct PDF download query string reflecting current filters
+  const dlParams = new URLSearchParams();
+  if (title && title !== 'تقرير مجلس الإدارة التنفيذي (تقرير المعالي)') dlParams.set('title', title);
+  if (filter?.department) dlParams.set('department', filter.department);
+  if (filter?.status) dlParams.set('status', filter.status);
+  if (filter?.query) dlParams.set('query', filter.query);
+  const dlQs = dlParams.toString() ? `?${dlParams.toString()}` : '';
+  const pdfDownloadUrl = `/api/executive/report/pdf${dlQs}`;
 
   waLines.push(
-    `━━━━━━━━━━━━━━━━━━━━━`,
-    `💼 *توجيه المجلس / المعالي الموصى به:*`,
-    `الموافقة على مصفوفة الإجراءات التصحيحية لرادار المخاطر، وتكليف فرق العمل بحل معوقات الربط التقني والاعتمادات.`,
     ``,
     `📄 *لتحميل التقرير الرسمي الشامل (PDF):*`,
-    `/api/executive/report/pdf`
+    pdfDownloadUrl
   );
 
   const whatsappText = waLines.join('\n');

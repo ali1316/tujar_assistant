@@ -1351,6 +1351,9 @@ body.eng-eleven #caption .ca::before {
   list-style: none;
   margin: 0;
   padding: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .docs small {
@@ -2119,15 +2122,44 @@ body.eng-eleven #caption .ca::before {
 .spotlight-active {
   position: relative !important;
   z-index: 1000 !important;
-  outline: 2px solid rgba(212, 175, 55, 0.85) !important;
+  overflow: visible !important;
+  outline: 3px solid #f5d05c !important;
   outline-offset: 3px !important;
-  box-shadow: 0 0 25px rgba(212, 175, 55, 0.7) !important;
-  border-color: rgba(212, 175, 55, 0.9) !important;
-  transition: box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-              outline-color 0.4s ease,
-              border-color 0.4s ease,
-              transform 0.3s ease-out;
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.7), 0 0 35px rgba(245, 208, 92, 0.85), inset 0 0 20px rgba(245, 208, 92, 0.2) !important;
+  border-color: #f5d05c !important;
+  background: linear-gradient(135deg, rgba(20, 50, 80, 0.98), rgba(10, 26, 44, 0.98)) !important;
+  transform: scale(1.02) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   animation: spotlight-pulse-glow 2.5s infinite alternate ease-in-out;
+}
+
+#kpis .kpi.spotlight-active {
+  overflow: visible !important;
+  outline: 3px solid #f5d05c !important;
+  box-shadow: 0 0 35px rgba(245, 208, 92, 0.9), inset 0 0 20px rgba(245, 208, 92, 0.3) !important;
+  transform: scale(1.04) !important;
+}
+
+/* Table Row Spotlight */
+tr.spotlight-active {
+  background: rgba(245, 208, 92, 0.25) !important;
+}
+tr.spotlight-active td {
+  background: rgba(245, 208, 92, 0.28) !important;
+  border-top: 2px solid #f5d05c !important;
+  border-bottom: 2px solid #f5d05c !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+tr.spotlight-active td:first-child {
+  border-right: 3px solid #f5d05c !important;
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+}
+tr.spotlight-active td:last-child {
+  border-left: 3px solid #f5d05c !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
 }
 
 @keyframes spotlight-pulse-glow {
@@ -2343,4 +2375,221 @@ body.eng-eleven #caption .ca::before {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* ==========================================================================
+   Executive Morning Briefing HUD (Floating Live Subtitle & Choreography Bar)
+   ========================================================================== */
+.briefing-hud {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(30px);
+  width: min(760px, calc(100vw - 32px));
+  background: linear-gradient(135deg, rgba(16, 36, 59, 0.97) 0%, rgba(8, 21, 36, 0.98) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.75);
+  border-radius: 16px;
+  padding: 16px 20px;
+  z-index: 10000;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 35px rgba(212, 175, 55, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #fceec5;
+  font-family: var(--font, 'IBM Plex Sans Arabic'), system-ui, sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  direction: rtl;
+}
+
+.briefing-hud.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.briefing-hud .hud-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+}
+
+.briefing-hud .hud-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d4af37, #f5d05c);
+  width: 0%;
+  animation: hud-progress 35s linear forwards;
+}
+
+@keyframes hud-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.briefing-hud .hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.briefing-hud .hud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.briefing-hud .hud-icon {
+  font-size: 18px;
+}
+
+.briefing-hud .hud-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.briefing-hud .hud-status-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.briefing-hud .hud-status-badge.live {
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.7);
+  color: #fca5a5;
+  animation: pulse-live 1.8s infinite;
+}
+
+.briefing-hud .hud-status-badge.stable {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(16, 185, 129, 0.7);
+  color: #6ee7b7;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.briefing-hud .hud-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.briefing-hud .hud-close-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.briefing-hud .hud-active-cue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5d05c;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.briefing-hud .hud-active-cue.pulse {
+  animation: hud-cue-pop 0.35s ease-out;
+}
+
+@keyframes hud-cue-pop {
+  0% { transform: scale(0.98); border-color: #fff; }
+  50% { transform: scale(1.02); border-color: #f5d05c; }
+  100% { transform: scale(1); }
+}
+
+.briefing-hud .hud-text {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.92);
+  max-height: 75px;
+  overflow-y: auto;
+  text-align: right;
+  padding-inline-start: 4px;
+}
+
+/* Choreography Stepper */
+.briefing-hud .hud-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.briefing-hud .hud-stepper::-webkit-scrollbar {
+  display: none;
+}
+
+.briefing-hud .hud-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+.briefing-hud .hud-step:hover {
+  background: rgba(212, 175, 55, 0.15);
+  color: #fff;
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.briefing-hud .hud-step.active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.28) 0%, rgba(245, 208, 92, 0.18) 100%);
+  border-color: #d4af37;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.45);
+  transform: scale(1.04);
+}
+
+.briefing-hud .hud-step.done {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #a7f3d0;
+}
+
+.briefing-hud .hud-step-icon {
+  font-size: 12px;
+}
+
+.briefing-hud .hud-step.done .hud-step-icon::after {
+  content: ' ✓';
+  font-size: 10px;
+  color: #34d399;
 }

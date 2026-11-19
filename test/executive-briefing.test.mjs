@@ -2,7 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { generateExecutiveBriefing, synthesizeExecutiveText, generateCues, formatCurrencyArabic, get_executive_briefing } from '../src/executive/briefing.js';
+import {
+  generateExecutiveBriefing,
+  synthesizeExecutiveText,
+  generateCues,
+  formatCurrencyArabic,
+  calculateBriefingDelta,
+  get_executive_briefing,
+} from '../src/executive/briefing.js';
 import { tools } from '../src/tools/registry.js';
 import { app } from '../server.js';
 
@@ -156,7 +163,171 @@ test('GET /api/executive/briefing endpoint returns complete briefing payload', a
     assert.ok(data.metrics && typeof data.metrics === 'object', 'Response should contain metrics object');
     assert.ok(data.metrics.total_projects > 0, 'Metrics should have total_projects');
     assert.ok(data.cues.length >= 3, 'Should have multiple cue points');
+    assert.ok(data.delta && typeof data.delta === 'object', 'Response should contain delta object');
   } finally {
     server.close();
+  }
+});
+
+test('calculateBriefingDelta accurately identifies unchanged vs changed sessions', () => {
+  const currentSnapshot = {
+    total_projects: 5,
+    total_budget: 5000000,
+    total_spent: 2000000,
+    avg_progress_pct: 60,
+    delayed_project_ids: [2],
+    delayed_projects: [{ id: 2, name: 'أتمتة رخص البناء' }],
+    open_tickets_count: 3,
+    high_priority_ticket_ids: [1],
+    high_priority_tickets: [{ id: 1, title: 'خلل الدخول' }],
+    doc_ids: ['doc-1'],
+    recent_docs: [{ id: 'doc-1', title: 'وثيقة الميزانية' }],
+  };
+
+  // Case 1: Identical previous snapshot => unchanged
+  const identicalPrev = { ...currentSnapshot };
+  const deltaUnchanged = calculateBriefingDelta(currentSnapshot, identicalPrev);
+  assert.equal(deltaUnchanged.has_prior_session, true);
+  assert.equal(deltaUnchanged.has_changes, false);
+  assert.equal(deltaUnchanged.is_unchanged, true);
+  assert.equal(deltaUnchanged.summary.spent_diff, 0);
+
+  // Case 2: Spent increased by 250,000 SAR => changed
+  const spentPrev = { ...currentSnapshot, total_spent: 1750000 };
+  const deltaSpent = calculateBriefingDelta(currentSnapshot, spentPrev);
+  assert.equal(deltaSpent.has_changes, true);
+  assert.equal(deltaSpent.is_unchanged, false);
+  assert.equal(deltaSpent.summary.spent_diff, 250000);
+  assert.match(deltaSpent.summary_text, /صرف إضافي/);
+
+  // Case 3: Force unchanged option override
+  const deltaForced = calculateBriefingDelta(currentSnapshot, null, { forceUnchanged: true });
+  assert.equal(deltaForced.is_unchanged, true);
+  assert.equal(deltaForced.has_changes, false);
+});
+
+test('synthesizeExecutiveText adapts naturally when data is unchanged from previous session', () => {
+  const mockMetrics = {
+    total_projects: 5,
+    total_budget: 5300000,
+    total_spent: 2130000,
+    budget_utilization_pct: 40,
+    avg_progress_pct: 50,
+    delayed_projects_count: 1,
+    delayed_projects: [{ id: 2, name: 'أتمتة رخص البناء', progress: 40, owner: 'خالد الحربي' }],
+    open_tickets_count: 5,
+    high_priority_tickets_count: 3,
+    high_priority_tickets: [{ id: 1, title: 'خلل في تسجيل الدخول عبر النفاذ الوطني' }],
+    recent_docs_count: 1,
+    delta: {
+      has_prior_session: true,
+      has_changes: false,
+      is_unchanged: true,
+    },
+  };
+  const mockDocs = [{ title: 'ميزانية اتحاد الغرف 2026' }];
+
+  const text = synthesizeExecutiveText({
+    metrics: mockMetrics,
+    projects: [],
+    tickets: [],
+    recentDocs: mockDocs,
+  });
+
+  // Verify stability announcement
+  assert.match(text, /استقرار الموقف العام دون أي تغييرات طارئة/, 'Must announce stability when unchanged');
+  assert.match(text, /تستمر المتابعة على المشروع المتأخر دون تغيير/, 'Must note ongoing monitoring of delayed project');
+  assert.match(text, /دون تصعيد جديد/, 'Must note operations without new escalations');
+
+  // Must still include standard executive figures & names
+  assert.match(text, /صباح الخير أستاذ فواز/);
+  assert.match(text, /5\.3 مليون ريال/);
+  assert.match(text, /أتمتة رخص البناء/);
+  assert.match(text, /النفاذ الوطني/);
+});
+
+test('GET and POST /api/executive/briefing/session endpoints', async () => {
+  const server = http.createServer(app);
+  await new Promise(resolve => server.listen(0, resolve));
+  const port = server.address().port;
+  const baseUrl = `http://localhost:${port}`;
+
+  try {
+    // 1. Get briefing to ensure session exists
+    await fetch(`${baseUrl}/api/executive/briefing`);
+
+    // 2. Query session endpoint
+    const getRes = await fetch(`${baseUrl}/api/executive/briefing/session`);
+    assert.equal(getRes.status, 200);
+    const sessionData = await getRes.json();
+    assert.equal(sessionData.ok, true);
+
+    // 3. Reset session endpoint
+    const postRes = await fetch(`${baseUrl}/api/executive/briefing/session/reset`, { method: 'POST' });
+    assert.equal(postRes.status, 200);
+    const resetData = await postRes.json();
+    assert.equal(resetData.ok, true);
+  } finally {
+    server.close();
+  }
+});
+
+test('synthesizeExecutiveText supports multi-variant dynamic phrasing without breaking core executive context', () => {
+  const mockMetrics = {
+    total_projects: 5,
+    total_budget: 5300000,
+    total_spent: 2130000,
+    budget_utilization_pct: 40,
+    avg_progress_pct: 50,
+    delayed_projects_count: 1,
+    delayed_projects: [{ id: 2, name: 'أتمتة رخص البناء', progress: 40, owner: 'خالد الحربي' }],
+    open_tickets_count: 5,
+    high_priority_tickets_count: 3,
+    high_priority_tickets: [{ id: 1, title: 'خلل في تسجيل الدخول عبر النفاذ الوطني' }],
+    recent_docs_count: 1,
+  };
+  const mockDocs = [{ title: 'ميزانية اتحاد الغرف 2026' }];
+
+  for (const v of [0, 1, 2, 3]) {
+    const text = synthesizeExecutiveText({
+      metrics: mockMetrics,
+      projects: [],
+      tickets: [],
+      recentDocs: mockDocs,
+      variant: v,
+    });
+    assert.match(text, /صباح الخير/);
+    assert.match(text, /فواز/);
+    assert.match(text, /الموجز التنفيذي الصباحي/);
+    assert.match(text, /اتحاد الغرف/);
+    assert.match(text, /5\.3 مليون ريال/);
+    assert.match(text, /أتمتة رخص البناء/);
+    assert.match(text, /النفاذ الوطني/);
+    const wc = text.split(/\s+/).filter(Boolean).length;
+    assert.ok(wc >= 60 && wc <= 130, `Variant ${v} word count ${wc} within bounds`);
+  }
+});
+
+test('generateCues provides step metadata and optimized pacing for Screen Choreography', () => {
+  const delayedProjects = [{ id: 2, name: 'أتمتة رخص البناء', progress: 40 }];
+  const highPriorityTickets = [{ id: 1, title: 'خلل في تسجيل الدخول' }];
+  const recentDocs = [{ id: 'ds-123', title: 'وثيقة استراتيجية' }];
+
+  const cues = generateCues({ delayedProjects, highPriorityTickets, recentDocs });
+  assert.equal(cues.length, 5);
+  assert.equal(cues[0].step, 1);
+  assert.equal(cues[0].timeOffset, 0);
+  assert.equal(cues[1].step, 2);
+  assert.equal(cues[1].timeOffset, 6);
+  assert.equal(cues[2].step, 3);
+  assert.equal(cues[2].timeOffset, 13);
+  assert.equal(cues[3].step, 4);
+  assert.equal(cues[3].timeOffset, 20);
+  assert.equal(cues[4].step, 5);
+  assert.equal(cues[4].timeOffset, 27);
+
+  for (const cue of cues) {
+    assert.ok(cue.stepTitle, `Cue must have stepTitle: ${JSON.stringify(cue)}`);
+    assert.ok(cue.stepIcon, `Cue must have stepIcon: ${JSON.stringify(cue)}`);
   }
 });

@@ -14,6 +14,188 @@ function fmtNum(num) {
   return Number(num || 0).toLocaleString('en-US');
 }
 
+/**
+ * Format compact numbers (e.g. 1.2M, 350K, 50K)
+ */
+function fmtCompact(n) {
+  const num = Math.abs(Number(n || 0));
+  if (num >= 1000000) {
+    const val = (num / 1000000).toFixed(1).replace(/\.0$/, '');
+    return `${val}M`;
+  }
+  if (num >= 1000) {
+    const val = (num / 1000).toFixed(0);
+    return `${val}K`;
+  }
+  return String(num);
+}
+
+/**
+ * Derives content-driven control parameters, slider boundaries, clean steps,
+ * and context-tailored accelerator packages from the project/file's actual state.
+ */
+function getProjectControls(project) {
+  if (project?.controls?.budgetRange && project?.controls?.strategyPackages) {
+    return project.controls;
+  }
+  const budget = Number(project?.budget || 0);
+  const spent = Number(project?.spent || 0);
+  const progress = Number(project?.progress || 0);
+  const status = project?.status || 'قيد التنفيذ';
+
+  let maxB = 500000;
+  let minB = -300000;
+  let stepB = 25000;
+
+  if (budget > 0) {
+    if (budget < 150000) {
+      maxB = Math.max(25000, Math.round((budget * 0.75) / 5000) * 5000);
+      minB = -Math.min(maxB, Math.max(5000, Math.round((budget * 0.5) / 5000) * 5000));
+      stepB = 5000;
+    } else if (budget < 800000) {
+      maxB = Math.max(50000, Math.round((budget * 0.5) / 10000) * 10000);
+      minB = -Math.min(maxB, Math.max(10000, Math.round((budget * 0.4) / 10000) * 10000));
+      stepB = 10000;
+    } else if (budget < 3000000) {
+      maxB = Math.max(100000, Math.round((budget * 0.4) / 25000) * 25000);
+      minB = -Math.min(maxB, Math.max(25000, Math.round((budget * 0.35) / 25000) * 25000));
+      stepB = 25000;
+    } else {
+      maxB = Math.max(250000, Math.round((budget * 0.3) / 50000) * 50000);
+      minB = -Math.min(maxB, Math.max(50000, Math.round((budget * 0.25) / 50000) * 50000));
+      stepB = 50000;
+    }
+  }
+
+  const isCompleted = progress >= 100 || status === 'مكتمل';
+  const minT = isCompleted ? 0 : -30;
+  const maxT = isCompleted ? 0 : 45;
+
+  const halfPositive = Math.round(maxB * 0.5 / stepB) * stepB;
+  const halfNegative = Math.round(minB * 0.5 / stepB) * stepB;
+  const rawBudgetPresets = [
+    { label: `+${fmtCompact(maxB)}`, value: maxB },
+    ...(halfPositive > 0 && halfPositive < maxB ? [{ label: `+${fmtCompact(halfPositive)}`, value: halfPositive }] : []),
+    { label: 'تعادل (0)', value: 0 },
+    ...(halfNegative < 0 && halfNegative > minB ? [{ label: `-${fmtCompact(Math.abs(halfNegative))}`, value: halfNegative }] : []),
+    { label: `-${fmtCompact(Math.abs(minB))}`, value: minB },
+  ];
+  const budgetPresets = rawBudgetPresets.filter((p, i, arr) => arr.findIndex(x => x.value === p.value) === i);
+
+  const halfTimeCompress = Math.round(minT * 0.5);
+  const halfTimeExtend = Math.round(maxT * 0.5);
+  const rawTimelinePresets = isCompleted ? [] : [
+    { label: `${minT} يوم (تسريع)`, value: minT },
+    ...(halfTimeCompress < 0 && halfTimeCompress > minT ? [{ label: `${halfTimeCompress} يوم`, value: halfTimeCompress }] : []),
+    { label: '0 (الأصل)', value: 0 },
+    ...(halfTimeExtend > 0 && halfTimeExtend < maxT ? [{ label: `+${halfTimeExtend} يوم`, value: halfTimeExtend }] : []),
+    { label: `+${maxT} يوم (تمديد)`, value: maxT },
+  ];
+  const timelinePresets = rawTimelinePresets.filter((p, i, arr) => arr.findIndex(x => x.value === p.value) === i);
+
+  const strategyPackages = [];
+  const bScale = budget > 0 ? budget : 1000000;
+
+  if (status === 'متأخر' || (spent > budget && budget > 0)) {
+    const rawRescue = Math.round((bScale * 0.22) / stepB) * stepB;
+    const rescueB = Math.min(maxB, Math.max(stepB, rawRescue));
+    strategyPackages.push({
+      id: 'rescue',
+      name: '🚀 خطة الإنقاذ وتدارك التأخير',
+      badgeColor: '#59c48f',
+      budgetDelta: rescueB,
+      timelineDelta: -20,
+      description: `ضخ ${fmtCompact(rescueB)} ر.س لضغط الجدول بـ 20 يوماً واستعادة مسار الإنجاز.`,
+    });
+    const containB = Math.max(minB, -Math.round((bScale * 0.12) / stepB) * stepB);
+    strategyPackages.push({
+      id: 'contain',
+      name: '⚖️ احتواء العجز وإعادة الموازنة',
+      badgeColor: '#e0705f',
+      budgetDelta: containB,
+      timelineDelta: 20,
+      description: `كبح الصرف بـ ${fmtCompact(Math.abs(containB))} ر.س مع تمديد 20 يوماً لضبط السيولة.`,
+    });
+  } else if (status === 'متوقف' || status === 'متعثر') {
+    const restartB = Math.min(maxB, Math.round((bScale * 0.25) / stepB) * stepB);
+    strategyPackages.push({
+      id: 'restart',
+      name: '🔄 فك التعثر وتحديث التعاقد',
+      badgeColor: '#d1a65c',
+      budgetDelta: restartB,
+      timelineDelta: 25,
+      description: `تخصيص ${fmtCompact(restartB)} ر.س مع مهلة 25 يوماً لإعادة تشغيل فرق المقاولات.`,
+    });
+    const rescopeB = Math.max(minB, -Math.round((bScale * 0.15) / stepB) * stepB);
+    strategyPackages.push({
+      id: 'rescope',
+      name: '✂️ تقليص النطاق (Scope Reduction)',
+      badgeColor: '#e0705f',
+      budgetDelta: rescopeB,
+      timelineDelta: 35,
+      description: `خفض النطاق يوفر ${fmtCompact(Math.abs(rescopeB))} ر.س مع ترحيل التسليم لتفادي الخسائر.`,
+    });
+  } else if (isCompleted) {
+    strategyPackages.push({
+      id: 'audit_close',
+      name: '📑 الإغلاق المالي والتدقيق النهائي',
+      badgeColor: '#59c48f',
+      budgetDelta: 0,
+      timelineDelta: 0,
+      description: 'المشروع مكتمل بنسبة 100%. اعتماد المطابقات المالية ومراجعة فترات الضمان.',
+    });
+    const surplus = budget > spent ? budget - spent : 0;
+    if (surplus > 0) {
+      strategyPackages.push({
+        id: 'reallocate',
+        name: '💸 تحرير الوفر المالي للمحفظة',
+        badgeColor: '#38bdf8',
+        budgetDelta: -surplus,
+        timelineDelta: 0,
+        description: `تحرير الفائض البالغ ${fmtCompact(surplus)} ر.س لإعادة توجيهه لدعم مشاريع أخرى.`,
+      });
+    }
+  } else {
+    const accelB = Math.min(maxB, Math.round((bScale * 0.18) / stepB) * stepB);
+    strategyPackages.push({
+      id: 'accelerate',
+      name: '⚡ التدشين المبكر ومضاعفة الوتيرة',
+      badgeColor: '#59c48f',
+      budgetDelta: accelB,
+      timelineDelta: -18,
+      description: `ضخ ${fmtCompact(accelB)} ر.س لتقديم موعد الإطلاق بـ 18 يوماً.`,
+    });
+    const qualityB = Math.min(maxB, Math.round((bScale * 0.08) / stepB) * stepB);
+    strategyPackages.push({
+      id: 'quality',
+      name: '🛡️ تعزيز الأمان والجودة والاعتمادية',
+      badgeColor: '#38bdf8',
+      budgetDelta: qualityB,
+      timelineDelta: 0,
+      description: `مخصص نوعي ${fmtCompact(qualityB)} ر.س للامتثال دون التأثير على الجدول الزمني.`,
+    });
+    const thriftB = Math.max(minB, -Math.round((bScale * 0.1) / stepB) * stepB);
+    strategyPackages.push({
+      id: 'thrift',
+      name: '💰 ترشيد الإنفاق وتحقيق وفورات',
+      badgeColor: '#d1a65c',
+      budgetDelta: thriftB,
+      timelineDelta: 14,
+      description: `توفير ${fmtCompact(Math.abs(thriftB))} ر.س مع تمديد مرن 14 يوماً.`,
+    });
+  }
+
+  return {
+    hasFinancialLevers: !isCompleted || budget > spent,
+    hasTimelineLevers: !isCompleted,
+    isCompleted,
+    componentType: isCompleted ? 'completed_audit' : 'whatif_simulator',
+    budgetRange: { min: minB, max: maxB, step: stepB, presets: budgetPresets },
+    timelineRange: { min: minT, max: maxT, step: 1, presets: timelinePresets },
+    strategyPackages,
+  };
+}
+
 let activeChart = null;
 let currentSimulationData = null;
 let availableProjects = [];
@@ -103,29 +285,17 @@ export async function renderSimulatorCockpit({
           </div>
         </div>
 
-        <!-- Strategic Decision Packages -->
+        <!-- Strategic Decision Packages (Derived Dynamically from Project & File Context) -->
         <div class="sim-card" style="margin-bottom: 20px; background: rgba(14, 34, 56, 0.85); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px;">
-          <div style="font-weight: 700; color: var(--sand); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-            <span>🎯 حزم السيناريوهات الاستراتيجية المعتمدة:</span>
-            <span style="font-size: 12px; color: var(--mute); font-weight: normal;">(تطبيق فوري لمعايير القرار التنفيذي)</span>
+          <div style="font-weight: 700; color: var(--sand); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>🎯 حزم السيناريوهات الاستراتيجية المعتمدة:</span>
+              <span style="font-size: 12px; color: var(--mute); font-weight: normal;">(مستخلصة ومصممة وفق واقع المشروع ومخاطره)</span>
+            </div>
+            <span id="simContextualBadge" style="font-size: 11px; background: #1a3a5f; color: var(--sand); padding: 2px 8px; border-radius: 4px; font-weight: 600;">مخصص للمشروع</span>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;" id="simStrategyPackages">
-            <button type="button" class="chipbtn sim-pkg-btn" data-b="300000" data-t="-25" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
-              <b style="color: #59c48f; display: block; font-size: 13px;">🚀 الإنقاذ والتسريع</b>
-              <small style="color: var(--mute); font-size: 11px;">ضخ 300K ر.س · ضغط 25 يوماً</small>
-            </button>
-            <button type="button" class="chipbtn sim-pkg-btn" data-b="-150000" data-t="20" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
-              <b style="color: #e0705f; display: block; font-size: 13px;">⚖️ ضبط الموازنة والسيولة</b>
-              <small style="color: var(--mute); font-size: 11px;">كبح 150K ر.س · تمديد 20 يوماً</small>
-            </button>
-            <button type="button" class="chipbtn sim-pkg-btn" data-b="150000" data-t="0" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
-              <b style="color: #38bdf8; display: block; font-size: 13px;">🛡️ الامتثال السيبراني والأمان</b>
-              <small style="color: var(--mute); font-size: 11px;">مخصص 150K ر.س · بدون تأخير</small>
-            </button>
-            <button type="button" class="chipbtn sim-pkg-btn" data-b="-50000" data-t="45" style="padding: 10px 14px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 8px; cursor: pointer;">
-              <b style="color: #d1a65c; display: block; font-size: 13px;">🔄 إعادة هيكلة التعاقد</b>
-              <small style="color: var(--mute); font-size: 11px;">خفض 50K ر.س · تمديد 45 يوماً</small>
-            </button>
+            <!-- Rendered dynamically by applyProjectControls -->
           </div>
         </div>
 
@@ -143,9 +313,9 @@ export async function renderSimulatorCockpit({
           </div>
         </div>
 
-        <!-- Sliders & Interactive Controls -->
+        <!-- Sliders & Interactive Controls (Boundaries Dynamically Derived) -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
-          <!-- Slider 1: Budget Delta (± 500k SAR) -->
+          <!-- Slider 1: Budget Delta -->
           <div class="sim-card" style="background: rgba(14, 34, 56, 0.85); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <span style="font-weight: 600; color: var(--ink); font-size: 15px;">ضخ / خفض الميزانية (SAR)</span>
@@ -154,22 +324,17 @@ export async function renderSimulatorCockpit({
             <input type="range" id="simBudgetSlider" min="-500000" max="500000" step="25000" value="${budgetDelta}"
                    style="width: 100%; accent-color: var(--acc); height: 8px; cursor: pointer; margin-bottom: 12px;">
             <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--mute); margin-bottom: 12px;">
-              <span>-500 ألف ر.س (تقليص)</span>
+              <span id="simMinBudgetLabel">-500 ألف ر.س (تقليص)</span>
               <span>0 (تعادل)</span>
-              <span>+500 ألف ر.س (ضخ)</span>
+              <span id="simMaxBudgetLabel">+500 ألف ر.س (ضخ)</span>
             </div>
             <!-- Quick preset chips -->
             <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="simBudgetPresets">
-              <button type="button" class="chipbtn" data-b="500000" style="padding: 4px 10px; font-size: 12px;">+500 ألف</button>
-              <button type="button" class="chipbtn" data-b="300000" style="padding: 4px 10px; font-size: 12px;">+300 ألف</button>
-              <button type="button" class="chipbtn" data-b="100000" style="padding: 4px 10px; font-size: 12px;">+100 ألف</button>
-              <button type="button" class="chipbtn" data-b="0" style="padding: 4px 10px; font-size: 12px;">تعادل (0)</button>
-              <button type="button" class="chipbtn" data-b="-100000" style="padding: 4px 10px; font-size: 12px;">-100 ألف</button>
-              <button type="button" class="chipbtn" data-b="-250000" style="padding: 4px 10px; font-size: 12px;">-250 ألف</button>
+              <!-- Rendered dynamically -->
             </div>
           </div>
 
-          <!-- Slider 2: Timeline Delta (± 60 days) -->
+          <!-- Slider 2: Timeline Delta -->
           <div class="sim-card" style="background: rgba(14, 34, 56, 0.85); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <span style="font-weight: 600; color: var(--ink); font-size: 15px;">تعديل الجدول الزمني (أيام)</span>
@@ -178,17 +343,13 @@ export async function renderSimulatorCockpit({
             <input type="range" id="simTimelineSlider" min="-60" max="60" step="1" value="${timelineDeltaDays}"
                    style="width: 100%; accent-color: var(--sand); height: 8px; cursor: pointer; margin-bottom: 12px;">
             <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--mute); margin-bottom: 12px;">
-              <span>-60 يوم (ضغط الجدول)</span>
+              <span id="simMinTimelineLabel">-60 يوم (ضغط الجدول)</span>
               <span>0 (الخطة الأصلية)</span>
-              <span>+60 يوم (تمديد/ترحيل)</span>
+              <span id="simMaxTimelineLabel">+60 يوم (تمديد/ترحيل)</span>
             </div>
             <!-- Quick preset chips -->
             <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="simTimelinePresets">
-              <button type="button" class="chipbtn" data-t="-30" style="padding: 4px 10px; font-size: 12px;">-30 يوم (تسريع)</button>
-              <button type="button" class="chipbtn" data-t="-14" style="padding: 4px 10px; font-size: 12px;">-14 يوم</button>
-              <button type="button" class="chipbtn" data-t="0" style="padding: 4px 10px; font-size: 12px;">0 (الأصل)</button>
-              <button type="button" class="chipbtn" data-t="14" style="padding: 4px 10px; font-size: 12px;">+14 يوم</button>
-              <button type="button" class="chipbtn" data-t="30" style="padding: 4px 10px; font-size: 12px;">+30 يوم</button>
+              <!-- Rendered dynamically -->
             </div>
           </div>
         </div>
@@ -602,25 +763,249 @@ export async function renderSimulatorCockpit({
     });
   }
 
+  // Dynamic Project Controls & UI Component Synchronization
+  function applyProjectControls(proj) {
+    if (!proj) return;
+    const controls = getProjectControls(proj);
+    const { budgetRange, timelineRange, strategyPackages, isCompleted } = controls;
+
+    // 1. Synchronize Budget Slider
+    if (budgetSlider && budgetRange) {
+      budgetSlider.min = budgetRange.min;
+      budgetSlider.max = budgetRange.max;
+      budgetSlider.step = budgetRange.step;
+      const curB = Number(budgetSlider.value || 0);
+      if (curB > budgetRange.max) budgetSlider.value = budgetRange.max;
+      if (curB < budgetRange.min) budgetSlider.value = budgetRange.min;
+    }
+    const minBudgetLabel = mountEl.querySelector('#simMinBudgetLabel');
+    const maxBudgetLabel = mountEl.querySelector('#simMaxBudgetLabel');
+    if (minBudgetLabel && budgetRange) {
+      minBudgetLabel.textContent = `-${fmtCompact(Math.abs(budgetRange.min))} ر.س (تقليص)`;
+    }
+    if (maxBudgetLabel && budgetRange) {
+      maxBudgetLabel.textContent = `+${fmtCompact(budgetRange.max)} ر.س (ضخ)`;
+    }
+
+    // 2. Synchronize Timeline Slider
+    if (timelineSlider && timelineRange) {
+      if (isCompleted) {
+        timelineSlider.disabled = true;
+        timelineSlider.value = 0;
+        timelineSlider.min = 0;
+        timelineSlider.max = 0;
+        timelineSlider.style.opacity = '0.35';
+      } else {
+        timelineSlider.disabled = false;
+        timelineSlider.style.opacity = '1';
+        timelineSlider.min = timelineRange.min;
+        timelineSlider.max = timelineRange.max;
+        timelineSlider.step = timelineRange.step || 1;
+        const curT = Number(timelineSlider.value || 0);
+        if (curT > timelineRange.max) timelineSlider.value = timelineRange.max;
+        if (curT < timelineRange.min) timelineSlider.value = timelineRange.min;
+      }
+    }
+    const minTimeLabel = mountEl.querySelector('#simMinTimelineLabel');
+    const maxTimeLabel = mountEl.querySelector('#simMaxTimelineLabel');
+    if (minTimeLabel && timelineRange) {
+      minTimeLabel.textContent = isCompleted ? 'مكتمل' : `${timelineRange.min} يوم (تسريع)`;
+    }
+    if (maxTimeLabel && timelineRange) {
+      maxTimeLabel.textContent = isCompleted ? 'مكتمل' : `+${timelineRange.max} يوم (تمديد)`;
+    }
+
+    // 3. Render Strategy Packages Dynamically based on file/project state
+    const pkgContainer = mountEl.querySelector('#simStrategyPackages');
+    if (pkgContainer && Array.isArray(strategyPackages)) {
+      pkgContainer.innerHTML = strategyPackages.map((pkg, idx) => `
+        <button type="button" class="sim-pkg-btn" data-b="${pkg.budgetDelta}" data-t="${pkg.timelineDelta}" data-pkg-id="${pkg.id || idx}" style="padding: 12px 16px; text-align: right; background: #0c2238; border: 1px solid #1f4268; border-radius: 10px; cursor: pointer; transition: all 0.22s ease; width: 100%; display: flex; flex-direction: column; gap: 4px; position: relative; box-shadow: 0 2px 6px rgba(0,0,0,0.25);">
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <b style="color: ${pkg.badgeColor || 'var(--sand)'}; font-size: 13.5px; font-weight: 700;">${pkg.name}</b>
+            <span class="pkg-status-tag" style="font-size: 11px; color: var(--mute); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); padding: 2px 8px; border-radius: 20px; font-weight: 600;">تطبيق ⚡</span>
+          </div>
+          <small style="color: var(--mute); font-size: 11.5px; line-height: 1.4; display: block;">${pkg.description || `${fmtSar(pkg.budgetDelta)} · ${pkg.timelineDelta} يوم`}</small>
+        </button>
+      `).join('');
+
+      const buttons = pkgContainer.querySelectorAll('.sim-pkg-btn');
+      buttons.forEach(btn => {
+        // Hover micro-interactions
+        btn.onmouseenter = () => {
+          if (!btn.classList.contains('active-pkg')) {
+            btn.style.borderColor = 'var(--acc)';
+            btn.style.background = '#102742';
+            btn.style.transform = 'translateY(-2px)';
+            btn.style.boxShadow = '0 6px 16px rgba(0,0,0,0.45)';
+          }
+        };
+        btn.onmouseleave = () => {
+          if (!btn.classList.contains('active-pkg')) {
+            btn.style.borderColor = '#1f4268';
+            btn.style.background = '#0c2238';
+            btn.style.transform = 'none';
+            btn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+          }
+        };
+
+        // Click handler: applies values, visual highlight, and dispatches events
+        btn.onclick = (e) => {
+          e.preventDefault();
+
+          // Reset all siblings
+          buttons.forEach(b => {
+            b.classList.remove('active-pkg');
+            b.style.borderColor = '#1f4268';
+            b.style.background = '#0c2238';
+            b.style.transform = 'none';
+            b.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+            const tag = b.querySelector('.pkg-status-tag');
+            if (tag) {
+              tag.textContent = 'تطبيق ⚡';
+              tag.style.background = 'rgba(255,255,255,0.06)';
+              tag.style.color = 'var(--mute)';
+              tag.style.borderColor = 'rgba(255,255,255,0.14)';
+            }
+          });
+
+          // Set active state on clicked button
+          btn.classList.add('active-pkg');
+          btn.style.borderColor = 'var(--acc)';
+          btn.style.background = 'linear-gradient(135deg, rgba(209, 166, 92, 0.24), #0c2238)';
+          btn.style.boxShadow = '0 0 18px rgba(209, 166, 92, 0.38)';
+          btn.style.transform = 'translateY(-1px)';
+          const activeTag = btn.querySelector('.pkg-status-tag');
+          if (activeTag) {
+            activeTag.textContent = '✓ مفعّل الآن';
+            activeTag.style.background = 'var(--acc)';
+            activeTag.style.color = '#081726';
+            activeTag.style.fontWeight = '700';
+            activeTag.style.borderColor = 'var(--acc)';
+          }
+
+          // Apply values to sliders and dispatch events so all listeners react
+          const bVal = Number(btn.dataset.b || 0);
+          const tVal = Number(btn.dataset.t || 0);
+
+          isApplyingPackage = true;
+          try {
+            if (budgetSlider) {
+              budgetSlider.value = bVal;
+              budgetSlider.dispatchEvent(new Event('input', { bubbles: true }));
+              budgetSlider.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (timelineSlider && !isCompleted) {
+              timelineSlider.value = tVal;
+              timelineSlider.dispatchEvent(new Event('input', { bubbles: true }));
+              timelineSlider.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          } finally {
+            isApplyingPackage = false;
+          }
+
+          triggerSimulation();
+        };
+      });
+    }
+
+    // 4. Render Budget Presets Dynamically
+    const bPresetsContainer = mountEl.querySelector('#simBudgetPresets');
+    if (bPresetsContainer && budgetRange && Array.isArray(budgetRange.presets)) {
+      bPresetsContainer.innerHTML = budgetRange.presets.map(p => `
+        <button type="button" class="chipbtn" data-b="${p.value}" style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px; border: 1px solid #1f4268;">${p.label}</button>
+      `).join('');
+
+      bPresetsContainer.querySelectorAll('button').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          if (budgetSlider) {
+            budgetSlider.value = btn.dataset.b;
+            budgetSlider.dispatchEvent(new Event('input', { bubbles: true }));
+            budgetSlider.dispatchEvent(new Event('change', { bubbles: true }));
+            triggerSimulation();
+          }
+        };
+      });
+    }
+
+    // 5. Render Timeline Presets Dynamically
+    const tPresetsContainer = mountEl.querySelector('#simTimelinePresets');
+    if (tPresetsContainer && timelineRange && Array.isArray(timelineRange.presets)) {
+      if (isCompleted) {
+        tPresetsContainer.innerHTML = `<span style="font-size: 12px; color: var(--ok); font-weight: 600;">المشروع مكتمل 100% · لا توجد تعديلات زمنية مطلوبة</span>`;
+      } else {
+        tPresetsContainer.innerHTML = timelineRange.presets.map(p => `
+          <button type="button" class="chipbtn" data-t="${p.value}" style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px; border: 1px solid #1f4268;">${p.label}</button>
+        `).join('');
+
+        tPresetsContainer.querySelectorAll('button').forEach(btn => {
+          btn.onclick = (e) => {
+            e.preventDefault();
+            if (timelineSlider && !isCompleted) {
+              timelineSlider.value = btn.dataset.t;
+              timelineSlider.dispatchEvent(new Event('input', { bubbles: true }));
+              timelineSlider.dispatchEvent(new Event('change', { bubbles: true }));
+              triggerSimulation();
+            }
+          };
+        });
+      }
+    }
+
+    // 6. Update Status Badge & Context Tag
+    const statusBadge = mountEl.querySelector('#simCurrentStatusBadge');
+    if (statusBadge) {
+      statusBadge.textContent = `الحالة: ${proj.status || 'قيد التنفيذ'} (${proj.progress || 0}%)`;
+      statusBadge.className = `tag ${proj.status || ''}`;
+    }
+  }
+
+  let isApplyingPackage = false;
+
+  // Helper to clear package selection if user moves sliders manually
+  function clearPackageActiveSelection() {
+    mountEl.querySelectorAll('.sim-pkg-btn.active-pkg').forEach(b => {
+      b.classList.remove('active-pkg');
+      b.style.borderColor = '#1f4268';
+      b.style.background = '#0c2238';
+      b.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+      b.style.transform = 'none';
+      const tag = b.querySelector('.pkg-status-tag');
+      if (tag) {
+        tag.textContent = 'تطبيق ⚡';
+        tag.style.background = 'rgba(255,255,255,0.06)';
+        tag.style.color = 'var(--mute)';
+        tag.style.borderColor = 'rgba(255,255,255,0.14)';
+      }
+    });
+  }
+
   // Event Listeners for Sliders & Project Select
   if (projectSelect) {
     projectSelect.onchange = () => {
       selectedId = Number(projectSelect.value);
+      const currProj = availableProjects.find(p => Number(p.id) === selectedId);
+      if (currProj) applyProjectControls(currProj);
       triggerSimulation();
     };
   }
 
-  if (budgetSlider) budgetSlider.oninput = triggerSimulation;
-  if (timelineSlider) timelineSlider.oninput = triggerSimulation;
-
-  // Strategy Package buttons
-  mountEl.querySelectorAll('.sim-pkg-btn').forEach(btn => {
-    btn.onclick = () => {
-      if (budgetSlider) budgetSlider.value = btn.dataset.b;
-      if (timelineSlider) timelineSlider.value = btn.dataset.t;
+  if (budgetSlider) {
+    budgetSlider.oninput = (e) => {
+      if (!isApplyingPackage && e?.isTrusted !== false) {
+        clearPackageActiveSelection();
+      }
       triggerSimulation();
     };
-  });
+  }
+  if (timelineSlider) {
+    timelineSlider.oninput = (e) => {
+      if (!isApplyingPackage && e?.isTrusted !== false) {
+        clearPackageActiveSelection();
+      }
+      triggerSimulation();
+    };
+  }
 
   // Custom AI Scenario query
   const customQueryInput = mountEl.querySelector('#simCustomQuery');
@@ -640,31 +1025,19 @@ export async function renderSimulatorCockpit({
     };
   }
 
-  // Preset buttons
-  mountEl.querySelectorAll('#simBudgetPresets button').forEach(btn => {
-    btn.onclick = () => {
-      if (budgetSlider) {
-        budgetSlider.value = btn.dataset.b;
-        triggerSimulation();
-      }
-    };
-  });
-
-  mountEl.querySelectorAll('#simTimelinePresets button').forEach(btn => {
-    btn.onclick = () => {
-      if (timelineSlider) {
-        timelineSlider.value = btn.dataset.t;
-        triggerSimulation();
-      }
-    };
-  });
-
   if (resetBtn) {
     resetBtn.onclick = () => {
+      clearPackageActiveSelection();
       if (budgetSlider) budgetSlider.value = 0;
       if (timelineSlider) timelineSlider.value = 0;
       triggerSimulation();
     };
+  }
+
+  // Initial synchronization for active project
+  const initialProj = availableProjects.find(p => Number(p.id) === selectedId) || availableProjects[0];
+  if (initialProj) {
+    applyProjectControls(initialProj);
   }
 
   // Action Button: "اعتماد التعديل في الخطة"
@@ -740,11 +1113,13 @@ export async function renderSimulatorCockpit({
 
 /**
  * Open the simulator cockpit from anywhere in the application
+ * Supports passing a project ID, document ID, or options object
  */
-export async function openSimulatorCockpit(projectId = null) {
+export async function openSimulatorCockpit(arg = null) {
   const mountEl = document.querySelector('#view');
   if (!mountEl) return;
-  await renderSimulatorCockpit({ mountEl, projectId });
+  const opts = typeof arg === 'object' && arg !== null && !Array.isArray(arg) ? arg : { projectId: arg };
+  await renderSimulatorCockpit({ mountEl, ...opts });
 }
 
 // Global exposure for chat/voice and external modules
