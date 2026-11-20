@@ -5,7 +5,7 @@ import { chatStart, chatAppend, chatTurns, chatRecentTurns, chatSessions, chatPe
 import { memoryTools, embed, cos, CATEGORIES } from './memory.js';
 
 let ai;
-const MODELS = [process.env.DIGEST_MODEL, 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'].filter(Boolean);
+const MODELS = [process.env.DIGEST_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean);
 let goodModel = null;
 export function initHistory(client) { ai = client; setTimeout(digestPending, 5000); }
 

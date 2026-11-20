@@ -192,7 +192,7 @@ export function synthesizeMock({ fileName = '', mimeType = '', text = '', tables
  * Gemini Flash synthesis with structured schema.
  */
 async function synthesizeWithGemini({ buffer, fileName, mimeType, text, tables }) {
-  const model = process.env.AUTO_DK_MODEL || 'gemini-2.5-flash';
+  const model = process.env.AUTO_DK_MODEL || 'gemini-3.8-flash';
   const tableSummary = tables.length
     ? `الجداول المستخرجة (${tables.length} جدول):\n` +
       tables.map(t => `[${t.sheet}]: ${t.columns.join(' | ')} (${t.rows.length} صف)`).join('\n')
