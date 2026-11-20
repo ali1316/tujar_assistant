@@ -118,7 +118,7 @@ ${userText}`;
 
     let reply = '';
     try {
-      const r = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const r = await ai.models.generateContent({ model: 'gemini-3.8-flash', contents: prompt });
       reply = r.text || r.output_text || '';
     } catch (llmErr) {
       console.warn('[chat/message] AI generateContent fallback:', llmErr.message);

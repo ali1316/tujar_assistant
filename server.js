@@ -49,13 +49,19 @@ app.use(driveRouter);
 // 4) تهيئة الخدمات وتشغيل السيرفر
 let server;
 export async function startServer(port = PORT) {
-  const info = await bootstrap();
+  const host = '0.0.0.0';
   return new Promise((resolve) => {
-    server = app.listen(port, () => {
-      console.log(
-        `✅ http://localhost:${port}  (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${info.backend}, designer: ${info.designer}, agent: ${JSON.stringify(info.agent)})`
-      );
-      resolve(server);
+    server = app.listen(port, host, () => {
+      console.log(`✅ Server listening on http://${host}:${port}`);
+      bootstrap().then(info => {
+        console.log(
+          `✅ App ready on http://${host}:${port} (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${info.backend}, designer: ${info.designer}, agent: ${JSON.stringify(info.agent)})`
+        );
+        resolve(server);
+      }).catch(err => {
+        console.warn('Bootstrap warning:', err.message);
+        resolve(server);
+      });
     });
   });
 }

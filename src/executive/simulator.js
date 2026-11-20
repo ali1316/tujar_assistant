@@ -510,7 +510,7 @@ ${scenarioQuery ? `- استفسار أو سيناريو مخصص من القيا
   ]
 }`;
 
-      const aiCall = ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const aiCall = ai.models.generateContent({ model: 'gemini-3.8-flash', contents: prompt });
       const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3500));
       const res = await Promise.race([aiCall, timeout]);
 

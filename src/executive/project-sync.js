@@ -184,7 +184,7 @@ export async function syncProjectsFromDocument({ text, fileName, docId }) {
 نص التقرير:
 ${String(text || '').slice(0, 6000)}`;
 
-      const aiCall = ai.models.generateContent({ model: 'gemini-2.5-flash', contents: aiPrompt });
+      const aiCall = ai.models.generateContent({ model: 'gemini-3.8-flash', contents: aiPrompt });
       const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 3500));
       const res = await Promise.race([aiCall, timeoutPromise]);
       if (res?.text) {
