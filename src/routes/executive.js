@@ -52,6 +52,10 @@ executiveRouter.post('/api/executive/briefing/session/reset', async (req, res) =
 // GET /api/executive/briefing/audio - Streams live audio for the morning briefing
 executiveRouter.get('/api/executive/briefing/audio', async (req, res) => {
   try {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key || key.startsWith('freellmapi-')) {
+      return res.status(503).json({ ok: false, fallback: 'speechSynthesis', error: 'توليد الصوت السحابي يتطلب مفتاح Gemini' });
+    }
     const briefing = await generateExecutiveBriefing(req.query);
     const mockReq = {
       body: {
@@ -60,7 +64,7 @@ executiveRouter.get('/api/executive/briefing/audio', async (req, res) => {
       },
     };
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Audio synthesis timeout')), 3000)
+      setTimeout(() => reject(new Error('Audio synthesis timeout')), 8000)
     );
     await Promise.race([handleSpeak(mockReq, res), timeout]);
   } catch (err) {

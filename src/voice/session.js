@@ -18,8 +18,9 @@ import { promptFor, buildSetup, screenBlock } from './prompt.js';
 
 // توكن مؤقت لجلسة Gemini Live: يدعم GET و POST مع التوافق الكامل
 export async function handleSession(req, res) {
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY غير مضبوط' });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.startsWith('freellmapi-')) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY غير مضبوط أو غير صالح (مفتاح Google Gemini الرسمي مطلوب)' });
   }
 
   const queryOrBody = { ...req.query, ...req.body };

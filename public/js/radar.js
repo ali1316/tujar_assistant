@@ -127,12 +127,12 @@ function injectRadarStyles() {
       width: min(520px, 94vw);
       background: var(--bg, #081726);
       border-inline-end: 1px solid var(--line, #1d3a5a);
-      box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5);
+      box-shadow: none;
       z-index: 1001;
       display: flex;
       flex-direction: column;
-      transform: translateX(-100%);
-      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s;
+      transform: translateX(-110%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.35s, box-shadow 0.35s;
       visibility: hidden;
       direction: rtl;
       font-family: inherit;
@@ -140,6 +140,13 @@ function injectRadarStyles() {
     .radar-drawer.open {
       transform: translateX(0);
       visibility: visible;
+      box-shadow: 10px 0 40px rgba(0, 0, 0, 0.5);
+    }
+    .radar-drawer[hidden],
+    .radar-backdrop[hidden] {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
     }
 
     /* رأس الدرج */
