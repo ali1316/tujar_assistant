@@ -560,10 +560,7 @@ export async function seedAllProjectDashboards() {
   try {
     // 1. التأكد من وجود عمود dashboard_id في جدول projects
     try {
-      const pCols = await db.prepare('PRAGMA table_info(projects)').all();
-      if (!pCols.some(c => c.name === 'dashboard_id')) {
-        await db.prepare('ALTER TABLE projects ADD COLUMN dashboard_id INTEGER').run();
-      }
+      await db.run('ALTER TABLE projects ADD COLUMN dashboard_id INTEGER');
     } catch {}
 
     const list = await dashList();

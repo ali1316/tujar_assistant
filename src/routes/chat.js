@@ -155,6 +155,17 @@ router.post('/api/chat/:id/turns', async (req, res) => {
   }
 });
 
+// استرجاع آخر أدوار المحادثة للواجهة
+router.get('/api/chat/recent', async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(+req.query?.limit || 16, 1), 100);
+    const turns = await recentForUI(limit);
+    res.json({ ok: true, turns: turns || [] });
+  } catch (err) {
+    res.json({ ok: false, turns: [] });
+  }
+});
+
 // قائمة المحادثات لـ UI
 router.get('/api/chats', async (req, res) => {
   try {

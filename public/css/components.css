@@ -572,6 +572,9 @@ body.blank .ic.mic {
 
 #drawer[hidden] {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* عندما يكون السجل مفتوحاً: يلتصق شريط المحادثة أسفل السجل مباشرة لتكوين عمود جانبي موحد ومتناسق */

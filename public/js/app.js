@@ -70,6 +70,9 @@ export async function loadDashboard(flash) {
           }
           if (dashId) {
             await showDash(dashId, name, 'مشروع رقم #' + projId, true, true);
+          } else {
+            openDashboardDirect();
+            setStatus(`📊 جاري استعراض مؤشرات: ${name}`);
           }
         });
       }
@@ -610,7 +613,7 @@ $('#f')?.addEventListener('submit', async e => {
     return;
   }
 
-  // REST Chat fallback via FreeLLMAPI / Gemini
+  // REST Chat fallback via Gemini
   const log = $('#log');
   if (log) {
     log.append(buildUserCard(t));
@@ -671,7 +674,14 @@ window.openDashboardDirect = openDashboardDirect;
 // Quick Action Buttons
 $$('.qa-btn').forEach(b => {
   b.onclick = () => {
-    if (b.dataset.act === 'file') return $('#file')?.click();
+    if (b.dataset.act === 'file') {
+      const fi = $('#file');
+      if (fi) {
+        setStatus('📁 يرجى اختيار ملف من جهازك للتحليل');
+        fi.click();
+      }
+      return;
+    }
     if (b.dataset.act === 'simulator') {
       if (window.openSimulatorCockpit) window.openSimulatorCockpit();
       return;

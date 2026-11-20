@@ -87,6 +87,7 @@ function getSqlite() {
     sqliteDb = new Database(process.env.DB_PATH || 'demo.db');
     try { sqliteDb.pragma('journal_mode = WAL'); } catch {}
     sqliteDb.exec(SQLITE_SCHEMA);
+    try { sqliteDb.exec('ALTER TABLE projects ADD COLUMN dashboard_id INTEGER'); } catch {}
     const count = sqliteDb.prepare('SELECT COUNT(*) c FROM projects').get()?.c || 0;
     if (count === 0) {
       const p = sqliteDb.prepare(`INSERT INTO projects (name, department, status, progress, budget, spent, owner, due_date, start_date)
@@ -117,6 +118,9 @@ export async function initDb() {
 
       await pool.query('SELECT 1');
       await pool.query(PG_SCHEMA);
+      try {
+        await pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS dashboard_id INTEGER');
+      } catch {}
 
       const res = await pool.query('SELECT COUNT(*) c FROM projects');
       const count = Number(res.rows[0]?.c || 0);

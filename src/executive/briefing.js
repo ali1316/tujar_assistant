@@ -359,7 +359,8 @@ export function synthesizeExecutiveText({ metrics, projects, tickets, recentDocs
  * @returns {Promise<string|null>}
  */
 export async function synthesizeWithGemini({ metrics, projects, tickets, recentDocs, delta }) {
-  if (!process.env.GEMINI_API_KEY && !process.env.FREELLMAPI_API_KEY) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || key.startsWith('freellmapi-')) {
     return null;
   }
   try {

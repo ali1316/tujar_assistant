@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS projects (
   spent BIGINT NOT NULL DEFAULT 0,
   owner TEXT NOT NULL,
   due_date TEXT NOT NULL,
-  start_date TEXT
+  start_date TEXT,
+  dashboard_id INTEGER
 );
 
 -- 2. Tickets
@@ -269,7 +270,8 @@ CREATE TABLE IF NOT EXISTS projects (
   spent INTEGER NOT NULL,
   owner TEXT NOT NULL,
   due_date TEXT NOT NULL,
-  start_date TEXT
+  start_date TEXT,
+  dashboard_id INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS tickets (

@@ -29,12 +29,18 @@ router.delete('/api/memories/:id', async (req, res) => res.json({ ok: !!(await m
 // كتالوج الداشبوردات المتاحة لجميع المشاريع والمحافظ والملفات
 router.get('/api/dashboards/catalog', async (req, res) => {
   try {
-    await seedAllProjectDashboards();
-    const projects = await db.prepare('SELECT id, name, department, status, progress, budget, spent, dashboard_id FROM projects ORDER BY id ASC').all();
-    const list = await dashList();
-    const validDashes = list.filter(d => d.title && d.title !== 'test dashboard');
+    await seedAllProjectDashboards().catch(err => console.warn('[catalog] seed warning:', err.message));
+    let projects = [];
+    try {
+      projects = await db.prepare('SELECT id, name, department, status, progress, budget, spent, dashboard_id FROM projects ORDER BY id ASC').all();
+    } catch {
+      const basic = await db.prepare('SELECT id, name, department, status, progress, budget, spent FROM projects ORDER BY id ASC').all();
+      projects = (basic || []).map(p => ({ ...p, dashboard_id: null }));
+    }
+    const list = await dashList().catch(() => []);
+    const validDashes = (list || []).filter(d => d.title && d.title !== 'test dashboard');
 
-    const projectDashes = projects.map(p => ({
+    const projectDashes = (projects || []).map(p => ({
       projectId: p.id,
       name: p.name,
       status: p.status,
@@ -61,7 +67,7 @@ router.get('/api/dashboards/catalog', async (req, res) => {
     });
   } catch (err) {
     console.error('[dashboards/catalog] error:', err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    res.json({ ok: false, projects: [], portfolios: [], files: [], error: err.message });
   }
 });
 
