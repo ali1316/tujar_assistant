@@ -16,6 +16,14 @@ import { driveRouter } from './src/routes/drive.js';
 import { bootstrap, shutdown } from './src/bootstrap.js';
 
 export const app = express();
+
+// Health check routes first — immediate 200 OK for Docker / ECS / ALB / SnapDeploy
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.head('/health', (req, res) => res.status(200).end());
+app.get('/healthz', (req, res) => res.status(200).send('OK'));
+app.get('/ping', (req, res) => res.status(200).send('OK'));
+app.get('/api/health', (req, res) => res.status(200).json({ status: 'ok' }));
+
 app.use(express.json({ limit: '1mb' }));
 
 // تمكين CORS لدعم نشر الواجهة منفصلة (مثل Vercel أو Netlify)
@@ -50,18 +58,18 @@ app.use(driveRouter);
 let server;
 export async function startServer(port = PORT) {
   const host = '0.0.0.0';
+  const numericPort = Number(port) || 3000;
   return new Promise((resolve) => {
-    server = app.listen(port, host, () => {
-      console.log(`✅ Server listening on http://${host}:${port}`);
+    server = app.listen(numericPort, host, () => {
+      console.log(`✅ Server listening on http://${host}:${numericPort}`);
       bootstrap().then(info => {
         console.log(
-          `✅ App ready on http://${host}:${port} (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${info.backend}, designer: ${info.designer}, agent: ${JSON.stringify(info.agent)})`
+          `✅ App ready on http://${host}:${numericPort} (model: ${MODEL}, api: ${API_VERSION}, code: ${ACCESS_CODE ? 'on' : 'off'}, store: ${info.backend}, designer: ${info.designer}, agent: ${JSON.stringify(info.agent)})`
         );
-        resolve(server);
       }).catch(err => {
         console.warn('Bootstrap warning:', err.message);
-        resolve(server);
       });
+      resolve(server);
     });
   });
 }
