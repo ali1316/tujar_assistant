@@ -53,6 +53,10 @@ export async function handleSession(req, res) {
         model: MODEL,
         config: {
           responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+            languageCode: 'ar-SA',
+          },
           ...(/extended-thinking/.test(MODEL)
             ? { thinkingConfig: { thinkingLevel: process.env.THINKING_LEVEL || 'medium' } }
             : {}),
